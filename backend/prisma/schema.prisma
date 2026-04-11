@@ -188,7 +188,9 @@ model Frame {
   sellingPrice  Float
   stockQty      Int        @default(0)
   lowStockAlert Int        @default(5)
-  barcode       String?
+  barcode       String     @unique
+  sku           String     @unique
+  modelCode     String?
   imageUrl      String?
   isActive      Boolean    @default(true)
   supplierId    String?
@@ -214,6 +216,9 @@ model Lens {
   lensIndex     String    @default("1.56")
   coating       String[]
   brand         String?
+  barcode       String    @unique
+  sku           String    @unique
+  modelCode     String?
   purchasePrice Float     @default(0)
   sellingPrice  Float
   stockQty      Int       @default(100)
@@ -241,7 +246,9 @@ model Accessory {
   sellingPrice  Float
   stockQty      Int     @default(0)
   lowStockAlert Int     @default(5)
-  barcode       String?
+  barcode       String  @unique
+  sku           String  @unique
+  modelCode     String?
   isActive      Boolean @default(true)
 
   createdAt DateTime @default(now())

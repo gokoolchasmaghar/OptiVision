@@ -4,6 +4,23 @@ const { authenticate, requireAdmin } = require('../middleware/auth');
 
 router.use(authenticate);
 
+const generateEAN13 = () => {
+  const base = Math.floor(100000000000 + Math.random() * 900000000000).toString();
+  const digits = base.split('').map(Number);
+  let sum = 0;
+
+  digits.forEach((num, i) => {
+    sum += i % 2 === 0 ? num : num * 3;
+  });
+
+  const checkDigit = (10 - (sum % 10)) % 10;
+  return base + checkDigit;
+};
+
+const generateSKU = () => {
+  return `SKU-${Date.now()}`;
+};
+
 router.get('/', async (req, res, next) => {
   try {
     const { search, brand, shape, color, gender, lowStock, page = 1, limit = 20, minPrice, maxPrice } = req.query;
@@ -52,11 +69,11 @@ router.get('/:id', async (req, res, next) => {
 
 router.post('/', async (req, res, next) => {
   try {
-    const { brand, model, shape, size, color, material, gender, purchasePrice, sellingPrice, stockQty, lowStockAlert, barcode, imageUrl, supplierId, frameCode } = req.body;
+    const { brand, model, shape, size, color, material, gender, purchasePrice, sellingPrice, stockQty, lowStockAlert, barcode, imageUrl, supplierId, frameCode, modelCode } = req.body;
     if (!brand || !sellingPrice) return res.status(400).json({ success: false, message: 'brand and sellingPrice required' });
     const code = frameCode || `FRM-${Date.now()}`;
     const frame = await prisma.frame.create({
-      data: { storeId: req.storeId, frameCode: code, brand, model, shape: shape || 'RECTANGLE', size, color, material, gender, purchasePrice: Number(purchasePrice) || 0, sellingPrice: Number(sellingPrice), stockQty: Number(stockQty) || 0, lowStockAlert: Number(lowStockAlert) || 5, barcode, imageUrl, supplierId }
+      data: { storeId: req.storeId, frameCode: frameCode || `FRM-${Date.now()}`, modelCode: modelCode || `MDL-${Date.now()}`, brand, model, shape: shape || 'RECTANGLE', size, color, material, gender, purchasePrice: Number(purchasePrice) || 0, sellingPrice: Number(sellingPrice), stockQty: Number(stockQty) || 0, lowStockAlert: Number(lowStockAlert) || 5,  barcode: barcode || generateEAN13(), sku: generateSKU(), imageUrl, supplierId }
     });
     if (Number(stockQty) > 0) {
       await prisma.stockMovement.create({ data: { storeId: req.storeId, frameId: frame.id, type: 'IN', quantity: Number(stockQty), beforeQty: 0, afterQty: Number(stockQty), reason: 'Initial stock' } });

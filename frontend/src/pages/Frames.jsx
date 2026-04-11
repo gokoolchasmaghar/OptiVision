@@ -1,11 +1,13 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { Plus, Grid, List, Package, Filter } from 'lucide-react';
 import api from '../services/api';
 import { Modal, PageHeader, SearchInput, StatusBadge, Spinner, Empty, Badge } from '../components/ui';
 import toast from 'react-hot-toast';
+import Label from '../components/Label';
+import { Html5Qrcode } from "html5-qrcode";
 
-const SHAPES = ['ROUND','OVAL','RECTANGLE','SQUARE','CAT_EYE','AVIATOR','WAYFARER','GEOMETRIC','RIMLESS','SEMI_RIMLESS'];
-const fmt = n => `₹${Number(n||0).toLocaleString('en-IN')}`;
+const SHAPES = ['ROUND', 'OVAL', 'RECTANGLE', 'SQUARE', 'CAT_EYE', 'AVIATOR', 'WAYFARER', 'GEOMETRIC', 'RIMLESS', 'SEMI_RIMLESS'];
+const fmt = n => `₹${Number(n || 0).toLocaleString('en-IN')}`;
 
 function StockBadge({ qty, alert }) {
   if (qty === 0) return <span className="badge-red badge">Out of Stock</span>;
@@ -18,12 +20,62 @@ export default function Frames() {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [brands, setBrands] = useState([]);
-  const [filters, setFilters] = useState({ brand:'', shape:'' });
+  const [filters, setFilters] = useState({ brand: '', shape: '' });
   const [view, setView] = useState('grid');
   const [modal, setModal] = useState(false);
   const [editFrame, setEditFrame] = useState(null);
-  const [form, setForm] = useState({ brand:'', model:'', shape:'RECTANGLE', size:'', color:'', material:'', gender:'', purchasePrice:'', sellingPrice:'', stockQty:'', lowStockAlert:'5', barcode:'' });
+  const [form, setForm] = useState({ brand: '', model: '', shape: 'RECTANGLE', size: '', color: '', material: '', gender: '', purchasePrice: '', sellingPrice: '', stockQty: '', lowStockAlert: '5', barcode: '' });
   const [saving, setSaving] = useState(false);
+  const [selectedFrame, setSelectedFrame] = useState(null);
+  const [scanning, setScanning] = useState(false);
+  const scannerRef = useRef(null);
+
+  const stopScanner = () => {
+    if (scannerRef.current) {
+      scannerRef.current.stop().then(() => {
+        setScanning(false);
+        document.getElementById("reader").style.display = "none";
+      }).catch(() => {}); // ignore errors
+    }
+  };
+
+  const toggleScanner = () => {
+    if (scanning) {
+      stopScanner();
+    } else {
+      const scanner = new Html5Qrcode("reader");
+      scannerRef.current = scanner;
+
+      const tryStartScanner = (constraints) => {
+        scanner.start(
+          constraints,
+          { fps: 10, qrbox: 250 },
+          (decodedText) => {
+            setForm(f => ({ ...f, barcode: decodedText }));
+            toast.success('Barcode scanned successfully!');
+            stopScanner();
+          },
+          (error) => {
+            // ignore scan errors
+          }
+        ).then(() => {
+          setScanning(true);
+          document.getElementById("reader").style.display = "block";
+        }).catch((err) => {
+          // Try next constraint if available
+          if (constraints.facingMode === "environment") {
+            tryStartScanner({ facingMode: "user" });
+          } else if (constraints.facingMode === "user") {
+            tryStartScanner({});
+          } else {
+            toast.error('Failed to start camera: ' + err);
+          }
+        });
+      };
+
+      tryStartScanner({ facingMode: "environment" });
+    }
+  };
 
   const load = async (q = '', f = {}) => {
     setLoading(true);
@@ -38,8 +90,8 @@ export default function Frames() {
   useEffect(() => { load(); }, []);
   useEffect(() => { const t = setTimeout(() => load(search, filters), 350); return () => clearTimeout(t); }, [search, filters]);
 
-  const openAdd = () => { setEditFrame(null); setForm({ brand:'', model:'', shape:'RECTANGLE', size:'', color:'', material:'', gender:'', purchasePrice:'', sellingPrice:'', stockQty:'', lowStockAlert:'5', barcode:'' }); setModal(true); };
-  const openEdit = f => { setEditFrame(f); setForm({ brand:f.brand, model:f.model||'', shape:f.shape, size:f.size||'', color:f.color||'', material:f.material||'', gender:f.gender||'', purchasePrice:f.purchasePrice, sellingPrice:f.sellingPrice, stockQty:f.stockQty, lowStockAlert:f.lowStockAlert, barcode:f.barcode||'' }); setModal(true); };
+  const openAdd = () => { setEditFrame(null); setForm({ brand: '', model: '', shape: 'RECTANGLE', size: '', color: '', material: '', gender: '', purchasePrice: '', sellingPrice: '', stockQty: '', lowStockAlert: '5', barcode: '' }); setModal(true); };
+  const openEdit = f => { setEditFrame(f); setForm({ brand: f.brand, model: f.model || '', shape: f.shape, size: f.size || '', color: f.color || '', material: f.material || '', gender: f.gender || '', purchasePrice: f.purchasePrice, sellingPrice: f.sellingPrice, stockQty: f.stockQty, lowStockAlert: f.lowStockAlert, barcode: f.barcode || '' }); setModal(true); };
 
   const save = async () => {
     if (!form.brand || !form.sellingPrice) return toast.error('Brand and selling price required');
@@ -66,29 +118,29 @@ export default function Frames() {
   return (
     <div>
       <PageHeader title="Frames" subtitle={`${frames.length} items`}
-        action={<button className="btn-primary btn-md" onClick={openAdd}><Plus size={15}/> Add Frame</button>}/>
+        action={<button className="btn-primary btn-md" onClick={openAdd}><Plus size={15} /> Add Frame</button>} />
 
       {/* Filters */}
       <div className="flex gap-3 mb-5 flex-wrap items-center">
-        <SearchInput value={search} onChange={setSearch} placeholder="Search brand, model, barcode…" className="flex-1 min-w-48 max-w-72"/>
-        <select className="field-select w-40" value={filters.brand} onChange={e => setFilters(f => ({...f, brand: e.target.value}))}>
+        <SearchInput value={search} onChange={setSearch} placeholder="Search brand, model, barcode…" className="flex-1 min-w-48 max-w-72" />
+        <select className="field-select w-40" value={filters.brand} onChange={e => setFilters(f => ({ ...f, brand: e.target.value }))}>
           <option value="">All Brands</option>
           {brands.map(b => <option key={b}>{b}</option>)}
         </select>
-        <select className="field-select w-44" value={filters.shape} onChange={e => setFilters(f => ({...f, shape: e.target.value}))}>
+        <select className="field-select w-44" value={filters.shape} onChange={e => setFilters(f => ({ ...f, shape: e.target.value }))}>
           <option value="">All Shapes</option>
-          {SHAPES.map(s => <option key={s}>{s.replace('_',' ')}</option>)}
+          {SHAPES.map(s => <option key={s}>{s.replace('_', ' ')}</option>)}
         </select>
         <div className="flex rounded-xl border border-slate-200 overflow-hidden">
-          <button onClick={() => setView('grid')} className={`p-2 ${view==='grid'?'bg-primary-600 text-white':'bg-white text-slate-500 hover:bg-slate-50'}`}><Grid size={15}/></button>
-          <button onClick={() => setView('list')} className={`p-2 ${view==='list'?'bg-primary-600 text-white':'bg-white text-slate-500 hover:bg-slate-50'}`}><List size={15}/></button>
+          <button onClick={() => setView('grid')} className={`p-2 ${view === 'grid' ? 'bg-primary-600 text-white' : 'bg-white text-slate-500 hover:bg-slate-50'}`}><Grid size={15} /></button>
+          <button onClick={() => setView('list')} className={`p-2 ${view === 'list' ? 'bg-primary-600 text-white' : 'bg-white text-slate-500 hover:bg-slate-50'}`}><List size={15} /></button>
         </div>
       </div>
 
       {loading ? (
-        <div className="flex justify-center py-16"><Spinner size={28}/></div>
+        <div className="flex justify-center py-16"><Spinner size={28} /></div>
       ) : frames.length === 0 ? (
-        <div className="card"><Empty icon="👓" title="No frames found"/></div>
+        <div className="card"><Empty icon="👓" title="No frames found" /></div>
       ) : view === 'grid' ? (
         <div className="grid sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
           {frames.map(f => (
@@ -107,12 +159,20 @@ export default function Frames() {
                     <div className="font-bold text-slate-900 text-sm">{f.brand}</div>
                     <div className="text-xs text-slate-500">{f.model || f.frameCode}</div>
                   </div>
-                  <span className="badge-gray badge text-xs flex-shrink-0">{f.shape?.replace('_',' ')}</span>
+                  <span className="badge-gray badge text-xs flex-shrink-0">{f.shape?.replace('_', ' ')}</span>
                 </div>
                 {f.color && <div className="text-xs text-slate-500 mb-2">🎨 {f.color}{f.size ? ` · ${f.size}` : ''}</div>}
                 <div className="flex items-center justify-between mt-2">
                   <span className="font-bold text-slate-900">{fmt(f.sellingPrice)}</span>
-                  <StockBadge qty={f.stockQty} alert={f.lowStockAlert}/>
+                  <div className="mt-3 flex gap-2">
+                    <button
+                      onClick={() => setSelectedFrame(f)}
+                      className="btn-secondary btn-xs w-full"
+                    >
+                      Print Label
+                    </button>
+                  </div>
+                  <StockBadge qty={f.stockQty} alert={f.lowStockAlert} />
                 </div>
               </div>
             </div>
@@ -127,11 +187,11 @@ export default function Frames() {
                 <tr key={f.id}>
                   <td className="font-mono text-xs text-slate-400">{f.frameCode}</td>
                   <td><div className="font-semibold text-slate-800">{f.brand}</div><div className="text-xs text-slate-400">{f.model}</div></td>
-                  <td className="text-xs">{f.shape?.replace('_',' ')}</td>
+                  <td className="text-xs">{f.shape?.replace('_', ' ')}</td>
                   <td className="text-xs">{f.color}</td>
                   <td className="text-slate-500 text-xs">{fmt(f.purchasePrice)}</td>
                   <td className="font-semibold">{fmt(f.sellingPrice)}</td>
-                  <td><StockBadge qty={f.stockQty} alert={f.lowStockAlert}/></td>
+                  <td><StockBadge qty={f.stockQty} alert={f.lowStockAlert} /></td>
                   <td>
                     <div className="flex gap-2">
                       <button onClick={() => openEdit(f)} className="btn-ghost btn-xs">Edit</button>
@@ -145,24 +205,65 @@ export default function Frames() {
         </div>
       )}
 
-      <Modal open={modal} onClose={() => setModal(false)} title={editFrame ? 'Edit Frame' : 'Add Frame'} size="lg"
+      <Modal open={modal} onClose={() => { if (scanning) stopScanner(); setModal(false); }} title={editFrame ? 'Edit Frame' : 'Add Frame'} size="lg"
         footer={<>
           <button className="btn-secondary btn-md" onClick={() => setModal(false)}>Cancel</button>
           <button className="btn-primary btn-md" onClick={save} disabled={saving}>{saving ? 'Saving…' : editFrame ? 'Update' : 'Add Frame'}</button>
         </>}>
         <div className="grid grid-cols-2 gap-4">
-          <div><label className="field-label">Brand *</label><input className="field-input" value={form.brand} onChange={e => setForm(f => ({...f, brand: e.target.value}))} placeholder="Titan, Ray-Ban…"/></div>
-          <div><label className="field-label">Model</label><input className="field-input" value={form.model} onChange={e => setForm(f => ({...f, model: e.target.value}))} placeholder="Octane"/></div>
-          <div><label className="field-label">Shape</label><select className="field-select" value={form.shape} onChange={e => setForm(f => ({...f, shape: e.target.value}))}>{SHAPES.map(s => <option key={s} value={s}>{s.replace('_',' ')}</option>)}</select></div>
-          <div><label className="field-label">Size</label><input className="field-input" value={form.size} onChange={e => setForm(f => ({...f, size: e.target.value}))} placeholder="Small / Medium / Large"/></div>
-          <div><label className="field-label">Color</label><input className="field-input" value={form.color} onChange={e => setForm(f => ({...f, color: e.target.value}))} placeholder="Black, Gold…"/></div>
-          <div><label className="field-label">Material</label><input className="field-input" value={form.material} onChange={e => setForm(f => ({...f, material: e.target.value}))} placeholder="Metal, Acetate…"/></div>
-          <div><label className="field-label">Gender</label><select className="field-select" value={form.gender} onChange={e => setForm(f => ({...f, gender: e.target.value}))}><option value="">Unisex</option><option value="Male">Male</option><option value="Female">Female</option></select></div>
-          <div><label className="field-label">Barcode</label><input className="field-input" value={form.barcode} onChange={e => setForm(f => ({...f, barcode: e.target.value}))} placeholder="Scan or type"/></div>
-          <div><label className="field-label">Purchase Price ₹</label><input className="field-input" type="number" value={form.purchasePrice} onChange={e => setForm(f => ({...f, purchasePrice: e.target.value}))} placeholder="800"/></div>
-          <div><label className="field-label">Selling Price ₹ *</label><input className="field-input" type="number" value={form.sellingPrice} onChange={e => setForm(f => ({...f, sellingPrice: e.target.value}))} placeholder="1999"/></div>
-          <div><label className="field-label">Stock Qty</label><input className="field-input" type="number" value={form.stockQty} onChange={e => setForm(f => ({...f, stockQty: e.target.value}))} placeholder="10"/></div>
-          <div><label className="field-label">Low Stock Alert</label><input className="field-input" type="number" value={form.lowStockAlert} onChange={e => setForm(f => ({...f, lowStockAlert: e.target.value}))} placeholder="5"/></div>
+          <div><label className="field-label">Brand *</label><input className="field-input" value={form.brand} onChange={e => setForm(f => ({ ...f, brand: e.target.value }))} placeholder="Titan, Ray-Ban…" /></div>
+          <div><label className="field-label">Model</label><input className="field-input" value={form.model} onChange={e => setForm(f => ({ ...f, model: e.target.value }))} placeholder="Octane" /></div>
+          <div><label className="field-label">Shape</label><select className="field-select" value={form.shape} onChange={e => setForm(f => ({ ...f, shape: e.target.value }))}>{SHAPES.map(s => <option key={s} value={s}>{s.replace('_', ' ')}</option>)}</select></div>
+          <div><label className="field-label">Size</label><input className="field-input" value={form.size} onChange={e => setForm(f => ({ ...f, size: e.target.value }))} placeholder="Small / Medium / Large" /></div>
+          <div><label className="field-label">Color</label><input className="field-input" value={form.color} onChange={e => setForm(f => ({ ...f, color: e.target.value }))} placeholder="Black, Gold…" /></div>
+          <div><label className="field-label">Material</label><input className="field-input" value={form.material} onChange={e => setForm(f => ({ ...f, material: e.target.value }))} placeholder="Metal, Acetate…" /></div>
+          <div><label className="field-label">Gender</label><select className="field-select" value={form.gender} onChange={e => setForm(f => ({ ...f, gender: e.target.value }))}><option value="">Unisex</option><option value="Male">Male</option><option value="Female">Female</option></select></div>
+          <div>
+            <label className="field-label">Barcode</label>
+
+            <div className="flex gap-2">
+              <input
+                className="field-input flex-1"
+                value={form.barcode}
+                onChange={e => setForm(f => ({ ...f, barcode: e.target.value }))}
+                placeholder="Scan or type"
+              />
+
+              <button
+                type="button"
+                onClick={toggleScanner}
+                className="btn-secondary btn-sm"
+              >
+                {scanning ? "Stop Scan" : "📷"}
+              </button>
+            </div>
+
+            {/* Scanner container */}
+            {scanning && (
+              <div className="text-sm text-blue-600 font-medium mt-2 flex items-center gap-2">
+                <div className="w-2 h-2 bg-blue-500 rounded-full animate-pulse"></div>
+                Scanning for QR code... Point camera at the barcode.
+              </div>
+            )}
+            <div
+              id="reader"
+              style={{
+                width: "100%",
+                maxWidth: "400px",
+                height: "300px",
+                marginTop: "10px",
+                display: "none",
+                border: scanning ? "2px solid #3b82f6" : "none",
+                borderRadius: "8px",
+                overflow: "hidden",
+              }}
+            ></div>
+          </div>
+          <div><label className="field-label">Model Code</label><input className="field-input" value={form.modelCode || ''} onChange={e => setForm(f => ({ ...f, modelCode: e.target.value }))} placeholder="VO5645I" /></div>
+          <div><label className="field-label">Purchase Price ₹</label><input className="field-input" type="number" value={form.purchasePrice} onChange={e => setForm(f => ({ ...f, purchasePrice: e.target.value }))} placeholder="800" /></div>
+          <div><label className="field-label">Selling Price ₹ *</label><input className="field-input" type="number" value={form.sellingPrice} onChange={e => setForm(f => ({ ...f, sellingPrice: e.target.value }))} placeholder="1999" /></div>
+          <div><label className="field-label">Stock Qty</label><input className="field-input" type="number" value={form.stockQty} onChange={e => setForm(f => ({ ...f, stockQty: e.target.value }))} placeholder="10" /></div>
+          <div><label className="field-label">Low Stock Alert</label><input className="field-input" type="number" value={form.lowStockAlert} onChange={e => setForm(f => ({ ...f, lowStockAlert: e.target.value }))} placeholder="5" /></div>
           {form.purchasePrice && form.sellingPrice && (
             <div className="col-span-2 bg-emerald-50 border border-emerald-100 rounded-xl p-3 text-sm">
               <span className="text-emerald-700 font-semibold">Margin: {Math.round((form.sellingPrice - form.purchasePrice) / form.sellingPrice * 100)}%</span>
@@ -171,6 +272,32 @@ export default function Frames() {
           )}
         </div>
       </Modal>
+
+      {selectedFrame && (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
+          <div className="bg-white p-6 rounded-xl shadow-lg">
+
+            <Label product={selectedFrame} />
+
+            <div className="flex justify-end gap-2 mt-4">
+              <button
+                className="btn-secondary btn-sm"
+                onClick={() => setSelectedFrame(null)}
+              >
+                Close
+              </button>
+
+              <button
+                className="btn-primary btn-sm"
+                onClick={() => window.print()}
+              >
+                Print
+              </button>
+            </div>
+
+          </div>
+        </div>
+      )}
     </div>
   );
 }

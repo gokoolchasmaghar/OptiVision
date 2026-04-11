@@ -17,6 +17,7 @@ export default function Billing() {
   const [prodSearch, setProdSearch] = useState('');
   const [products, setProducts] = useState([]);
   const [cart, setCart] = useState([]);
+  const [scanInput, setScanInput] = useState('');
   const [discount, setDiscount] = useState(0);
   const [advance, setAdvance] = useState(0);
   const [payMethod, setPayMethod] = useState('CASH');
@@ -48,7 +49,7 @@ export default function Billing() {
     api.get('/stores/current').then(r => setStorePricing({
       gstEnabled: r.data.data?.gstEnabled !== false,
       taxRate: Number.isFinite(Number(r.data.data?.taxRate)) ? Math.max(0, Number(r.data.data.taxRate)) : 18,
-    })).catch(() => {});
+    })).catch(() => { });
   }, []);
   useEffect(() => { const t = setTimeout(() => searchCust(custSearch), 300); return () => clearTimeout(t); }, [custSearch]);
   useEffect(() => { const t = setTimeout(() => searchProd(prodSearch), 300); return () => clearTimeout(t); }, [prodSearch]);
@@ -141,6 +142,36 @@ export default function Billing() {
           {/* Product search */}
           <div className="card p-4">
             <label className="field-label mb-2">Add Product</label>
+            <input
+              type="text"
+              value={scanInput}
+              onChange={(e) => setScanInput(e.target.value)}
+              placeholder="Scan barcode..."
+              className="field-input mb-2"
+              onKeyDown={async (e) => {
+                if (e.key === 'Enter') {
+                  try {
+                    const res = await api.get(`/barcode/${scanInput}`);
+                    const product = res.data.data;
+
+                    // 🔥 ADD TO CART (smart handling)
+                    addToCart({
+                      ...product,
+                      itemType: res.data.type.toLowerCase(),
+                      displayName:
+                        res.data.type === 'FRAME'
+                          ? `${product.brand} ${product.model || ''}`
+                          : product.name,
+                    });
+
+                  } catch {
+                    toast.error("Product not found");
+                  }
+
+                  setScanInput('');
+                }
+              }}
+            />
             <div className="relative">
               <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
               <input className="field-input pl-9" value={prodSearch} onChange={e => setProdSearch(e.target.value)} placeholder="Search frames, lenses, accessories…" />
