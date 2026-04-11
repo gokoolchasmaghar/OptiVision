@@ -7,6 +7,8 @@ import toast from 'react-hot-toast';
 
 const fmt = n => `₹${Number(n || 0).toLocaleString('en-IN')}`;
 
+const DEFAULT_STORE_PRICING = { gstEnabled: true, taxRate: 18 };
+
 export default function Billing() {
   const navigate = useNavigate();
   const [custSearch, setCustSearch] = useState('');
@@ -19,6 +21,7 @@ export default function Billing() {
   const [advance, setAdvance] = useState(0);
   const [payMethod, setPayMethod] = useState('CASH');
   const [saving, setSaving] = useState(false);
+  const [storePricing, setStorePricing] = useState(DEFAULT_STORE_PRICING);
 
   const searchCust = async q => {
     if (!q) { setCustomers([]); return; }
@@ -40,7 +43,13 @@ export default function Billing() {
     setProducts(all);
   };
 
-  useEffect(() => { searchProd(''); }, []);
+  useEffect(() => {
+    searchProd('');
+    api.get('/stores/current').then(r => setStorePricing({
+      gstEnabled: r.data.data?.gstEnabled !== false,
+      taxRate: Number.isFinite(Number(r.data.data?.taxRate)) ? Math.max(0, Number(r.data.data.taxRate)) : 18,
+    })).catch(() => {});
+  }, []);
   useEffect(() => { const t = setTimeout(() => searchCust(custSearch), 300); return () => clearTimeout(t); }, [custSearch]);
   useEffect(() => { const t = setTimeout(() => searchProd(prodSearch), 300); return () => clearTimeout(t); }, [prodSearch]);
 
@@ -59,9 +68,10 @@ export default function Billing() {
   const removeItem = (id, type) => setCart(c => c.filter(x => !(x.id === id && x.itemType === type)));
 
   const subtotal = cart.reduce((s, x) => s + x.sellingPrice * x.qty, 0);
-  const discAmt = Math.min(Number(discount) || 0, subtotal);
+  const discAmt = Math.min(Math.max(Number(discount) || 0, 0), subtotal);
+  const gstRate = storePricing.gstEnabled ? Number(storePricing.taxRate) || 0 : 0;
   const taxable = subtotal - discAmt;
-  const tax = taxable * 0.18;
+  const tax = (taxable * gstRate) / 100;
   const total = taxable + tax;
   const balance = Math.max(0, total - (Number(advance) || 0));
 
@@ -82,8 +92,8 @@ export default function Billing() {
       }));
       const r = await api.post('/orders', {
         customerId: selCustomer.id, items,
-        subtotal, discountAmount: discAmt, taxAmount: tax, taxPct: 18,
-        totalAmount: total, advanceAmount: Number(advance) || 0,
+        discountAmount: discAmt,
+        advanceAmount: Number(advance) || 0,
         paymentMethod: payMethod,
       });
       toast.success(`Order ${r.data.data.orderNumber} created!`);
@@ -216,7 +226,11 @@ export default function Billing() {
             <div className="space-y-2 text-sm">
               <div className="flex justify-between text-slate-600"><span>Subtotal</span><span>{fmt(subtotal)}</span></div>
               {discAmt > 0 && <div className="flex justify-between text-red-500"><span>Discount</span><span>−{fmt(discAmt)}</span></div>}
-              <div className="flex justify-between text-slate-600"><span>GST 18%</span><span>{fmt(tax)}</span></div>
+              {gstRate > 0 ? (
+                <div className="flex justify-between text-slate-600"><span>{`GST ${gstRate}%`}</span><span>{fmt(tax)}</span></div>
+              ) : (
+                <div className="flex justify-between text-slate-600"><span>GST</span><span>Off</span></div>
+              )}
               <div className="flex justify-between font-bold text-lg border-t border-slate-100 pt-2"><span>Total</span><span>{fmt(total)}</span></div>
               {balance > 0 && <div className="flex justify-between text-red-600 font-semibold"><span>Balance Due</span><span>{fmt(balance)}</span></div>}
               {(Number(advance) || 0) >= total && cart.length > 0 && <div className="text-emerald-600 font-semibold text-center text-sm">✅ Fully Paid</div>}

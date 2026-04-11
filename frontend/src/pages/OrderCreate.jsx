@@ -8,6 +8,8 @@ import toast from 'react-hot-toast';
 const fmt = n => `₹${Number(n||0).toLocaleString('en-IN')}`;
 const STEPS = ['Customer', 'Frame', 'Prescription', 'Lens Package', 'Checkout'];
 
+const DEFAULT_STORE_PRICING = { gstEnabled: true, taxRate: 18 };
+
 export default function OrderCreate() {
   const navigate = useNavigate();
   const [params] = useSearchParams();
@@ -41,9 +43,14 @@ export default function OrderCreate() {
   const [delivDate, setDelivDate] = useState('');
   const [notes, setNotes] = useState('');
   const [saving, setSaving] = useState(false);
+  const [storePricing, setStorePricing] = useState(DEFAULT_STORE_PRICING);
 
   // Load initial customer if passed via URL
   useEffect(() => {
+    api.get('/stores/current').then(r => setStorePricing({
+      gstEnabled: r.data.data?.gstEnabled !== false,
+      taxRate: Number.isFinite(Number(r.data.data?.taxRate)) ? Math.max(0, Number(r.data.data.taxRate)) : 18,
+    })).catch(() => {});
     const cid = params.get('customerId');
     if (cid) {
       api.get(`/customers/${cid}`).then(r => { setSelCustomer(r.data.data); setStep(1); });
@@ -73,9 +80,10 @@ export default function OrderCreate() {
   const frameCost = selFrame?.sellingPrice || 0;
   const lensCost = selLens ? selLens.sellingPrice * 2 : 0;
   const subtotal = frameCost + lensCost;
-  const discountAmt = Math.min(discount, subtotal);
+  const discountAmt = Math.min(Math.max(Number(discount) || 0, 0), subtotal);
+  const gstRate = storePricing.gstEnabled ? Number(storePricing.taxRate) || 0 : 0;
   const taxable = subtotal - discountAmt;
-  const tax = taxable * 0.18;
+  const tax = (taxable * gstRate) / 100;
   const total = taxable + tax;
   const balance = Math.max(0, total - advance);
 
@@ -98,11 +106,7 @@ export default function OrderCreate() {
         customerId: selCustomer.id,
         prescriptionId,
         items,
-        subtotal,
         discountAmount: discountAmt,
-        taxAmount: tax,
-        taxPct: 18,
-        totalAmount: total,
         advanceAmount: advance,
         paymentMethod: payMethod,
         deliveryDate: delivDate || null,
@@ -265,7 +269,11 @@ export default function OrderCreate() {
                   <div className="border-t border-slate-200 pt-2 mt-1 space-y-1">
                     <div className="flex justify-between text-slate-500"><span>Subtotal</span><span>{fmt(subtotal)}</span></div>
                     {discountAmt > 0 && <div className="flex justify-between text-red-500"><span>Discount</span><span>−{fmt(discountAmt)}</span></div>}
-                    <div className="flex justify-between text-slate-500"><span>GST 18%</span><span>{fmt(tax)}</span></div>
+                    {gstRate > 0 ? (
+                      <div className="flex justify-between text-slate-500"><span>{`GST ${gstRate}%`}</span><span>{fmt(tax)}</span></div>
+                    ) : (
+                      <div className="flex justify-between text-slate-500"><span>GST</span><span>Off</span></div>
+                    )}
                     <div className="flex justify-between font-bold text-base border-t border-slate-200 pt-1.5 mt-1"><span>Total</span><span>{fmt(total)}</span></div>
                   </div>
                 </div>

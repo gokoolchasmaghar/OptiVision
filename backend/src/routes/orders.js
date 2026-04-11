@@ -1,6 +1,9 @@
 const router = require('express').Router();
 const prisma = require('../utils/prisma');
 const { authenticate, requireAdmin } = require('../middleware/auth');
+const { generateInvoice } = require('../controllers/invoice');
+
+const roundMoney = value => Math.round((Number(value) || 0) * 100) / 100;
 
 router.use(authenticate);
 
@@ -41,12 +44,27 @@ router.get('/:id', async (req, res, next) => {
   } catch (e) { next(e); }
 });
 
+router.get('/:id/invoice', authenticate, generateInvoice);
+
 router.post('/', async (req, res, next) => {
   try {
-    const { customerId, prescriptionId, items, subtotal, discountAmount = 0, taxAmount = 0, taxPct = 18, totalAmount, advanceAmount = 0, paymentMethod = 'CASH', deliveryDate, frameDetails, lensDetails, notes } = req.body;
-    if (!customerId || !items?.length || !totalAmount) return res.status(400).json({ success: false, message: 'customerId, items, totalAmount required' });
+    const { customerId, prescriptionId, items, discountAmount = 0, advanceAmount = 0, paymentMethod = 'CASH', deliveryDate, frameDetails, lensDetails, notes } = req.body;
+    if (!customerId || !items?.length) return res.status(400).json({ success: false, message: 'customerId and items are required' });
 
     const store = await prisma.store.findUnique({ where: { id: req.storeId } });
+    if (!store) return res.status(404).json({ success: false, message: 'Store not found' });
+
+    const calculatedSubtotal = roundMoney(items.reduce((sum, item) => sum + (Number(item.totalPrice) || 0), 0));
+    const safeDiscount = Math.min(Math.max(roundMoney(discountAmount), 0), calculatedSubtotal);
+    const taxableAmount = roundMoney(calculatedSubtotal - safeDiscount);
+    const effectiveTaxRate = store.gstEnabled ? Math.max(0, Number(store.taxRate) || 0) : 0;
+    const calculatedTax = roundMoney((taxableAmount * effectiveTaxRate) / 100);
+    const calculatedTotal = roundMoney(taxableAmount + calculatedTax);
+
+    if (calculatedTotal <= 0) {
+      return res.status(400).json({ success: false, message: 'Order total must be greater than zero' });
+    }
+
     const orderNumber = `${store.invoicePrefix}-${String(store.invoiceCounter + 1).padStart(4, '0')}`;
 
     const order = await prisma.$transaction(async tx => {
@@ -71,9 +89,9 @@ router.post('/', async (req, res, next) => {
       const newOrder = await tx.order.create({
         data: {
           storeId: req.storeId, orderNumber, customerId, prescriptionId: prescriptionId || null, staffId: req.user.id,
-          subtotal: Number(subtotal) || Number(totalAmount), discountAmount: Number(discountAmount), taxAmount: Number(taxAmount), taxPct: Number(taxPct), totalAmount: Number(totalAmount),
-          advanceAmount: Number(advanceAmount), balanceAmount: Number(totalAmount) - Number(advanceAmount),
-          paymentMethod, paymentStatus: Number(advanceAmount) >= Number(totalAmount) ? 'PAID' : Number(advanceAmount) > 0 ? 'PARTIAL' : 'PENDING',
+          subtotal: calculatedSubtotal, discountAmount: safeDiscount, taxAmount: calculatedTax, taxPct: effectiveTaxRate, totalAmount: calculatedTotal,
+          advanceAmount: Number(advanceAmount), balanceAmount: Math.max(0, calculatedTotal - Number(advanceAmount)),
+          paymentMethod, paymentStatus: Number(advanceAmount) >= calculatedTotal ? 'PAID' : Number(advanceAmount) > 0 ? 'PARTIAL' : 'PENDING',
           deliveryDate: deliveryDate ? new Date(deliveryDate) : null, frameDetails, lensDetails, notes,
           items: { create: items.map(i => ({ itemType: i.itemType, frameId: i.frameId || null, lensId: i.lensId || null, accessoryId: i.accessoryId || null, name: i.name, quantity: i.quantity, unitPrice: i.unitPrice, totalPrice: i.totalPrice })) },
           statusLogs: { create: { status: 'CREATED', note: 'Order created' } },

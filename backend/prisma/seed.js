@@ -8,7 +8,7 @@ async function main() {
   const store = await prisma.store.upsert({
     where: { id: 'store-main-01' },
     update: {},
-    create: { id: 'store-main-01', name: 'OptiVision Optical Store', address: '123 Vision Street, Andheri West, Mumbai - 400053', phone: '+91-9876543210', email: 'info@optivision.in', gstNumber: '27AABCU9603R1ZX', taxRate: 18, invoicePrefix: 'INV', invoiceCounter: 1050 }
+    create: { id: 'store-main-01', name: 'OptiVision Optical Store', address: '123 Vision Street, Andheri West, Mumbai - 400053', phone: '+91-9876543210', email: 'info@optivision.in', gstNumber: '27AABCU9603R1ZX', gstEnabled: true, taxRate: 18, invoicePrefix: 'INV', invoiceCounter: 1050 }
   });
 
   const adminHash = await bcrypt.hash('Admin@123', 12);
@@ -123,26 +123,30 @@ async function main() {
     const total = subtotal + tax;
     const orderNum = `INV-${1001 + i}`;
 
-    await prisma.order.create({ data: {
-      storeId: store.id, orderNumber: orderNum,
-      customerId: customers[od.c].id,
-      prescriptionId: od.rx !== null ? prescriptions[od.rx].id : null,
-      staffId: staff.id,
-      frameDetails: `${frame.brand} ${frame.model} - ${frame.color}`,
-      lensDetails: `${lens.name} x2`,
-      subtotal, discountAmount: 0, taxAmount: tax, taxPct: 18, totalAmount: total,
-      advanceAmount: od.adv || total, balanceAmount: Math.max(0, total - (od.adv || total)),
-      status: od.status, paymentMethod: od.method,
-      paymentStatus: (od.adv || total) >= total ? 'PAID' : od.adv > 0 ? 'PARTIAL' : 'PENDING',
-      deliveryDate: new Date(date.getTime() + 4*86400000),
-      createdAt: date,
-      items: { create: [
-        { itemType:'frame', frameId:frame.id, name:`${frame.brand} ${frame.model}`, quantity:1, unitPrice:fPrice, totalPrice:fPrice },
-        { itemType:'lens', lensId:lens.id, name:lens.name, quantity:2, unitPrice:lens.sellingPrice, totalPrice:lPrice }
-      ]},
-      statusLogs: { create: { status:'CREATED', note:'Order created', changedAt: date } },
-      ...(od.adv > 0 ? { payments: { create: [{ amount:od.adv, method:od.method, note:'Advance', paidAt:date }] } } : {})
-    }});
+    await prisma.order.upsert({
+      where: { orderNumber: orderNum },
+      update: {},
+      create: {
+        storeId: store.id, orderNumber: orderNum,
+        customerId: customers[od.c].id,
+        prescriptionId: od.rx !== null ? prescriptions[od.rx].id : null,
+        staffId: staff.id,
+        frameDetails: `${frame.brand} ${frame.model} - ${frame.color}`,
+        lensDetails: `${lens.name} x2`,
+        subtotal, discountAmount: 0, taxAmount: tax, taxPct: 18, totalAmount: total,
+        advanceAmount: od.adv || total, balanceAmount: Math.max(0, total - (od.adv || total)),
+        status: od.status, paymentMethod: od.method,
+        paymentStatus: (od.adv || total) >= total ? 'PAID' : od.adv > 0 ? 'PARTIAL' : 'PENDING',
+        deliveryDate: new Date(date.getTime() + 4 * 86400000),
+        createdAt: date,
+        items: { create: [
+          { itemType:'frame', frameId:frame.id, name:`${frame.brand} ${frame.model}`, quantity:1, unitPrice:fPrice, totalPrice:fPrice },
+          { itemType:'lens', lensId:lens.id, name:lens.name, quantity:2, unitPrice:lens.sellingPrice, totalPrice:lPrice }
+        ]},
+        statusLogs: { create: { status:'CREATED', note:'Order created', changedAt: date } },
+        ...(od.adv > 0 ? { payments: { create: [{ amount:od.adv, method:od.method, note:'Advance', paidAt:date }] } } : {})
+      }
+    });
   }
   console.log(`✅ ${orderDefs.length} orders`);
 

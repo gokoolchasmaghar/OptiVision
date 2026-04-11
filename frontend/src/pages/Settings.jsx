@@ -4,10 +4,21 @@ import { PageHeader, Tabs } from '../components/ui';
 import { useAuthStore } from '../stores/authStore';
 import toast from 'react-hot-toast';
 
+const DEFAULT_STORE = {
+  name: '',
+  address: '',
+  phone: '',
+  email: '',
+  gstNumber: '',
+  gstEnabled: true,
+  taxRate: 18,
+  invoicePrefix: 'INV',
+};
+
 export default function Settings() {
   const { user } = useAuthStore();
   const [tab, setTab] = useState('store');
-  const [store, setStore] = useState({ name: '', address: '', phone: '', email: '', gstNumber: '', taxRate: 18, invoicePrefix: 'INV' });
+  const [store, setStore] = useState(DEFAULT_STORE);
   const [users, setUsers] = useState([]);
   const [pwForm, setPwForm] = useState({ currentPassword: '', newPassword: '', confirmPassword: '' });
   const [userForm, setUserForm] = useState({ name: '', email: '', password: '', role: 'STAFF', phone: '' });
@@ -17,14 +28,18 @@ export default function Settings() {
 
   useEffect(() => {
     if (isAdmin) {
-      api.get('/stores/current').then(r => setStore(r.data.data)).catch(() => {});
+      api.get('/stores/current').then(r => setStore(s => ({ ...s, ...r.data.data }))).catch(() => {});
       api.get('/auth/users').then(r => setUsers(r.data.data)).catch(() => {});
     }
   }, [isAdmin]);
 
   const saveStore = async () => {
     setLoading(true);
-    try { await api.put('/stores/current', store); toast.success('Store settings saved'); }
+    try {
+      const { data } = await api.put('/stores/current', store);
+      setStore(s => ({ ...s, ...data.data }));
+      toast.success('Store settings saved');
+    }
     catch { toast.error('Error saving settings'); }
     setLoading(false);
   };
@@ -66,17 +81,32 @@ export default function Settings() {
           <div className="card p-6 space-y-4">
             <h3 className="font-bold text-slate-800">Store Information</h3>
             <div className="grid grid-cols-2 gap-4">
+              <div className="col-span-2 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 flex items-start justify-between gap-4">
+                <div>
+                  <div className="font-semibold text-slate-800">GST on new orders</div>
+                  <div className="text-sm text-slate-500">Turn GST calculation on or off. Your saved GST rate stays available even when GST is off.</div>
+                </div>
+                <label className="inline-flex items-center gap-2 cursor-pointer flex-shrink-0">
+                  <input
+                    className="h-4 w-4 accent-primary-600"
+                    type="checkbox"
+                    checked={store.gstEnabled !== false}
+                    onChange={e => setStore(s => ({ ...s, gstEnabled: e.target.checked }))}
+                  />
+                  <span className="text-sm font-semibold text-slate-700">{store.gstEnabled !== false ? 'On' : 'Off'}</span>
+                </label>
+              </div>
               {[
                 ['Store Name *', 'name', 'OptiVision'],
                 ['Phone', 'phone', '+91-9876543210'],
                 ['Email', 'email', 'info@store.in'],
                 ['GST Number', 'gstNumber', '27AABCU9603R1ZX'],
-                ['Tax Rate %', 'taxRate', '18', 'number'],
+                ['GST Rate %', 'taxRate', '18', 'number'],
                 ['Invoice Prefix', 'invoicePrefix', 'INV'],
               ].map(([label, key, ph, type = 'text']) => (
                 <div key={key} className={key === 'name' ? 'col-span-2' : ''}>
                   <label className="field-label">{label}</label>
-                  <input className="field-input" type={type} value={store[key] || ''} onChange={e => setStore(s => ({ ...s, [key]: type === 'number' ? Number(e.target.value) : e.target.value }))} placeholder={ph} />
+                  <input className="field-input" type={type} value={store[key] ?? ''} onChange={e => setStore(s => ({ ...s, [key]: type === 'number' ? Number(e.target.value) : e.target.value }))} placeholder={ph} />
                 </div>
               ))}
               <div className="col-span-2">

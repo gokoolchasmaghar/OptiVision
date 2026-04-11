@@ -37,7 +37,7 @@ router.get('/barcode/:barcode', async (req, res, next) => {
 
 router.get('/low-stock', async (req, res, next) => {
   try {
-    const frames = await prisma.$queryRaw`SELECT id, brand, model, frame_code, stock_qty, low_stock_alert, selling_price FROM frames WHERE store_id = ${req.storeId}::uuid AND is_active = true AND stock_qty <= low_stock_alert ORDER BY stock_qty ASC LIMIT 20`;
+    const frames = await prisma.$queryRaw`SELECT id, brand, model, "frameCode", "stockQty", "lowStockAlert", "sellingPrice" FROM frames WHERE "storeId" = ${req.storeId} AND "isActive" = true AND "stockQty" <= "lowStockAlert" ORDER BY "stockQty" ASC LIMIT 20`;
     res.json({ success: true, data: frames });
   } catch (e) { next(e); }
 });

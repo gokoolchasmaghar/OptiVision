@@ -76,6 +76,7 @@ model Store {
   phone           String?
   email           String?
   gstNumber       String?
+  gstEnabled      Boolean  @default(false)
   logoUrl         String?
   taxRate         Float    @default(18)
   invoicePrefix   String   @default("INV")
