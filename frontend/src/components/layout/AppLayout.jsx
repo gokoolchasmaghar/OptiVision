@@ -14,7 +14,7 @@ const NAV = [
   { to:'/frames',     icon:Glasses,        label:'Frames' },
   { to:'/lenses',     icon:Eye,            label:'Lenses' },
   { to:'/orders',     icon:ClipboardList,  label:'Orders' },
-  { to:'/billing',    icon:Receipt,        label:'Billing / POS' },
+  { to:'/billing',    icon:Receipt,        label:'Billing' },
   { to:'/inventory',  icon:Package,        label:'Inventory' },
   { to:'/reports',    icon:BarChart3,      label:'Reports' },
   { to:'/settings',   icon:Settings,       label:'Settings' },

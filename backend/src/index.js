@@ -10,6 +10,12 @@ const logger = require('./utils/logger');
 const app = express();
 const PORT = process.env.PORT || 8080;
 
+app.use(express.static(path.join(__dirname, "../frontend/dist")));
+
+app.get("*", (req, res) => {
+  res.sendFile(path.join(__dirname, "../frontend/dist/index.html"));
+});
+
 // Security
 app.use(helmet({ crossOriginResourcePolicy: { policy: 'cross-origin' } }));
 app.use(cors({

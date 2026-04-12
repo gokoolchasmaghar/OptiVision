@@ -1,13 +1,19 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Search, Trash2, Plus, Minus } from 'lucide-react';
+import { Search, Trash2, Plus, Minus, CreditCard, ReceiptText, Smartphone, Wallet, UserRound, ShieldCheck } from 'lucide-react';
 import api from '../services/api';
 import { PageHeader } from '../components/ui';
 import toast from 'react-hot-toast';
+import { Html5Qrcode } from "html5-qrcode";
 
 const fmt = n => `₹${Number(n || 0).toLocaleString('en-IN')}`;
 
 const DEFAULT_STORE_PRICING = { gstEnabled: true, taxRate: 18 };
+const PAYMENT_OPTIONS = [
+  { value: 'CASH', label: 'Cash', Icon: Wallet, active: 'from-emerald-500 to-emerald-600 border-emerald-500 shadow-emerald-200', idle: 'hover:border-emerald-200 hover:bg-emerald-50/70', icon: 'text-emerald-600' },
+  { value: 'UPI', label: 'UPI', Icon: Smartphone, active: 'from-sky-500 to-blue-600 border-sky-500 shadow-sky-200', idle: 'hover:border-sky-200 hover:bg-sky-50/70', icon: 'text-sky-600' },
+  { value: 'CARD', label: 'Card', Icon: CreditCard, active: 'from-violet-500 to-fuchsia-600 border-violet-500 shadow-violet-200', idle: 'hover:border-violet-200 hover:bg-violet-50/70', icon: 'text-violet-600' },
+];
 
 export default function Billing() {
   const navigate = useNavigate();
@@ -18,11 +24,18 @@ export default function Billing() {
   const [products, setProducts] = useState([]);
   const [cart, setCart] = useState([]);
   const [scanInput, setScanInput] = useState('');
+  const inputRef = useRef(null);
+  const scannerRef = useRef(null);
+  const scannerActiveRef = useRef(false);
+  const scannerStartingRef = useRef(false);
+  const scanLockRef = useRef(false);
   const [discount, setDiscount] = useState(0);
   const [advance, setAdvance] = useState(0);
   const [payMethod, setPayMethod] = useState('CASH');
   const [saving, setSaving] = useState(false);
   const [storePricing, setStorePricing] = useState(DEFAULT_STORE_PRICING);
+  const [scannerOpen, setScannerOpen] = useState(false);
+  const [redeemPoints, setRedeemPoints] = useState(0);
 
   const searchCust = async q => {
     if (!q) { setCustomers([]); return; }
@@ -44,6 +57,110 @@ export default function Billing() {
     setProducts(all);
   };
 
+  const addBarcodeToCart = async (barcode, { showToast = false } = {}) => {
+    const code = String(barcode || '').trim();
+    if (!code) return false;
+
+    try {
+      const res = await api.get(`/barcode/${code}`);
+      const product = res.data.data;
+
+      addToCart({
+        ...product,
+        itemType: res.data.type.toLowerCase(),
+        displayName:
+          res.data.type === 'FRAME'
+            ? `${product.brand} ${product.model || ''}`.trim()
+            : product.name,
+      });
+
+      setScanInput('');
+      if (showToast) toast.success('Product added');
+      return true;
+    } catch {
+      if (showToast) toast.error('Product not found');
+      return false;
+    }
+  };
+
+  const stopScanner = async () => {
+    const scanner = scannerRef.current;
+
+    scannerStartingRef.current = false;
+    scanLockRef.current = false;
+
+    if (scanner) {
+      try {
+        if (scannerActiveRef.current) {
+          await scanner.stop();
+        }
+      } catch {
+        // ignore scanner stop failures
+      }
+
+      try {
+        await scanner.clear();
+      } catch {
+        // ignore scanner clear failures
+      }
+    }
+
+    scannerActiveRef.current = false;
+    scannerRef.current = null;
+    setScannerOpen(false);
+    inputRef.current?.focus();
+  };
+
+  const startScanner = async () => {
+    if (scannerRef.current || scannerStartingRef.current) return;
+
+    const scanner = new Html5Qrcode('reader');
+    scannerRef.current = scanner;
+    scannerStartingRef.current = true;
+    setScannerOpen(true);
+
+    try {
+      await scanner.start(
+        { facingMode: 'environment' },
+        { fps: 10, qrbox: 250 },
+        async (decodedText) => {
+          if (scanLockRef.current) return;
+
+          scanLockRef.current = true;
+          // 🔥 SCAN SUCCESS
+          try {
+            const res = await api.get(`/barcode/${decodedText}`);
+            const product = res.data.data;
+
+            addToCart({
+              ...product,
+              itemType: res.data.type.toLowerCase(),
+              displayName:
+                res.data.type === 'FRAME'
+                  ? `${product.brand} ${product.model || ''}`
+                  : product.name,
+            });
+
+            toast.success("Product added");
+
+          } catch {
+            toast.error("Product not found");
+          }
+
+          await stopScanner();
+        },
+        () => { }
+      );
+      scannerActiveRef.current = true;
+    } catch {
+      scannerRef.current = null;
+      setScannerOpen(false);
+      toast.error('Camera not supported');
+    } finally {
+      scannerStartingRef.current = false;
+    }
+  };
+
   useEffect(() => {
     searchProd('');
     api.get('/stores/current').then(r => setStorePricing({
@@ -53,6 +170,21 @@ export default function Billing() {
   }, []);
   useEffect(() => { const t = setTimeout(() => searchCust(custSearch), 300); return () => clearTimeout(t); }, [custSearch]);
   useEffect(() => { const t = setTimeout(() => searchProd(prodSearch), 300); return () => clearTimeout(t); }, [prodSearch]);
+  useEffect(() => () => { void stopScanner(); }, []);
+
+  useEffect(() => {
+    if (!scanInput) return;
+
+    const delay = setTimeout(async () => {
+      await addBarcodeToCart(scanInput);
+    }, 300);
+
+    return () => clearTimeout(delay);
+  }, [scanInput]);
+
+  useEffect(() => {
+    inputRef.current?.focus();
+  }, []);
 
   const addToCart = item => {
     setCart(c => {
@@ -69,12 +201,17 @@ export default function Billing() {
   const removeItem = (id, type) => setCart(c => c.filter(x => !(x.id === id && x.itemType === type)));
 
   const subtotal = cart.reduce((s, x) => s + x.sellingPrice * x.qty, 0);
+  const itemCount = cart.reduce((s, x) => s + x.qty, 0);
   const discAmt = Math.min(Math.max(Number(discount) || 0, 0), subtotal);
   const gstRate = storePricing.gstEnabled ? Number(storePricing.taxRate) || 0 : 0;
   const taxable = subtotal - discAmt;
   const tax = (taxable * gstRate) / 100;
-  const total = taxable + tax;
+  const loyaltyDiscount = Math.min(Number(redeemPoints) || 0, selCustomer?.loyaltyPoints || 0);
+  const total = Math.max(0, taxable + tax - loyaltyDiscount);
+  const paidAmount = Math.min(total, Math.max(Number(advance) || 0, 0));
   const balance = Math.max(0, total - (Number(advance) || 0));
+  const paymentProgress = total > 0 ? Math.min(100, Math.round((paidAmount / total) * 100)) : 0;
+  const fullyPaid = cart.length > 0 && paidAmount >= total;
 
   const checkout = async () => {
     if (!selCustomer) return toast.error('Select a customer');
@@ -93,7 +230,8 @@ export default function Billing() {
       }));
       const r = await api.post('/orders', {
         customerId: selCustomer.id, items,
-        discountAmount: discAmt,
+        discountAmount: discAmt + loyaltyDiscount,
+        redeemPoints: loyaltyDiscount,
         advanceAmount: Number(advance) || 0,
         paymentMethod: payMethod,
       });
@@ -105,7 +243,7 @@ export default function Billing() {
 
   return (
     <div>
-      <PageHeader title="Billing / POS" subtitle="Quick billing at the counter" />
+      <PageHeader title="Billing" subtitle="Quick billing at the counter" />
       <div className="grid lg:grid-cols-3 gap-5">
         {/* Left: Product search + cart */}
         <div className="lg:col-span-2 space-y-4">
@@ -117,6 +255,7 @@ export default function Billing() {
                 <div>
                   <div className="font-semibold text-primary-800">{selCustomer.name}</div>
                   <div className="text-xs text-primary-600">{selCustomer.phone}</div>
+                  <div className="text-xs text-emerald-600 font-semibold mt-1">{selCustomer.loyaltyPoints || 0} Points </div>
                 </div>
                 <button onClick={() => setSelCustomer(null)} className="text-xs text-slate-500 hover:text-red-500">Change</button>
               </div>
@@ -142,36 +281,41 @@ export default function Billing() {
           {/* Product search */}
           <div className="card p-4">
             <label className="field-label mb-2">Add Product</label>
-            <input
-              type="text"
-              value={scanInput}
-              onChange={(e) => setScanInput(e.target.value)}
-              placeholder="Scan barcode..."
-              className="field-input mb-2"
-              onKeyDown={async (e) => {
-                if (e.key === 'Enter') {
-                  try {
-                    const res = await api.get(`/barcode/${scanInput}`);
-                    const product = res.data.data;
+            <div className="flex gap-2 mb-2">
+              <input
+                ref={inputRef}
+                type="text"
+                value={scanInput}
+                onChange={(e) => setScanInput(e.target.value)}
+                placeholder="Scan barcode..."
+                className="field-input flex-1"
+              />
 
-                    // 🔥 ADD TO CART (smart handling)
-                    addToCart({
-                      ...product,
-                      itemType: res.data.type.toLowerCase(),
-                      displayName:
-                        res.data.type === 'FRAME'
-                          ? `${product.brand} ${product.model || ''}`
-                          : product.name,
-                    });
-
-                  } catch {
-                    toast.error("Product not found");
+              <button
+                type="button"
+                title={scannerOpen ? 'Stop camera scanner' : 'Start camera scanner'}
+                onClick={() => {
+                  if (scannerOpen || scannerRef.current || scannerStartingRef.current) {
+                    void stopScanner();
+                    return;
                   }
 
-                  setScanInput('');
-                }
+                  void startScanner();
+                }}
+                className="btn-secondary h-10 px-3 flex items-center justify-center rounded-xl text-xs font-semibold"
+              >
+                📷
+              </button>
+            </div>
+
+            <div
+              id="reader"
+              style={{
+                width: '300px',
+                marginTop: '10px',
+                display: scannerOpen ? 'block' : 'none'
               }}
-            />
+            ></div>
             <div className="relative">
               <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
               <input className="field-input pl-9" value={prodSearch} onChange={e => setProdSearch(e.target.value)} placeholder="Search frames, lenses, accessories…" />
@@ -236,6 +380,8 @@ export default function Billing() {
             <div>
               <label className="field-label">Discount ₹</label>
               <input className="field-input" type="number" value={discount} onChange={e => setDiscount(e.target.value)} placeholder="0" />
+              <label className="field-label m-2">Use Loyalty Points</label>
+              <input className="field-input" type="number" value={redeemPoints}  onChange={e => setRedeemPoints(e.target.value)} placeholder={`Max ${selCustomer?.loyaltyPoints || 0}`}/>
             </div>
             <div>
               <label className="field-label">Payment Method</label>
@@ -257,6 +403,7 @@ export default function Billing() {
             <div className="space-y-2 text-sm">
               <div className="flex justify-between text-slate-600"><span>Subtotal</span><span>{fmt(subtotal)}</span></div>
               {discAmt > 0 && <div className="flex justify-between text-red-500"><span>Discount</span><span>−{fmt(discAmt)}</span></div>}
+              {loyaltyDiscount > 0 && ( <div className="flex justify-between text-emerald-600"><span>Loyalty Points</span><span>−{fmt(loyaltyDiscount)}</span></div>)}
               {gstRate > 0 ? (
                 <div className="flex justify-between text-slate-600"><span>{`GST ${gstRate}%`}</span><span>{fmt(tax)}</span></div>
               ) : (
@@ -269,7 +416,7 @@ export default function Billing() {
 
             <button onClick={checkout} disabled={saving || cart.length === 0 || !selCustomer}
               className="btn-primary btn-lg w-full justify-center">
-              {saving ? 'Processing…' : `🧾 Create Invoice  ${cart.length > 0 ? fmt(total) : ''}`}
+              {saving ? 'Processing…' : `🧾 Order Now  ${cart.length > 0 ? fmt(total) : ''}`}
             </button>
           </div>
 
