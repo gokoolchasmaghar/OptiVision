@@ -158,7 +158,27 @@ export default function OrderDetail() {
                 <div class="muted">Order ${order.orderNumber}</div>
               </div>
               <div style="text-align:right">
-                <span class="pill">${order.paymentStatus}</span>
+                <span
+                  style={{
+                    padding: '4px 10px',
+                    borderRadius: '6px',
+                    fontSize: '12px',
+                    fontWeight: 600,
+                    background:
+                      order.paymentStatus === 'PAID' ? '#d1fae5' :
+                      order.paymentStatus === 'PARTIAL' ? '#fef3c7' :
+                      order.paymentStatus === 'REFUNDED' ? '#fee2e2' :
+                      '#e5e7eb',
+                    color:
+                      order.paymentStatus === 'PAID' ? '#065f46' :
+                      order.paymentStatus === 'PARTIAL' ? '#92400e' :
+                      order.paymentStatus === 'REFUNDED' ? '#991b1b' :
+                      '#374151'
+                  }}
+                >
+                  {order.paymentStatus}
+                </span>
+                
                 <div class="muted">Issued ${format(new Date(order.createdAt), 'MMM d, yyyy h:mm a')}</div>
               </div>
             </div>
@@ -196,12 +216,64 @@ export default function OrderDetail() {
 
             <div class="summary-wrap">
               <div class="summary">
-                <div class="row"><span>Subtotal</span><span>INR ${Number(order.subtotal || 0).toLocaleString('en-IN')}</span></div>
-                ${order.discountAmount > 0 ? `<div class="row"><span>Discount</span><span>- INR ${Number(order.discountAmount || 0).toLocaleString('en-IN')}</span></div>` : ''}
-                <div class="row"><span>GST (${order.taxPct || 0}%)</span><span>INR ${Number(order.taxAmount || 0).toLocaleString('en-IN')}</span></div>
-                <div class="row total"><span>Total</span><span>INR ${Number(order.totalAmount || 0).toLocaleString('en-IN')}</span></div>
-                <div class="row good"><span>Paid</span><span>INR ${paidAmount.toLocaleString('en-IN')}</span></div>
-                <div class="row due"><span>Balance Due</span><span>INR ${Number(order.balanceAmount || 0).toLocaleString('en-IN')}</span></div>
+
+                <div class="row">
+                  <span>Subtotal</span>
+                  <span>INR ${Number(order.subtotal || 0).toLocaleString('en-IN')}</span>
+                </div>
+
+                ${order.discountAmount > 0 ? `
+                  <div class="row">
+                    <span>Discount</span>
+                    <span>- INR ${Number(order.discountAmount || 0).toLocaleString('en-IN')}</span>
+                  </div>` : ''}
+
+                <div class="row">
+                  <span>GST (${order.taxPct || 0}%)</span>
+                  <span>INR ${Number(order.taxAmount || 0).toLocaleString('en-IN')}</span>
+                </div>
+
+                <div class="row total">
+                  <span>Total</span>
+                  <span>INR ${Number(order.totalAmount || 0).toLocaleString('en-IN')}</span>
+                </div>
+
+                ${order.paymentStatus === 'REFUNDED'
+                      ? `
+                    <div class="row good">
+                      <span>Refunded</span>
+                      <span style="color:red;">
+                        - INR ${Number(order.totalAmount || 0).toLocaleString('en-IN')}
+                      </span>
+                    </div>
+                    `
+                      : `
+                    <div class="row good">
+                      <span>Paid</span>
+                      <span>INR ${paidAmount.toLocaleString('en-IN')}</span>
+                    </div>
+                    `
+                    }
+
+                <div class="row due">
+                  <span>Balance Due</span>
+                  <span>
+                    INR ${order.paymentStatus === 'REFUNDED'
+                      ? '0'
+                      : Number(order.balanceAmount || 0).toLocaleString('en-IN')
+                    }
+                  </span>
+                </div>
+
+                ${order.paymentStatus === 'REFUNDED'
+                      ? `
+                    <div style="margin-top:12px; font-size:12px; color:#c0392b;">
+                      Full amount refunded to customer.
+                    </div>
+                    `
+                      : ''
+                    }
+
               </div>
             </div>
 
@@ -245,6 +317,23 @@ export default function OrderDetail() {
 
     window.open(`https://api.whatsapp.com/send?phone=${phone}&text=${encodeURIComponent(message)}`, '_blank');
   };
+  const handleCancelOrder = async () => {
+    if (!confirm("Are you sure you want to cancel this order?")) return;
+
+    try {
+      await api.delete(`/orders/${id}`, {
+        data: {
+          reason: "Cancelled by staff"
+        }
+      });
+
+      toast.success("Order cancelled");
+      load();
+
+    } catch (e) {
+      toast.error(e?.response?.data?.message || "Cancel failed");
+    }
+  };
 
   return (
     <div>
@@ -265,7 +354,7 @@ export default function OrderDetail() {
           </p>
         </div>
         <div className="flex gap-2 flex-wrap no-print">
-          <button onClick={() => window.print()} className="btn-secondary btn-md"><Printer size={15} /> Print</button>
+          {/* <button onClick={() => window.print()} className="btn-secondary btn-md"><Printer size={15} /> Print</button> */}
           {order.balanceAmount > 0 && (
             <button onClick={() => { setPayForm({ amount: String(order.balanceAmount), method: 'CASH', note: '' }); setPayModal(true); }}
               className="btn-success btn-md"><CreditCard size={15} /> Collect {fmt(order.balanceAmount)}</button>
@@ -354,6 +443,16 @@ export default function OrderDetail() {
               </div>
             )}
           </div>
+
+          {order.status !== 'CANCELLED' && curIdx < 4 && (
+            <button
+              onClick={handleCancelOrder}
+              className="btn-danger btn-md"
+            >
+              Cancel Order
+            </button>
+          )}
+
           {nextStatus && (
             <button onClick={advanceStatus} className="btn-primary btn-md">→ {nextStatus.replace('_', ' ')}</button>
           )}
@@ -413,7 +512,15 @@ export default function OrderDetail() {
             <div className="px-5 py-4 border-t border-slate-100 space-y-2 bg-slate-50/50">
               {[
                 ['Subtotal', fmt(order.subtotal)],
-                order.discountAmount > 0 ? ['Discount', `−${fmt(order.discountAmount)}`] : null,
+
+                order.discountAmount > 0
+                  ? ['Discount', `−${fmt(order.discountAmount)}`]
+                  : null,
+
+                order.redeemPoints > 0
+                  ? ['Loyalty Points Used', `−${fmt(order.redeemPoints)}`]
+                  : null,
+
                 [`GST ${order.taxPct}%`, fmt(order.taxAmount)],
               ].filter(Boolean).map(([k, v]) => (
                 <div key={k} className="flex justify-between text-sm text-slate-600"><span>{k}</span><span>{v}</span></div>
@@ -469,10 +576,25 @@ export default function OrderDetail() {
                 <tbody>
                   {order.payments.map(p => (
                     <tr key={p.id}>
-                      <td className="text-xs text-slate-500">{format(new Date(p.paidAt), 'MMM d, yyyy h:mm a')}</td>
-                      <td><span className="badge-blue badge">{p.method}</span></td>
-                      <td className="text-xs text-slate-400">{p.reference || p.note || '—'}</td>
-                      <td className="text-right font-semibold text-emerald-600">{fmt(p.amount)}</td>
+                      <td>
+                        {p.method === 'REFUND'
+                          ? <span style={{ color: 'red', fontWeight: 600 }}>REFUND</span>
+                          : p.method}
+                      </td>
+
+                      <td style={{ textAlign: 'right' }}>
+                        {p.amount < 0 ? (
+                          <span style={{ color: 'red', fontWeight: 600 }}>
+                            -₹{Math.abs(p.amount).toLocaleString('en-IN')}
+                          </span>
+                        ) : (
+                          `₹${Number(p.amount).toLocaleString('en-IN')}`
+                        )}
+                      </td>
+
+                      <td>
+                        {p.note || '-'}
+                      </td>
                     </tr>
                   ))}
                 </tbody>

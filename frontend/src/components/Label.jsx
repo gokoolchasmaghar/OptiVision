@@ -39,8 +39,8 @@ export default function Label({ product }) {
         padding: "18px 20px",
         borderRadius: "22px",
         background: "#ffffff",
-        width: "440px",
-        minHeight: "180px",
+        width: "450px",
+        minHeight: "100px",
         boxShadow: "0 10px 30px rgba(0, 0, 0, 0.08)",
         fontFamily: "Inter, system-ui, sans-serif",
       }}

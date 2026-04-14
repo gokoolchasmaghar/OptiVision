@@ -97,4 +97,28 @@ router.delete('/:id', requireAdmin, async (req, res, next) => {
   } catch (e) { next(e); }
 });
 
+router.get('/barcode/:code', async (req, res, next) => {
+  try {
+    const { code } = req.params;
+
+    const item = await prisma[req.baseUrl.includes('lenses') ? 'lens' : 'frame']
+      .findFirst({
+        where: {
+          barcode: code,
+          storeId: req.storeId,
+          isActive: true
+        }
+      });
+
+    if (!item) {
+      return res.json({ success: false, message: 'Not found' });
+    }
+
+    res.json({ success: true, data: item });
+
+  } catch (e) {
+    next(e);
+  }
+});
+
 module.exports = router;

@@ -51,6 +51,7 @@ app.use('/api/purchases',    require('./routes/purchases'));
 app.use('/api/reports',      require('./routes/reports'));
 app.use('/api/dashboard',    require('./routes/dashboard'));
 app.use('/api/upload',       require('./routes/upload'));
+app.use('/api/barcode',      require('./routes/barcode'));
 
 app.get('/health', (req, res) => res.json({ status: 'healthy', version: '2.0.0', timestamp: new Date().toISOString() }));
 

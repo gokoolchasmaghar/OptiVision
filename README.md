@@ -68,52 +68,66 @@ optivision/
 │   │   ├── index.js            # Express app entry
 │   │   ├── middleware/
 │   │   │   └── auth.js         # JWT auth middleware
+|   |   ├── controllers/
+|   |   |   └── invoice.js      # Invoice
 │   │   ├── routes/
-│   │   │   ├── auth.js         # Login, users
-│   │   │   ├── customers.js    # Customer CRUD
-│   │   │   ├── prescriptions.js# Rx management
-│   │   │   ├── frames.js       # Frame inventory
-│   │   │   ├── lenses.js       # Lens catalog
-│   │   │   ├── orders.js       # Order lifecycle
-│   │   │   ├── inventory.js    # Stock management
-│   │   │   ├── reports.js      # Analytics
-│   │   │   ├── dashboard.js    # KPI dashboard
-│   │   │   ├── purchases.js    # Purchase orders
-│   │   │   ├── suppliers.js    # Suppliers
-│   │   │   └── stores.js       # Store settings
+|   |   |   ├── accessories.js     # Products except frames & lenses.
+│   │   │   ├── auth.js            # Login, users
+|   |   |   ├── barcode.js         # Barcode
+│   │   │   ├── customers.js       # Customer CRUD
+│   │   │   ├── dashboard.js       # KPI dashboard
+│   │   │   ├── frames.js          # Frame inventory
+│   │   │   ├── inventory.js       # Stock management
+│   │   │   ├── lenses.js          # Lens catalog
+│   │   │   ├── orders.js          # Order
+│   │   │   ├── payments.js        # Payment Method
+│   │   │   ├── prescriptions.js   # Rx management
+│   │   │   ├── purchases.js       # Purchase orders
+│   │   │   ├── reports.js         # Analytics
+│   │   │   ├── stores.js          # Store settings
+│   │   │   ├── suppliers.js       # Suppliers
+│   │   │   └── upload.js          # Uploads
 │   │   └── utils/
 │   │       ├── prisma.js       # DB client
 │   │       └── logger.js       # Winston logger
 │   ├── prisma/
+|   |   ├── migrations/         # Migration in DB schema
 │   │   ├── schema.prisma       # DB schema
 │   │   └── seed.js             # Sample data
 │   └── Dockerfile
 │
 ├── frontend/
 │   ├── src/
-│   │   ├── App.jsx             # Routes
+│   │   ├── App.jsx                   # Routes
+│   │   ├── index.css                 # React css file
+│   │   ├── main.jsx                  # React file
 │   │   ├── components/
-│   │   │   ├── layout/         # AppLayout, Sidebar
-│   │   │   └── ui/             # Shared components
+│   │   │   ├── layout/         
+│   │   │   |   └── AppLayout.jsx     # AppLayout, Sidebar
+│   │   │   ├── ui/             
+│   │   │   |   └── index.jsx         # Shared components
+│   │   │   ├── BarcodeInput.jsx      # Barcode component         
+|   |   |   └── Label.jsx             # Label for lenses, frames.
 │   │   ├── pages/
 │   │   │   ├── Login.jsx
-│   │   │   ├── Dashboard.jsx   # KPI + charts
-│   │   │   ├── Customers.jsx   # Customer grid
-│   │   │   ├── CustomerDetail.jsx # History + Rx
-│   │   │   ├── Frames.jsx      # Gallery + filters
-│   │   │   ├── Lenses.jsx      # Lens packages
-│   │   │   ├── Orders.jsx      # Order list
-│   │   │   ├── OrderCreate.jsx # 5-step wizard
-│   │   │   ├── OrderDetail.jsx # Timeline + bill
-│   │   │   ├── Billing.jsx     # POS counter
-│   │   │   ├── Inventory.jsx   # Stock levels
-│   │   │   ├── Reports.jsx     # Analytics
-│   │   │   └── Settings.jsx    # Config + users
+│   │   │   ├── Dashboard.jsx         # KPI + charts
+│   │   │   ├── Customers.jsx         # Customer grid
+│   │   │   ├── CustomerDetail.jsx    # History + Rx
+│   │   │   ├── Frames.jsx            # Gallery + filters
+│   │   │   ├── Lenses.jsx            # Lens packages
+│   │   │   ├── Orders.jsx            # Order list
+│   │   │   ├── OrderCreate.jsx       # 5-step wizard
+│   │   │   ├── OrderDetail.jsx       # Timeline + bill
+│   │   │   ├── Billing.jsx           # POS counter
+│   │   │   ├── Inventory.jsx         # Stock levels
+│   │   │   ├── Reports.jsx           # Analytics
+│   │   │   └── Settings.jsx          # Config + users
 │   │   ├── stores/
 │   │   │   └── authStore.js    # Zustand auth
 │   │   └── services/
 │   │       └── api.js          # Axios instance
-│   └── Dockerfile
+│   ├── Dockerfile
+│   └── Index.html
 │
 └── docker-compose.yml
 ```

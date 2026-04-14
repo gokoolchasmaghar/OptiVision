@@ -30,12 +30,25 @@ export default function Frames() {
   const [scanning, setScanning] = useState(false);
   const scannerRef = useRef(null);
 
+  const generateEAN13 = () => {
+    const digits = Array.from({ length: 12 }, () => Math.floor(Math.random() * 10));
+    const checksum = digits.reduce((sum, d, i) => sum + d * (i % 2 === 0 ? 1 : 3), 0);
+    const checkDigit = (10 - (checksum % 10)) % 10;
+    return [...digits, checkDigit].join('');
+  };
+
+  const handleGenerateBarcode = () => {
+    const code = generateEAN13();
+    setForm(f => ({ ...f, barcode: code }));
+    toast.success('Barcode generated!');
+  };
+
   const stopScanner = () => {
     if (scannerRef.current) {
       scannerRef.current.stop().then(() => {
         setScanning(false);
         document.getElementById("reader").style.display = "none";
-      }).catch(() => {}); // ignore errors
+      }).catch(() => { }); // ignore errors
     }
   };
 
@@ -226,15 +239,25 @@ export default function Frames() {
                 className="field-input flex-1"
                 value={form.barcode}
                 onChange={e => setForm(f => ({ ...f, barcode: e.target.value }))}
-                placeholder="Scan or type"
+                placeholder="Auto-generated or manual"
               />
 
+              {/* Generate button */}
+              <button
+                type="button"
+                onClick={handleGenerateBarcode}
+                className="btn-secondary btn-sm"
+              >
+                🔄
+              </button>
+
+              {/* Scanner button */}
               <button
                 type="button"
                 onClick={toggleScanner}
                 className="btn-secondary btn-sm"
               >
-                {scanning ? "Stop Scan" : "📷"}
+                {scanning ? "Stop" : "📷"}
               </button>
             </div>
 
@@ -289,7 +312,11 @@ export default function Frames() {
 
               <button
                 className="btn-primary btn-sm"
-                onClick={() => window.print()}
+                onClick={() => {
+                  document.getElementById("print-label").style.display = "block";
+                  window.print();
+                  document.getElementById("print-label").style.display = "none";
+                }}
               >
                 Print
               </button>
@@ -298,6 +325,13 @@ export default function Frames() {
           </div>
         </div>
       )}
+
+      {selectedFrame && (
+        <div id="print-label" style={{ display: "none" }}>
+          <Label product={selectedFrame} />
+        </div>
+      )}
+
     </div>
   );
 }

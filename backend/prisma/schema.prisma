@@ -120,18 +120,19 @@ model User {
 }
 
 model Customer {
-  id          String    @id @default(uuid())
-  storeId     String
-  name        String
-  phone       String
-  email       String?
-  address     String?
-  gender      Gender?
-  age         Int?
-  dateOfBirth DateTime?
-  notes       String?
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
+  id            String      @id @default(uuid())
+  storeId       String
+  name          String
+  phone         String
+  email         String?
+  address       String?
+  gender        Gender?
+  age           Int?
+  dateOfBirth   DateTime?
+  notes         String?
+  loyaltyPoints Int         @default(0)
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
 
   store         Store          @relation(fields: [storeId], references: [id])
   prescriptions Prescription[]
@@ -276,6 +277,7 @@ model Order {
   subtotal       Float
   discountAmount Float         @default(0)
   discountPct    Float         @default(0)
+  redeemPoints   Int           @default(0)
   taxAmount      Float         @default(0)
   taxPct         Float         @default(18)
   totalAmount    Float

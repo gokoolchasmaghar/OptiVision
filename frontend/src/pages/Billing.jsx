@@ -5,6 +5,7 @@ import api from '../services/api';
 import { PageHeader } from '../components/ui';
 import toast from 'react-hot-toast';
 import { Html5Qrcode } from "html5-qrcode";
+const beepRef = useRef(null);
 
 const fmt = n => `₹${Number(n || 0).toLocaleString('en-IN')}`;
 
@@ -57,12 +58,17 @@ export default function Billing() {
     setProducts(all);
   };
 
+  const focusInput = () => {
+    inputRef.current?.focus();
+  };
+
   const addBarcodeToCart = async (barcode, { showToast = false } = {}) => {
     const code = String(barcode || '').trim();
     if (!code) return false;
 
     try {
       const res = await api.get(`/barcode/${code}`);
+
       const product = res.data.data;
 
       addToCart({
@@ -70,14 +76,20 @@ export default function Billing() {
         itemType: res.data.type.toLowerCase(),
         displayName:
           res.data.type === 'FRAME'
-            ? `${product.brand} ${product.model || ''}`.trim()
+            ? `${product.brand} ${product.model || ''}`
             : product.name,
       });
 
-      setScanInput('');
+      // 🔊 BEEP
+      if (beepRef.current) {
+        beepRef.current.currentTime = 0;
+        beepRef.current.play().catch(() => { });
+      }
+
       if (showToast) toast.success('Product added');
       return true;
-    } catch {
+
+    } catch (e) {
       if (showToast) toast.error('Product not found');
       return false;
     }
@@ -129,7 +141,7 @@ export default function Billing() {
           scanLockRef.current = true;
           // 🔥 SCAN SUCCESS
           try {
-            const res = await api.get(`/barcode/${decodedText}`);
+            await addBarcodeToCart(decodedText, { showToast: true });
             const product = res.data.data;
 
             addToCart({
@@ -161,6 +173,16 @@ export default function Billing() {
     }
   };
 
+  // 🔊 Beep
+  if (beepRef.current) {
+    beepRef.current.currentTime = 0;
+    beepRef.current.play().catch(() => { });
+  }
+
+  // 🎯 Focus again
+  setScanInput('');
+  focusInput();
+
   useEffect(() => {
     searchProd('');
     api.get('/stores/current').then(r => setStorePricing({
@@ -171,16 +193,27 @@ export default function Billing() {
   useEffect(() => { const t = setTimeout(() => searchCust(custSearch), 300); return () => clearTimeout(t); }, [custSearch]);
   useEffect(() => { const t = setTimeout(() => searchProd(prodSearch), 300); return () => clearTimeout(t); }, [prodSearch]);
   useEffect(() => () => { void stopScanner(); }, []);
+  useEffect(() => {
+    beepRef.current = new Audio("/beep.mp3"); // place file in public folder
+  }, []);
 
   useEffect(() => {
-    if (!scanInput) return;
+    const interval = setInterval(() => {
+      if (document.activeElement !== inputRef.current) {
+        inputRef.current?.focus();
+      }
+    }, 500);
 
-    const delay = setTimeout(async () => {
-      await addBarcodeToCart(scanInput);
-    }, 300);
+    return () => clearInterval(interval);
+  }, []);
 
-    return () => clearTimeout(delay);
-  }, [scanInput]);
+  const handleScanInput = async (e) => {
+    if (e.key === 'Enter') {
+      await addBarcodeToCart(scanInput, { showToast: true });
+      setScanInput('');
+      focusInput();
+    }
+  };
 
   useEffect(() => {
     inputRef.current?.focus();
@@ -230,7 +263,7 @@ export default function Billing() {
       }));
       const r = await api.post('/orders', {
         customerId: selCustomer.id, items,
-        discountAmount: discAmt + loyaltyDiscount,
+        discountAmount: discAmt,
         redeemPoints: loyaltyDiscount,
         advanceAmount: Number(advance) || 0,
         paymentMethod: payMethod,
@@ -287,6 +320,7 @@ export default function Billing() {
                 type="text"
                 value={scanInput}
                 onChange={(e) => setScanInput(e.target.value)}
+                onKeyDown={handleScanInput}
                 placeholder="Scan barcode..."
                 className="field-input flex-1"
               />
@@ -381,7 +415,7 @@ export default function Billing() {
               <label className="field-label">Discount ₹</label>
               <input className="field-input" type="number" value={discount} onChange={e => setDiscount(e.target.value)} placeholder="0" />
               <label className="field-label m-2">Use Loyalty Points</label>
-              <input className="field-input" type="number" value={redeemPoints}  onChange={e => setRedeemPoints(e.target.value)} placeholder={`Max ${selCustomer?.loyaltyPoints || 0}`}/>
+              <input className="field-input" type="number" value={redeemPoints} onChange={e => setRedeemPoints(e.target.value)} placeholder={`Max ${selCustomer?.loyaltyPoints || 0}`} />
             </div>
             <div>
               <label className="field-label">Payment Method</label>
@@ -403,7 +437,7 @@ export default function Billing() {
             <div className="space-y-2 text-sm">
               <div className="flex justify-between text-slate-600"><span>Subtotal</span><span>{fmt(subtotal)}</span></div>
               {discAmt > 0 && <div className="flex justify-between text-red-500"><span>Discount</span><span>−{fmt(discAmt)}</span></div>}
-              {loyaltyDiscount > 0 && ( <div className="flex justify-between text-emerald-600"><span>Loyalty Points</span><span>−{fmt(loyaltyDiscount)}</span></div>)}
+              {loyaltyDiscount > 0 && (<div className="flex justify-between text-emerald-600"><span>Loyalty Points</span><span>−{fmt(loyaltyDiscount)}</span></div>)}
               {gstRate > 0 ? (
                 <div className="flex justify-between text-slate-600"><span>{`GST ${gstRate}%`}</span><span>{fmt(tax)}</span></div>
               ) : (

@@ -62,6 +62,8 @@ const generateInvoice = async (req, res) => {
 
       <h3>Summary</h3>
       <p>Subtotal: ${fmt(order.subtotal)}</p>
+      ${order.discountAmount > 0 ? `<p>Discount: -${fmt(order.discountAmount)}</p>` : ''}
+      ${order.redeemPoints > 0 ? `<p>Loyalty Used: -${fmt(order.redeemPoints)}</p>` : ''}
       <p>GST: ${fmt(order.taxAmount)}</p>
       <p><b>Total: ${fmt(order.totalAmount)}</b></p>
       <p>Advance: ${fmt(order.advanceAmount)}</p>
@@ -99,7 +101,7 @@ const generateInvoice = async (req, res) => {
 
     res.set({
       'Content-Type': 'application/pdf',
-      'Content-Disposition': `attachment; filename=invoice-${order.orderNumber}.pdf`,
+      'Content-Disposition': `inline; filename=invoice-${order.orderNumber}.pdf`,
     });
 
     return res.status(200).end(pdf);

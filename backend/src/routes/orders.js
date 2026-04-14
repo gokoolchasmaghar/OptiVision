@@ -17,7 +17,7 @@ router.get('/', async (req, res, next) => {
       ...(customerId && { customerId }),
       ...(search && { OR: [{ orderNumber: { contains: search, mode: 'insensitive' } }, { customer: { name: { contains: search, mode: 'insensitive' } } }, { customer: { phone: { contains: search } } }] }),
       ...(dateFrom && { createdAt: { gte: new Date(dateFrom) } }),
-      ...(dateTo && { createdAt: { ...( dateFrom ? { gte: new Date(dateFrom) } : {}), lte: new Date(dateTo + 'T23:59:59') } }),
+      ...(dateTo && { createdAt: { ...(dateFrom ? { gte: new Date(dateFrom) } : {}), lte: new Date(dateTo + 'T23:59:59') } }),
     };
     const [orders, total] = await Promise.all([
       prisma.order.findMany({ where, skip, take: Number(limit), orderBy: { createdAt: 'desc' }, include: { customer: { select: { id: true, name: true, phone: true } }, staff: { select: { id: true, name: true } }, items: true, payments: true } }),
@@ -48,7 +48,7 @@ router.get('/:id/invoice', authenticate, generateInvoice);
 
 router.post('/', async (req, res, next) => {
   try {
-    const { customerId, prescriptionId, items, discountAmount = 0, advanceAmount = 0, paymentMethod = 'CASH', deliveryDate, frameDetails, lensDetails, notes } = req.body;
+    const { customerId, prescriptionId, items, discountAmount = 0, advanceAmount = 0, paymentMethod = 'CASH', deliveryDate, frameDetails, lensDetails, notes, redeemPoints = 0 } = req.body;
     if (!customerId || !items?.length) return res.status(400).json({ success: false, message: 'customerId and items are required' });
 
     const store = await prisma.store.findUnique({ where: { id: req.storeId } });
@@ -56,7 +56,8 @@ router.post('/', async (req, res, next) => {
 
     const calculatedSubtotal = roundMoney(items.reduce((sum, item) => sum + (Number(item.totalPrice) || 0), 0));
     const safeDiscount = Math.min(Math.max(roundMoney(discountAmount), 0), calculatedSubtotal);
-    const taxableAmount = roundMoney(calculatedSubtotal - safeDiscount);
+    const loyaltyUsed = Number(redeemPoints || 0);
+    const taxableAmount = calculatedSubtotal - safeDiscount;
     const effectiveTaxRate = store.gstEnabled ? Math.max(0, Number(store.taxRate) || 0) : 0;
     const calculatedTax = roundMoney((taxableAmount * effectiveTaxRate) / 100);
     const calculatedTotal = roundMoney(taxableAmount + calculatedTax);
@@ -89,7 +90,7 @@ router.post('/', async (req, res, next) => {
       const newOrder = await tx.order.create({
         data: {
           storeId: req.storeId, orderNumber, customerId, prescriptionId: prescriptionId || null, staffId: req.user.id,
-          subtotal: calculatedSubtotal, discountAmount: safeDiscount, taxAmount: calculatedTax, taxPct: effectiveTaxRate, totalAmount: calculatedTotal,
+          subtotal: calculatedSubtotal, discountAmount: safeDiscount, redeemPoints: Number(redeemPoints || 0), taxAmount: calculatedTax, taxPct: effectiveTaxRate, totalAmount: calculatedTotal,
           advanceAmount: Number(advanceAmount), balanceAmount: Math.max(0, calculatedTotal - Number(advanceAmount)),
           paymentMethod, paymentStatus: Number(advanceAmount) >= calculatedTotal ? 'PAID' : Number(advanceAmount) > 0 ? 'PARTIAL' : 'PENDING',
           deliveryDate: deliveryDate ? new Date(deliveryDate) : null, frameDetails, lensDetails, notes,
@@ -100,7 +101,27 @@ router.post('/', async (req, res, next) => {
         include: { customer: true, items: true }
       });
 
-      await tx.store.update({ where: { id: req.storeId }, data: { invoiceCounter: { increment: 1 } } });
+      // 🔥 LOYALTY LOGIC START
+
+      const earnedPoints = Math.floor(newOrder.totalAmount / 100);
+
+      // update customer points
+      await tx.customer.update({
+        where: { id: customerId },
+        data: {
+          loyaltyPoints: {
+            increment: earnedPoints - Number(redeemPoints || 0)
+          }
+        }
+      });
+
+      // 🔥 LOYALTY LOGIC END
+
+      await tx.store.update({
+        where: { id: req.storeId },
+        data: { invoiceCounter: { increment: 1 } }
+      });
+
       return newOrder;
     });
 
@@ -111,7 +132,7 @@ router.post('/', async (req, res, next) => {
 router.patch('/:id/status', async (req, res, next) => {
   try {
     const { status, note } = req.body;
-    const valid = ['CREATED','LENS_ORDERED','GRINDING','FITTING','READY','DELIVERED','CANCELLED'];
+    const valid = ['CREATED', 'LENS_ORDERED', 'GRINDING', 'FITTING', 'READY', 'DELIVERED', 'CANCELLED'];
     if (!valid.includes(status)) return res.status(400).json({ success: false, message: 'Invalid status' });
     const order = await prisma.$transaction(async tx => {
       const u = await tx.order.update({ where: { id: req.params.id }, data: { status, ...(status === 'DELIVERED' && { deliveredAt: new Date() }), ...(status === 'CANCELLED' && { cancelledAt: new Date(), cancelReason: note }) } });
@@ -140,23 +161,131 @@ router.post('/:id/payment', async (req, res, next) => {
 router.delete('/:id', requireAdmin, async (req, res, next) => {
   try {
     const { reason } = req.body;
-    const order = await prisma.order.findFirst({ where: { id: req.params.id, storeId: req.storeId }, include: { items: true } });
-    if (!order) return res.status(404).json({ success: false, message: 'Not found' });
+
+    const order = await prisma.order.findFirst({
+      where: { id: req.params.id, storeId: req.storeId },
+      include: { items: true }
+    });
+
+    if (!order) {
+      return res.status(404).json({ success: false, message: 'Not found' });
+    }
+
+    // ❌ Restrict delete after READY
+    if (['READY', 'DELIVERED'].includes(order.status)) {
+      return res.status(400).json({
+        message: "Cannot delete order after READY stage"
+      });
+    }
+
     await prisma.$transaction(async tx => {
       for (const item of order.items) {
+        // 🟦 FRAME
         if (item.frameId) {
-          const f = await tx.frame.findUnique({ where: { id: item.frameId } });
-          if (f) {
-            await tx.frame.update({ where: { id: item.frameId }, data: { stockQty: { increment: item.quantity } } });
-            await tx.stockMovement.create({ data: { storeId: req.storeId, frameId: item.frameId, type: 'RETURN', quantity: item.quantity, beforeQty: f.stockQty, afterQty: f.stockQty + item.quantity, reason: 'Cancelled', reference: order.orderNumber } });
-          }
+          const frame = await tx.frame.findUnique({
+            where: { id: item.frameId }
+          });
+
+          await tx.frame.update({
+            where: { id: item.frameId },
+            data: {
+              stockQty: { increment: item.quantity }
+            }
+          });
+
+          await tx.stockMovement.create({
+            data: {
+              storeId: req.storeId,
+              frameId: item.frameId,
+              type: 'IN',
+              quantity: item.quantity,
+              beforeQty: frame.stockQty,
+              afterQty: frame.stockQty + item.quantity,
+              reason: 'Order Cancel',
+              reference: order.orderNumber
+            }
+          });
+        }
+
+        // 🟨 LENS
+        else if (item.lensId) {
+          const lens = await tx.lens.findUnique({
+            where: { id: item.lensId }
+          });
+
+          await tx.lens.update({
+            where: { id: item.lensId },
+            data: {
+              stockQty: { increment: item.quantity }
+            }
+          });
+
+          await tx.stockMovement.create({
+            data: {
+              storeId: req.storeId,
+              lensId: item.lensId,
+              type: 'IN',
+              quantity: item.quantity,
+              beforeQty: lens.stockQty,
+              afterQty: lens.stockQty + item.quantity,
+              reason: 'Order Cancel',
+              reference: order.orderNumber
+            }
+          });
+        }
+
+        // 🟩 ACCESSORY (FIXED)
+        else if (item.accessoryId) {
+          const acc = await tx.accessory.findUnique({
+            where: { id: item.accessoryId }
+          });
+
+          await tx.accessory.update({
+            where: { id: item.accessoryId },
+            data: {
+              stockQty: { increment: item.quantity }
+            }
+          });
+
+          await tx.stockMovement.create({
+            data: {
+              storeId: req.storeId,
+              accessoryId: item.accessoryId,
+              type: 'IN',
+              quantity: item.quantity,
+              beforeQty: acc.stockQty,
+              afterQty: acc.stockQty + item.quantity,
+              reason: 'Order Cancel',
+              reference: order.orderNumber
+            }
+          });
         }
       }
-      await tx.order.update({ where: { id: req.params.id }, data: { status: 'CANCELLED', cancelledAt: new Date(), cancelReason: reason } });
-      await tx.orderStatusLog.create({ data: { orderId: req.params.id, status: 'CANCELLED', note: reason || 'Cancelled by admin' } });
+
+      // 🔥 Cancel order (soft delete)
+      await tx.order.update({
+        where: { id: req.params.id },
+        data: {
+          status: 'CANCELLED',
+          cancelledAt: new Date(),
+          cancelReason: reason
+        }
+      });
+
+      await tx.orderStatusLog.create({
+        data: {
+          orderId: req.params.id,
+          status: 'CANCELLED',
+          note: reason || 'Cancelled by admin'
+        }
+      });
+
     });
     res.json({ success: true });
-  } catch (e) { next(e); }
+
+  } catch (e) {
+    next(e);
+  }
 });
 
 module.exports = router;
