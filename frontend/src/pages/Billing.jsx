@@ -5,7 +5,6 @@ import api from '../services/api';
 import { PageHeader } from '../components/ui';
 import toast from 'react-hot-toast';
 import { Html5Qrcode } from "html5-qrcode";
-const beepRef = useRef(null);
 
 const fmt = n => `₹${Number(n || 0).toLocaleString('en-IN')}`;
 
@@ -17,6 +16,7 @@ const PAYMENT_OPTIONS = [
 ];
 
 export default function Billing() {
+  const beepRef = useRef(null);
   const navigate = useNavigate();
   const [custSearch, setCustSearch] = useState('');
   const [customers, setCustomers] = useState([]);
@@ -142,7 +142,6 @@ export default function Billing() {
           // 🔥 SCAN SUCCESS
           try {
             await addBarcodeToCart(decodedText, { showToast: true });
-            const product = res.data.data;
 
             addToCart({
               ...product,
@@ -172,16 +171,6 @@ export default function Billing() {
       scannerStartingRef.current = false;
     }
   };
-
-  // 🔊 Beep
-  if (beepRef.current) {
-    beepRef.current.currentTime = 0;
-    beepRef.current.play().catch(() => { });
-  }
-
-  // 🎯 Focus again
-  setScanInput('');
-  focusInput();
 
   useEffect(() => {
     searchProd('');
