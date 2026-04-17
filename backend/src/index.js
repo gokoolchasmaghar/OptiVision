@@ -19,9 +19,8 @@ const PORT = process.env.PORT || 8080;
 // Security
 app.use(helmet({ crossOriginResourcePolicy: { policy: 'cross-origin' } }));
 app.use(cors({
-  origin: (process.env.FRONTEND_URL || 'https://opti-vision-plum.vercel.app').split(','),
-  credentials: true,
-  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+  origin: true,
+  credentials: true
 }));
 app.use(rateLimit({ windowMs: 15 * 60 * 1000, max: 500 }));
 
