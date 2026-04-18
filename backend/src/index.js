@@ -13,13 +13,37 @@ const PORT = process.env.PORT || 8080;
 // Security
 app.use(helmet({ crossOriginResourcePolicy: { policy: 'cross-origin' } }));
 
-// Simplified CORS
+const parseOrigins = (value) =>
+  String(value || '')
+    .split(',')
+    .map(origin => origin.trim())
+    .filter(Boolean);
+
+const wildcardToRegex = (pattern) => {
+  const escaped = pattern.replace(/[.+?^${}()|[\]\\]/g, '\\$&');
+  return new RegExp(`^${escaped.replace(/\*/g, '.*')}$`);
+};
+
+const configuredOrigins = parseOrigins(process.env.FRONTEND_URL);
+const fallbackOrigins = ['http://localhost:5173', 'http://localhost:3000', 'https://*.vercel.app'];
+const allowedOrigins = configuredOrigins.length ? configuredOrigins : fallbackOrigins;
+const exactOrigins = allowedOrigins.filter(origin => !origin.includes('*'));
+const wildcardOrigins = allowedOrigins
+  .filter(origin => origin.includes('*'))
+  .map(wildcardToRegex);
+
+const isOriginAllowed = (origin) => {
+  if (!origin) return true;
+  if (exactOrigins.includes(origin)) return true;
+  return wildcardOrigins.some(regex => regex.test(origin));
+};
+
 const corsOptions = {
-  origin: [
-    'https://opti-vision-plum.vercel.app',  // Production Vercel URL
-    'http://localhost:5173',                  // Local development (Vite)
-    'http://localhost:3000'                   // Alternative local (Next.js)
-  ],
+  origin(origin, callback) {
+    if (isOriginAllowed(origin)) return callback(null, true);
+    logger.warn(`CORS blocked origin: ${origin}`);
+    return callback(new Error('Origin not allowed by CORS'));
+  },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization'],

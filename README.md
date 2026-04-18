@@ -17,11 +17,7 @@ docker compose up -d --build
 open http://localhost:5173
 ```
 
-**Login Credentials:**
-| Role | Email | Password |
-|------|-------|----------|
-| Admin | admin@optivision.in | Admin@123 |
-| Staff | priya@optivision.in | Staff@123 |
+No demo credentials are bundled. Create your admin account via the seed configuration in `backend/.env`.
 
 ---
 
@@ -36,11 +32,11 @@ open http://localhost:5173
 ```bash
 cd backend
 cp .env.example .env
-# Edit .env with your PostgreSQL credentials
+# Edit .env with your PostgreSQL credentials + SEED_ADMIN_EMAIL + SEED_ADMIN_PASSWORD
 
 npm install
 npx prisma migrate dev --name init
-node prisma/seed.js
+npm run db:seed
 npm run dev
 # → API running at http://localhost:5000
 ```
@@ -93,7 +89,7 @@ optivision/
 │   ├── prisma/
 |   |   ├── migrations/         # Migration in DB schema
 │   │   ├── schema.prisma       # DB schema
-│   │   └── seed.js             # Sample data
+│   │   └── seed.js             # Production bootstrap seed
 │   └── Dockerfile
 │
 ├── frontend/
@@ -256,3 +252,4 @@ docker compose up -d --build
 ---
 
 *Built with Node.js, Express, PostgreSQL, Prisma, React 18, Vite, Tailwind CSS*
+

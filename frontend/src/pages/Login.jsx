@@ -7,7 +7,7 @@ import toast from 'react-hot-toast';
 export default function Login() {
   const { login } = useAuthStore();
   const navigate = useNavigate();
-  const [form, setForm] = useState({ email: 'admin@optivision.in', password: 'Admin@123' });
+  const [form, setForm] = useState({ email: '', password: '' });
   const [loading, setLoading] = useState(false);
   const [showPw, setShowPw] = useState(false);
   const [err, setErr] = useState('');
@@ -81,7 +81,7 @@ export default function Login() {
                   type="email" required value={form.email} onChange={e => setForm(f => ({...f, email: e.target.value}))}
                   className="w-full px-4 py-3 rounded-xl text-sm text-white placeholder:text-slate-600 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all"
                   style={{ background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.12)' }}
-                  placeholder="admin@optivision.in"
+                  placeholder="name@company.com"
                 />
               </div>
               <div>
@@ -111,19 +111,6 @@ export default function Login() {
               </button>
             </form>
 
-            <div className="mt-6 pt-5 border-t border-white/8">
-              <p className="text-xs text-slate-500 text-center mb-3 font-medium">Demo credentials</p>
-              <div className="grid grid-cols-2 gap-2">
-                {[['Admin', 'admin@optivision.in', 'Admin@123'], ['Staff', 'priya@optivision.in', 'Staff@123']].map(([r, e, p]) => (
-                  <button key={r} onClick={() => setForm({ email: e, password: p })}
-                    className="text-left px-3 py-2 rounded-xl transition-colors"
-                    style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.08)' }}>
-                    <div className="text-xs font-semibold text-slate-300">{r}</div>
-                    <div className="text-xs text-slate-600 truncate">{e}</div>
-                  </button>
-                ))}
-              </div>
-            </div>
           </div>
         </div>
       </div>
