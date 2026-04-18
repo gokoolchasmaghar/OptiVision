@@ -15,10 +15,10 @@ router.post('/login',
       const errs = validationResult(req);
       if (!errs.isEmpty()) return res.status(400).json({ success: false, errors: errs.array() });
       const { email, password } = req.body;
-      const user = await prisma.users.findUnique({ where: { email }, include: { stores: true } });
+      const user = await prisma.user.findUnique({ where: { email }, include: { stores: true } });
       if (!user || !user.isActive) return res.status(401).json({ success: false, message: 'Invalid credentials' });
       if (!await bcrypt.compare(password, user.passwordHash)) return res.status(401).json({ success: false, message: 'Invalid credentials' });
-      await prisma.users.update({ where: { id: user.id }, data: { lastLogin: new Date() } });
+      await prisma.user.update({ where: { id: user.id }, data: { lastLogin: new Date() } });
       const { passwordHash, ...safe } = user;
       res.json({ success: true, token: sign(user.id), user: safe });
     } catch (e) { next(e); }
@@ -37,11 +37,11 @@ router.post('/change-password', authenticate,
     try {
       const errs = validationResult(req);
       if (!errs.isEmpty()) return res.status(400).json({ success: false, errors: errs.array() });
-      const user = await prisma.users.findUnique({ where: { id: req.user.id } });
+      const user = await prisma.user.findUnique({ where: { id: req.user.id } });
       if (!await bcrypt.compare(req.body.currentPassword, user.passwordHash))
         return res.status(400).json({ success: false, message: 'Current password incorrect' });
       const passwordHash = await bcrypt.hash(req.body.newPassword, 12);
-      await prisma.users.update({ where: { id: req.user.id }, data: { passwordHash } });
+      await prisma.user.update({ where: { id: req.user.id }, data: { passwordHash } });
       res.json({ success: true, message: 'Password changed' });
     } catch (e) { next(e); }
   }
@@ -49,7 +49,7 @@ router.post('/change-password', authenticate,
 
 router.get('/users', authenticate, requireAdmin, async (req, res, next) => {
   try {
-    const users = await prisma.users.findMany({
+    const users = await prisma.user.findMany({
       where: { storeId: req.storeId },
       select: { id:true, name:true, email:true, phone:true, role:true, isActive:true, lastLogin:true, createdAt:true },
       orderBy: { createdAt: 'desc' }
@@ -68,7 +68,7 @@ router.post('/users', authenticate, requireAdmin,
       const errs = validationResult(req);
       if (!errs.isEmpty()) return res.status(400).json({ success: false, errors: errs.array() });
       const { name, email, password, role, phone } = req.body;
-      const user = await prisma.users.create({
+      const user = await prisma.user.create({
         data: { storeId: req.storeId, name, email, phone, passwordHash: await bcrypt.hash(password, 12), role },
         select: { id:true, name:true, email:true, phone:true, role:true, isActive:true, createdAt:true }
       });
@@ -84,7 +84,7 @@ router.patch('/users/:id', authenticate, requireAdmin, async (req, res, next) =>
       return res.status(400).json({ success: false, message: 'Invalid role' });
     }
 
-    const result = await prisma.users.updateMany({
+    const result = await prisma.user.updateMany({
       where: { id: req.params.id, storeId: req.storeId },
       data: {
         ...(name && { name }),
@@ -95,7 +95,7 @@ router.patch('/users/:id', authenticate, requireAdmin, async (req, res, next) =>
     });
     if (!result.count) return res.status(404).json({ success: false, message: 'User not found' });
 
-    const user = await prisma.users.findFirst({
+    const user = await prisma.user.findFirst({
       where: { id: req.params.id, storeId: req.storeId },
       select: { id:true, name:true, email:true, phone:true, role:true, isActive:true }
     });
