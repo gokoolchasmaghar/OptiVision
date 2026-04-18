@@ -8,7 +8,11 @@
     "build": "cd ../frontend && npm install && npm run build",
     "db:migrate": "npx prisma migrate deploy",
     "db:generate": "npx prisma generate",
-    "db:seed": "node prisma/seed.js"
+    "db:seed": "node prisma/seed.js",
+    "prisma": "prisma"
+  },
+  "prisma": {
+    "seed": "node prisma/seed.js"
   },
   "dependencies": {
     "@prisma/client": "^5.10.0",

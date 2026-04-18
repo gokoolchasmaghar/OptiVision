@@ -16,4 +16,4 @@ RUN mkdir -p uploads
 
 EXPOSE 8080
 
-CMD ["sh", "-c", "npx prisma migrate deploy && node prisma/seed.js && node src/index.js"]
+CMD ["sh", "-c", "npx prisma migrate deploy; npx prisma db seed; node src/index.js"]
