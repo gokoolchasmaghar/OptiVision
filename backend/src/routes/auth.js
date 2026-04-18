@@ -15,7 +15,7 @@ router.post('/login',
       const errs = validationResult(req);
       if (!errs.isEmpty()) return res.status(400).json({ success: false, errors: errs.array() });
       const { email, password } = req.body;
-      const user = await prisma.user.findUnique({ where: { email }, include: { stores: true } });
+      const user = await prisma.user.findUnique({ where: { email }, include: { store: true } });
       if (!user || !user.isActive) return res.status(401).json({ success: false, message: 'Invalid credentials' });
       if (!await bcrypt.compare(password, user.passwordHash)) return res.status(401).json({ success: false, message: 'Invalid credentials' });
       await prisma.user.update({ where: { id: user.id }, data: { lastLogin: new Date() } });
