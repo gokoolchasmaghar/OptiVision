@@ -5,7 +5,7 @@ WORKDIR /app
 RUN apt-get update -y && apt-get install -y openssl && rm -rf /var/lib/apt/lists/*
 
 COPY package*.json ./
-RUN npm ci --only=production
+RUN npm ci --omit=dev
 
 COPY prisma ./prisma
 RUN npx prisma generate
@@ -16,4 +16,4 @@ RUN mkdir -p uploads
 
 EXPOSE 8080
 
-CMD ["sh", "-c", "npx prisma migrate deploy; npx prisma db seed; node src/index.js"]
+CMD ["sh", "-c", "npx prisma migrate deploy && node src/index.js"]

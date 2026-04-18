@@ -18,10 +18,40 @@ const PORT = process.env.PORT || 8080;
 
 // Security
 app.use(helmet({ crossOriginResourcePolicy: { policy: 'cross-origin' } }));
-app.use(cors({
-  origin: 'https://opti-vision-plum.vercel.app',  // your exact Vercel URL
-  credentials: true
-}));
+const normalizeOrigin = (origin = '') => origin.trim().replace(/\/+$/, '');
+
+const configuredOrigins = (process.env.FRONTEND_URL || 'http://localhost:5173')
+  .split(',')
+  .map(normalizeOrigin)
+  .filter(Boolean);
+
+const originMatchers = configuredOrigins.map(value => {
+  if (value.includes('*')) {
+    const pattern = value
+      .replace(/[.+?^${}()|[\]\\]/g, '\\$&')
+      .replace(/\*/g, '.*');
+    return new RegExp(`^${pattern}$`);
+  }
+  return value;
+});
+
+const corsOptions = {
+  origin: (origin, callback) => {
+    if (!origin) return callback(null, true);
+    const normalized = normalizeOrigin(origin);
+    const allowed = originMatchers.some(m => (typeof m === 'string' ? m === normalized : m.test(normalized)));
+    if (allowed) return callback(null, true);
+
+    logger.warn(`CORS blocked origin: ${normalized}`);
+    return callback(new Error('Not allowed by CORS'));
+  },
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
+};
+
+app.use(cors(corsOptions));
+app.options('*', cors(corsOptions));
 
 app.set('trust proxy', 1);
 app.use(rateLimit({ windowMs: 15 * 60 * 1000, max: 500 }));
