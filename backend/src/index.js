@@ -10,41 +10,16 @@ const logger = require('./utils/logger');
 const app = express();
 const PORT = process.env.PORT || 8080;
 
-// app.use(express.static(path.join(__dirname, "../frontend/dist")));
-
-// app.get("*", (req, res) => {
-//   res.sendFile(path.join(__dirname, "../frontend/dist/index.html"));
-// });
-
 // Security
 app.use(helmet({ crossOriginResourcePolicy: { policy: 'cross-origin' } }));
-const normalizeOrigin = (origin = '') => origin.trim().replace(/\/+$/, '');
 
-const configuredOrigins = (process.env.FRONTEND_URL || 'http://localhost:5173')
-  .split(',')
-  .map(normalizeOrigin)
-  .filter(Boolean);
-
-const originMatchers = configuredOrigins.map(value => {
-  if (value.includes('*')) {
-    const pattern = value
-      .replace(/[.+?^${}()|[\]\\]/g, '\\$&')
-      .replace(/\*/g, '.*');
-    return new RegExp(`^${pattern}$`);
-  }
-  return value;
-});
-
+// Simplified CORS
 const corsOptions = {
-  origin: (origin, callback) => {
-    if (!origin) return callback(null, true);
-    const normalized = normalizeOrigin(origin);
-    const allowed = originMatchers.some(m => (typeof m === 'string' ? m === normalized : m.test(normalized)));
-    if (allowed) return callback(null, true);
-
-    logger.warn(`CORS blocked origin: ${normalized}`);
-    return callback(new Error('Not allowed by CORS'));
-  },
+  origin: [
+    'https://opti-vision-plum.vercel.app',  // Production Vercel URL
+    'http://localhost:5173',                  // Local development (Vite)
+    'http://localhost:3000'                   // Alternative local (Next.js)
+  ],
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization'],
@@ -62,9 +37,8 @@ app.use(express.urlencoded({ extended: true }));
 app.use(morgan('combined', { stream: { write: m => logger.info(m.trim()) }, skip: r => r.url === '/health' }));
 app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
 
-app.get('/health', (req, res) => {
-  res.send('OK');
-});
+// Health check
+app.get('/health', (req, res) => res.json({ status: 'healthy', version: '2.0.0', timestamp: new Date().toISOString() }));
 
 // Routes
 app.use('/api/auth',         require('./routes/auth'));
@@ -83,8 +57,6 @@ app.use('/api/reports',      require('./routes/reports'));
 app.use('/api/dashboard',    require('./routes/dashboard'));
 app.use('/api/upload',       require('./routes/upload'));
 app.use('/api/barcode',      require('./routes/barcode'));
-
-app.get('/health', (req, res) => res.json({ status: 'healthy', version: '2.0.0', timestamp: new Date().toISOString() }));
 
 // Error handling
 app.use((req, res) => res.status(404).json({ success: false, message: 'Route not found' }));

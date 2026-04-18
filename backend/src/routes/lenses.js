@@ -56,6 +56,18 @@ router.post('/', async (req, res, next) => {
       barcode
     } = req.body;
 
+    let resolvedSupplierId = null;
+    if (supplierId) {
+      const supplier = await prisma.supplier.findFirst({
+        where: { id: supplierId, storeId: req.storeId, isActive: true },
+        select: { id: true },
+      });
+      if (!supplier) {
+        return res.status(400).json({ success: false, message: 'Invalid supplier for this store' });
+      }
+      resolvedSupplierId = supplier.id;
+    }
+
     // Barcode logic
     const finalBarcode =
       barcode && String(barcode).trim() !== ''
@@ -78,7 +90,7 @@ router.post('/', async (req, res, next) => {
         sellingPrice: Number(sellingPrice),
         stockQty: Number(stockQty) || 100,
         lowStockAlert: Number(lowStockAlert) || 10,
-        supplierId,
+        supplierId: resolvedSupplierId,
         barcode: finalBarcode,
         sku: finalSKU
       }
@@ -95,13 +107,23 @@ router.post('/', async (req, res, next) => {
 
 router.put('/:id', async (req, res, next) => {
   try {
-    const lens = await prisma.lens.update({ where: { id: req.params.id }, data: req.body });
+    const { storeId, id, createdAt, updatedAt, ...safeData } = req.body;
+    const result = await prisma.lens.updateMany({
+      where: { id: req.params.id, storeId: req.storeId },
+      data: safeData
+    });
+    if (!result.count) return res.status(404).json({ success: false, message: 'Not found' });
+    const lens = await prisma.lens.findFirst({ where: { id: req.params.id, storeId: req.storeId } });
     res.json({ success: true, data: lens });
   } catch (e) { next(e); }
 });
 router.delete('/:id', async (req, res, next) => {
   try {
-    await prisma.lens.update({ where: { id: req.params.id }, data: { isActive: false } });
+    const result = await prisma.lens.updateMany({
+      where: { id: req.params.id, storeId: req.storeId },
+      data: { isActive: false }
+    });
+    if (!result.count) return res.status(404).json({ success: false, message: 'Not found' });
     res.json({ success: true });
   } catch (e) { next(e); }
 });

@@ -30,15 +30,32 @@ router.get('/movements', async (req, res, next) => {
 router.post('/adjust', async (req, res, next) => {
   try {
     const { frameId, lensId, accessoryId, type, quantity, reason } = req.body;
+    if (!['IN', 'OUT', 'ADJUSTMENT'].includes(type)) {
+      return res.status(400).json({ success: false, message: 'Invalid movement type' });
+    }
+
     let item, idKey;
-    if (frameId) { item = await prisma.frame.findUnique({ where: { id: frameId } }); idKey = 'frameId'; }
-    else if (lensId) { item = await prisma.lens.findUnique({ where: { id: lensId } }); idKey = 'lensId'; }
-    else if (accessoryId) { item = await prisma.accessory.findUnique({ where: { id: accessoryId } }); idKey = 'accessoryId'; }
+    if (frameId) {
+      item = await prisma.frame.findFirst({ where: { id: frameId, storeId: req.storeId } });
+      idKey = 'frameId';
+    } else if (lensId) {
+      item = await prisma.lens.findFirst({ where: { id: lensId, storeId: req.storeId } });
+      idKey = 'lensId';
+    } else if (accessoryId) {
+      item = await prisma.accessory.findFirst({ where: { id: accessoryId, storeId: req.storeId } });
+      idKey = 'accessoryId';
+    }
+
     if (!item) return res.status(404).json({ success: false, message: 'Item not found' });
     const bef = item.stockQty;
     const aft = type === 'IN' ? bef + Number(quantity) : type === 'OUT' ? Math.max(0, bef - Number(quantity)) : Number(quantity);
-    const model = idKey === 'frameId' ? prisma.frame : idKey === 'lensId' ? prisma.lens : prisma.accessory;
-    await model.update({ where: { id: item.id }, data: { stockQty: aft } });
+    const updateResult = idKey === 'frameId'
+      ? await prisma.frame.updateMany({ where: { id: item.id, storeId: req.storeId }, data: { stockQty: aft } })
+      : idKey === 'lensId'
+        ? await prisma.lens.updateMany({ where: { id: item.id, storeId: req.storeId }, data: { stockQty: aft } })
+        : await prisma.accessory.updateMany({ where: { id: item.id, storeId: req.storeId }, data: { stockQty: aft } });
+
+    if (!updateResult.count) return res.status(404).json({ success: false, message: 'Item not found' });
     await prisma.stockMovement.create({ data: { storeId: req.storeId, [idKey]: item.id, type, quantity: Number(quantity), beforeQty: bef, afterQty: aft, reason } });
     res.json({ success: true, data: { beforeQty: bef, afterQty: aft } });
   } catch (e) { next(e); }

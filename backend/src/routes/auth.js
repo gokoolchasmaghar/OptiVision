@@ -80,9 +80,23 @@ router.post('/users', authenticate, requireAdmin,
 router.patch('/users/:id', authenticate, requireAdmin, async (req, res, next) => {
   try {
     const { name, phone, role, isActive } = req.body;
-    const user = await prisma.user.update({
-      where: { id: req.params.id },
-      data: { ...(name && { name }), ...(phone !== undefined && { phone }), ...(role && { role }), ...(isActive !== undefined && { isActive }) },
+    if (role && !['SHOP_ADMIN', 'STAFF'].includes(role)) {
+      return res.status(400).json({ success: false, message: 'Invalid role' });
+    }
+
+    const result = await prisma.user.updateMany({
+      where: { id: req.params.id, storeId: req.storeId },
+      data: {
+        ...(name && { name }),
+        ...(phone !== undefined && { phone }),
+        ...(role && { role }),
+        ...(isActive !== undefined && { isActive })
+      }
+    });
+    if (!result.count) return res.status(404).json({ success: false, message: 'User not found' });
+
+    const user = await prisma.user.findFirst({
+      where: { id: req.params.id, storeId: req.storeId },
       select: { id:true, name:true, email:true, phone:true, role:true, isActive:true }
     });
     res.json({ success: true, data: user });

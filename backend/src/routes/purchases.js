@@ -13,24 +13,77 @@ router.get('/', async (req, res, next) => {
 router.post('/', async (req, res, next) => {
   try {
     const { supplierId, invoiceNumber, items, notes, purchasedAt } = req.body;
+    if (!supplierId || !Array.isArray(items) || !items.length) {
+      return res.status(400).json({ success: false, message: 'supplierId and items are required' });
+    }
+
+    const supplier = await prisma.supplier.findFirst({
+      where: { id: supplierId, storeId: req.storeId, isActive: true },
+      select: { id: true },
+    });
+    if (!supplier) return res.status(400).json({ success: false, message: 'Invalid supplier for this store' });
+
     const totalAmount = items.reduce((s, i) => s + i.quantity * i.unitCost, 0);
     const purchase = await prisma.$transaction(async tx => {
       const p = await tx.purchase.create({
-        data: { storeId: req.storeId, supplierId, invoiceNumber, totalAmount, notes, purchasedAt: purchasedAt ? new Date(purchasedAt) : new Date(), items: { create: items.map(i => ({ itemType: i.itemType, itemId: i.itemId, itemName: i.itemName, quantity: i.quantity, unitCost: i.unitCost, totalCost: i.quantity * i.unitCost })) } },
+        data: {
+          storeId: req.storeId,
+          supplierId,
+          invoiceNumber,
+          totalAmount,
+          notes,
+          purchasedAt: purchasedAt ? new Date(purchasedAt) : new Date(),
+          items: {
+            create: items.map(i => ({
+              itemType: i.itemType,
+              itemId: i.itemId,
+              itemName: i.itemName,
+              quantity: i.quantity,
+              unitCost: i.unitCost,
+              totalCost: i.quantity * i.unitCost
+            }))
+          }
+        },
         include: { items: true }
       });
       for (const item of items) {
         if (item.itemType === 'frame' && item.itemId) {
-          const f = await tx.frame.findUnique({ where: { id: item.itemId } });
+          const f = await tx.frame.findFirst({ where: { id: item.itemId, storeId: req.storeId } });
           if (f) {
-            await tx.frame.update({ where: { id: item.itemId }, data: { stockQty: { increment: item.quantity }, purchasePrice: item.unitCost } });
+            await tx.frame.updateMany({
+              where: { id: item.itemId, storeId: req.storeId },
+              data: { stockQty: { increment: item.quantity }, purchasePrice: item.unitCost }
+            });
             await tx.stockMovement.create({ data: { storeId: req.storeId, frameId: item.itemId, type: 'IN', quantity: item.quantity, beforeQty: f.stockQty, afterQty: f.stockQty + item.quantity, reason: 'Purchase', reference: invoiceNumber || p.id } });
           }
         } else if (item.itemType === 'lens' && item.itemId) {
-          const l = await tx.lens.findUnique({ where: { id: item.itemId } });
+          const l = await tx.lens.findFirst({ where: { id: item.itemId, storeId: req.storeId } });
           if (l) {
-            await tx.lens.update({ where: { id: item.itemId }, data: { stockQty: { increment: item.quantity } } });
+            await tx.lens.updateMany({
+              where: { id: item.itemId, storeId: req.storeId },
+              data: { stockQty: { increment: item.quantity } }
+            });
             await tx.stockMovement.create({ data: { storeId: req.storeId, lensId: item.itemId, type: 'IN', quantity: item.quantity, beforeQty: l.stockQty, afterQty: l.stockQty + item.quantity, reason: 'Purchase', reference: invoiceNumber || p.id } });
+          }
+        } else if (item.itemType === 'accessory' && item.itemId) {
+          const a = await tx.accessory.findFirst({ where: { id: item.itemId, storeId: req.storeId } });
+          if (a) {
+            await tx.accessory.updateMany({
+              where: { id: item.itemId, storeId: req.storeId },
+              data: { stockQty: { increment: item.quantity } }
+            });
+            await tx.stockMovement.create({
+              data: {
+                storeId: req.storeId,
+                accessoryId: item.itemId,
+                type: 'IN',
+                quantity: item.quantity,
+                beforeQty: a.stockQty,
+                afterQty: a.stockQty + item.quantity,
+                reason: 'Purchase',
+                reference: invoiceNumber || p.id
+              }
+            });
           }
         }
       }

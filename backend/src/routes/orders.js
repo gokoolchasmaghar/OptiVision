@@ -54,6 +54,20 @@ router.post('/', async (req, res, next) => {
     const store = await prisma.store.findUnique({ where: { id: req.storeId } });
     if (!store) return res.status(404).json({ success: false, message: 'Store not found' });
 
+    const customer = await prisma.customer.findFirst({
+      where: { id: customerId, storeId: req.storeId },
+      select: { id: true },
+    });
+    if (!customer) return res.status(400).json({ success: false, message: 'Invalid customer for this store' });
+
+    if (prescriptionId) {
+      const prescription = await prisma.prescription.findFirst({
+        where: { id: prescriptionId, customerId, customer: { storeId: req.storeId } },
+        select: { id: true },
+      });
+      if (!prescription) return res.status(400).json({ success: false, message: 'Invalid prescription for this customer' });
+    }
+
     const calculatedSubtotal = roundMoney(items.reduce((sum, item) => sum + (Number(item.totalPrice) || 0), 0));
     const safeDiscount = Math.min(Math.max(roundMoney(discountAmount), 0), calculatedSubtotal);
     const loyaltyUsed = Number(redeemPoints || 0);
@@ -71,17 +85,27 @@ router.post('/', async (req, res, next) => {
     const order = await prisma.$transaction(async tx => {
       for (const item of items) {
         if (item.itemType === 'frame' && item.frameId) {
-          const frame = await tx.frame.findUnique({ where: { id: item.frameId } });
+          const frame = await tx.frame.findFirst({
+            where: { id: item.frameId, storeId: req.storeId, isActive: true }
+          });
           if (!frame || frame.stockQty < item.quantity) throw Object.assign(new Error(`Insufficient stock: ${frame?.brand || 'frame'}`), { status: 400 });
           const bef = frame.stockQty;
-          await tx.frame.update({ where: { id: item.frameId }, data: { stockQty: { decrement: item.quantity } } });
+          await tx.frame.updateMany({
+            where: { id: item.frameId, storeId: req.storeId },
+            data: { stockQty: { decrement: item.quantity } }
+          });
           await tx.stockMovement.create({ data: { storeId: req.storeId, frameId: item.frameId, type: 'OUT', quantity: item.quantity, beforeQty: bef, afterQty: bef - item.quantity, reason: 'Order', reference: orderNumber } });
         }
         if (item.itemType === 'lens' && item.lensId) {
-          const lens = await tx.lens.findUnique({ where: { id: item.lensId } });
+          const lens = await tx.lens.findFirst({
+            where: { id: item.lensId, storeId: req.storeId, isActive: true }
+          });
           if (lens && lens.stockQty >= item.quantity) {
             const bef = lens.stockQty;
-            await tx.lens.update({ where: { id: item.lensId }, data: { stockQty: { decrement: item.quantity } } });
+            await tx.lens.updateMany({
+              where: { id: item.lensId, storeId: req.storeId },
+              data: { stockQty: { decrement: item.quantity } }
+            });
             await tx.stockMovement.create({ data: { storeId: req.storeId, lensId: item.lensId, type: 'OUT', quantity: item.quantity, beforeQty: bef, afterQty: bef - item.quantity, reason: 'Order', reference: orderNumber } });
           }
         }
@@ -106,14 +130,15 @@ router.post('/', async (req, res, next) => {
       const earnedPoints = Math.floor(newOrder.totalAmount / 100);
 
       // update customer points
-      await tx.customer.update({
-        where: { id: customerId },
+      const customerUpdate = await tx.customer.updateMany({
+        where: { id: customerId, storeId: req.storeId },
         data: {
           loyaltyPoints: {
             increment: earnedPoints - Number(redeemPoints || 0)
           }
         }
       });
+      if (!customerUpdate.count) throw Object.assign(new Error('Customer not found'), { status: 404 });
 
       // 🔥 LOYALTY LOGIC END
 
@@ -134,10 +159,21 @@ router.patch('/:id/status', async (req, res, next) => {
     const { status, note } = req.body;
     const valid = ['CREATED', 'LENS_ORDERED', 'GRINDING', 'FITTING', 'READY', 'DELIVERED', 'CANCELLED'];
     if (!valid.includes(status)) return res.status(400).json({ success: false, message: 'Invalid status' });
+
+    const existing = await prisma.order.findFirst({
+      where: { id: req.params.id, storeId: req.storeId },
+      select: { id: true },
+    });
+    if (!existing) return res.status(404).json({ success: false, message: 'Not found' });
+
     const order = await prisma.$transaction(async tx => {
-      const u = await tx.order.update({ where: { id: req.params.id }, data: { status, ...(status === 'DELIVERED' && { deliveredAt: new Date() }), ...(status === 'CANCELLED' && { cancelledAt: new Date(), cancelReason: note }) } });
+      const result = await tx.order.updateMany({
+        where: { id: req.params.id, storeId: req.storeId },
+        data: { status, ...(status === 'DELIVERED' && { deliveredAt: new Date() }), ...(status === 'CANCELLED' && { cancelledAt: new Date(), cancelReason: note }) }
+      });
+      if (!result.count) throw Object.assign(new Error('Order not found'), { status: 404 });
       await tx.orderStatusLog.create({ data: { orderId: req.params.id, status, note } });
-      return u;
+      return tx.order.findFirst({ where: { id: req.params.id, storeId: req.storeId } });
     });
     res.json({ success: true, data: order });
   } catch (e) { next(e); }
@@ -146,13 +182,19 @@ router.patch('/:id/status', async (req, res, next) => {
 router.post('/:id/payment', async (req, res, next) => {
   try {
     const { amount, method, reference, note } = req.body;
+    if (Number(amount) <= 0) return res.status(400).json({ success: false, message: 'Amount must be greater than zero' });
+
     const order = await prisma.order.findFirst({ where: { id: req.params.id, storeId: req.storeId } });
     if (!order) return res.status(404).json({ success: false, message: 'Not found' });
     await prisma.$transaction(async tx => {
       await tx.payment.create({ data: { orderId: req.params.id, amount: Number(amount), method, reference, note } });
       const agg = await tx.payment.aggregate({ where: { orderId: req.params.id }, _sum: { amount: true } });
       const paid = agg._sum.amount || 0;
-      await tx.order.update({ where: { id: req.params.id }, data: { advanceAmount: paid, balanceAmount: Math.max(0, order.totalAmount - paid), paymentStatus: paid >= order.totalAmount ? 'PAID' : 'PARTIAL' } });
+      const result = await tx.order.updateMany({
+        where: { id: req.params.id, storeId: req.storeId },
+        data: { advanceAmount: paid, balanceAmount: Math.max(0, order.totalAmount - paid), paymentStatus: paid >= order.totalAmount ? 'PAID' : 'PARTIAL' }
+      });
+      if (!result.count) throw Object.assign(new Error('Order not found'), { status: 404 });
     });
     res.status(201).json({ success: true });
   } catch (e) { next(e); }
@@ -182,12 +224,13 @@ router.delete('/:id', requireAdmin, async (req, res, next) => {
       for (const item of order.items) {
         // 🟦 FRAME
         if (item.frameId) {
-          const frame = await tx.frame.findUnique({
-            where: { id: item.frameId }
+          const frame = await tx.frame.findFirst({
+            where: { id: item.frameId, storeId: req.storeId }
           });
+          if (!frame) continue;
 
-          await tx.frame.update({
-            where: { id: item.frameId },
+          await tx.frame.updateMany({
+            where: { id: item.frameId, storeId: req.storeId },
             data: {
               stockQty: { increment: item.quantity }
             }
@@ -209,12 +252,13 @@ router.delete('/:id', requireAdmin, async (req, res, next) => {
 
         // 🟨 LENS
         else if (item.lensId) {
-          const lens = await tx.lens.findUnique({
-            where: { id: item.lensId }
+          const lens = await tx.lens.findFirst({
+            where: { id: item.lensId, storeId: req.storeId }
           });
+          if (!lens) continue;
 
-          await tx.lens.update({
-            where: { id: item.lensId },
+          await tx.lens.updateMany({
+            where: { id: item.lensId, storeId: req.storeId },
             data: {
               stockQty: { increment: item.quantity }
             }
@@ -236,12 +280,13 @@ router.delete('/:id', requireAdmin, async (req, res, next) => {
 
         // 🟩 ACCESSORY (FIXED)
         else if (item.accessoryId) {
-          const acc = await tx.accessory.findUnique({
-            where: { id: item.accessoryId }
+          const acc = await tx.accessory.findFirst({
+            where: { id: item.accessoryId, storeId: req.storeId }
           });
+          if (!acc) continue;
 
-          await tx.accessory.update({
-            where: { id: item.accessoryId },
+          await tx.accessory.updateMany({
+            where: { id: item.accessoryId, storeId: req.storeId },
             data: {
               stockQty: { increment: item.quantity }
             }
@@ -263,14 +308,15 @@ router.delete('/:id', requireAdmin, async (req, res, next) => {
       }
 
       // 🔥 Cancel order (soft delete)
-      await tx.order.update({
-        where: { id: req.params.id },
+      const updateResult = await tx.order.updateMany({
+        where: { id: req.params.id, storeId: req.storeId },
         data: {
           status: 'CANCELLED',
           cancelledAt: new Date(),
           cancelReason: reason
         }
       });
+      if (!updateResult.count) throw Object.assign(new Error('Order not found'), { status: 404 });
 
       await tx.orderStatusLog.create({
         data: {
