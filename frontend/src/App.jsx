@@ -1,7 +1,7 @@
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { useAuthStore } from './stores/authStore';
 import AppLayout from './components/layout/AppLayout';
-// import Login from './pages/Login';
+import Login from './pages/Login';
 import Dashboard from './pages/Dashboard';
 import Customers from './pages/Customers';
 import CustomerDetail from './pages/CustomerDetail';
@@ -14,7 +14,7 @@ import Billing from './pages/Billing';
 import Inventory from './pages/Inventory';
 import Reports from './pages/Reports';
 import Settings from './pages/Settings';
-import Auth from './pages/Auth';
+// import Auth from './pages/Auth';
 
 const Guard = ({ children }) => {
   const { token } = useAuthStore();
@@ -28,8 +28,8 @@ const Public = ({ children }) => {
 export default function App() {
   return (
     <Routes>
-      {/* <Route path="/login" element={<Public><Login /></Public>} /> */}
-      <Route path="/auth" element={<Public><Auth /></Public>} />
+      <Route path="/login" element={<Public><Login /></Public>} />
+      {/* <Route path="/auth" element={<Public><Auth /></Public>} /> */}
       <Route path="/" element={<Guard><AppLayout /></Guard>}>
         <Route index element={<Navigate to="/dashboard" replace />} />
         <Route path="dashboard" element={<Dashboard />} />
