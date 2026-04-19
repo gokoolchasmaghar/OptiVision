@@ -43,10 +43,17 @@ const isOriginAllowed = (origin) => {
 
 const corsOptions = {
   origin(origin, callback) {
-    if (isOriginAllowed(origin)) return callback(null, true);
-    logger.warn(`CORS blocked origin: ${origin}`);
-    return callback(new Error('Origin not allowed by CORS'));
-  },
+  if (!origin) return callback(null, true); // allow non-browser requests
+
+  if (isOriginAllowed(origin)) {
+    return callback(null, true);
+  }
+
+  logger.warn(`CORS blocked origin: ${origin}`);
+
+  // 🔥 IMPORTANT: don't throw error, just block silently
+  return callback(null, false);
+},
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization'],
