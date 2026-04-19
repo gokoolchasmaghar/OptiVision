@@ -25,8 +25,11 @@ const wildcardToRegex = (pattern) => {
 };
 
 const configuredOrigins = parseOrigins(process.env.FRONTEND_URL);
-const fallbackOrigins = ['http://localhost:5173', 'http://localhost:3000', 'https://*.vercel.app'];
-const allowedOrigins = configuredOrigins.length ? configuredOrigins : fallbackOrigins;
+const fallbackOrigins = ['http://localhost:5173', 'http://localhost:3000', 'https://opti-vision-plum.vercel.app', 'https://*.vercel.app'];
+const allowedOrigins = [...new Set([
+  ...fallbackOrigins,
+  ...configuredOrigins
+])];
 const exactOrigins = allowedOrigins.filter(origin => !origin.includes('*'));
 const wildcardOrigins = allowedOrigins
   .filter(origin => origin.includes('*'))
@@ -65,22 +68,22 @@ app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
 app.get('/health', (req, res) => res.json({ status: 'healthy', version: '2.0.0', timestamp: new Date().toISOString() }));
 
 // Routes
-app.use('/api/auth',         require('./routes/auth'));
-app.use('/api/stores',       require('./routes/stores'));
-app.use('/api/customers',    require('./routes/customers'));
-app.use('/api/prescriptions',require('./routes/prescriptions'));
-app.use('/api/frames',       require('./routes/frames'));
-app.use('/api/lenses',       require('./routes/lenses'));
-app.use('/api/accessories',  require('./routes/accessories'));
-app.use('/api/orders',       require('./routes/orders'));
-app.use('/api/payments',     require('./routes/payments'));
-app.use('/api/inventory',    require('./routes/inventory'));
-app.use('/api/suppliers',    require('./routes/suppliers'));
-app.use('/api/purchases',    require('./routes/purchases'));
-app.use('/api/reports',      require('./routes/reports'));
-app.use('/api/dashboard',    require('./routes/dashboard'));
-app.use('/api/upload',       require('./routes/upload'));
-app.use('/api/barcode',      require('./routes/barcode'));
+app.use('/api/auth', require('./routes/auth'));
+app.use('/api/stores', require('./routes/stores'));
+app.use('/api/customers', require('./routes/customers'));
+app.use('/api/prescriptions', require('./routes/prescriptions'));
+app.use('/api/frames', require('./routes/frames'));
+app.use('/api/lenses', require('./routes/lenses'));
+app.use('/api/accessories', require('./routes/accessories'));
+app.use('/api/orders', require('./routes/orders'));
+app.use('/api/payments', require('./routes/payments'));
+app.use('/api/inventory', require('./routes/inventory'));
+app.use('/api/suppliers', require('./routes/suppliers'));
+app.use('/api/purchases', require('./routes/purchases'));
+app.use('/api/reports', require('./routes/reports'));
+app.use('/api/dashboard', require('./routes/dashboard'));
+app.use('/api/upload', require('./routes/upload'));
+app.use('/api/barcode', require('./routes/barcode'));
 
 // Error handling
 app.use((req, res) => res.status(404).json({ success: false, message: 'Route not found' }));
