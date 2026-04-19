@@ -10,23 +10,39 @@ const logger = require('./utils/logger');
 const app = express();
 const PORT = process.env.PORT || 8080;
 
-// Security
-app.use(helmet({ crossOriginResourcePolicy: { policy: 'cross-origin' } }));
-
-// ✅ SIMPLE & FIXED CORS
-app.use(cors({
-  origin: [
-    'https://opti-vision-plum.vercel.app',
-    'http://localhost:5173',
-    'http://localhost:3000'
-  ],
+// ✅ CORS CONFIG - sabse pehle
+const corsOptions = {
+  origin: function (origin, callback) {
+    const allowedOrigins = [
+      'https://opti-vision-plum.vercel.app',
+      'http://localhost:5173',
+      'http://localhost:3000',
+      'http://localhost:4173'
+    ];
+    // Allow requests with no origin (mobile apps, curl, Postman)
+    if (!origin) return callback(null, true);
+    if (allowedOrigins.includes(origin)) {
+      callback(null, true);
+    } else {
+      callback(null, true); // Temporary: allow all origins
+    }
+  },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization']
-}));
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
+  optionsSuccessStatus: 200
+};
 
-// Handle preflight
-app.options('*', cors());
+// ✅ Preflight - CORS se pehle kuch nahi
+app.options('*', cors(corsOptions));
+app.use(cors(corsOptions));
+
+// Security - CORS ke baad
+app.use(helmet({
+  crossOriginResourcePolicy: { policy: 'cross-origin' },
+  crossOriginOpenerPolicy: false,
+  contentSecurityPolicy: false
+}));
 
 // Trust proxy (Railway)
 app.set('trust proxy', 1);
@@ -34,7 +50,9 @@ app.set('trust proxy', 1);
 // Rate limiting
 app.use(rateLimit({
   windowMs: 15 * 60 * 1000,
-  max: 500
+  max: 500,
+  standardHeaders: true,
+  legacyHeaders: false
 }));
 
 // Parsing
@@ -59,7 +77,7 @@ app.get('/health', (req, res) => {
   });
 });
 
-// Routes
+// ✅ Routes
 app.use('/api/auth', require('./routes/auth'));
 app.use('/api/stores', require('./routes/stores'));
 app.use('/api/customers', require('./routes/customers'));
@@ -94,17 +112,14 @@ app.use((err, req, res, next) => {
     status = 409;
     message = 'Duplicate record';
   }
-
   if (err.code === 'P2025') {
     status = 404;
     message = 'Record not found';
   }
-
   if (err.code === 'P2003') {
     status = 400;
     message = 'Invalid reference';
   }
-
   if (status >= 500) {
     logger.error(`${status} - ${message}`, { stack: err.stack });
   }

@@ -1,85 +1,91 @@
-require('dotenv').config();
 const { PrismaClient } = require('@prisma/client');
 const bcrypt = require('bcryptjs');
 
 const prisma = new PrismaClient();
 
-const getRequiredEnv = (name) => {
-  const value = process.env[name];
-  if (!value || !value.trim()) {
-    throw new Error(`Missing required environment variable: ${name}`);
-  }
-  return value.trim();
-};
-
 async function main() {
-  console.log('Bootstrapping production seed...');
+  console.log('🌱 OptiVision Seeding started...\n');
 
-  const storeId = process.env.SEED_STORE_ID || 'store-main-01';
-  const storeName = process.env.SEED_STORE_NAME || 'OptiVision';
+  // ─── Step 1: Store ───────────────────────────────────────
   const store = await prisma.store.upsert({
-    where: { id: storeId },
+    where: { id: 'store-optivision-001' },
     update: {
-      name: storeName,
-      address: process.env.SEED_STORE_ADDRESS || null,
-      phone: process.env.SEED_STORE_PHONE || null,
-      email: process.env.SEED_STORE_EMAIL || null,
-      gstNumber: process.env.SEED_STORE_GST_NUMBER || null,
-      gstEnabled: String(process.env.SEED_STORE_GST_ENABLED || 'false').toLowerCase() === 'true',
-      taxRate: Number(process.env.SEED_STORE_TAX_RATE || 18),
-      invoicePrefix: process.env.SEED_INVOICE_PREFIX || 'INV',
-    },
-    create: {
-      id: storeId,
-      name: storeName,
-      address: process.env.SEED_STORE_ADDRESS || null,
-      phone: process.env.SEED_STORE_PHONE || null,
-      email: process.env.SEED_STORE_EMAIL || null,
-      gstNumber: process.env.SEED_STORE_GST_NUMBER || null,
-      gstEnabled: String(process.env.SEED_STORE_GST_ENABLED || 'false').toLowerCase() === 'true',
-      taxRate: Number(process.env.SEED_STORE_TAX_RATE || 18),
-      invoicePrefix: process.env.SEED_INVOICE_PREFIX || 'INV',
-    }
-  });
-
-  const adminEmail = getRequiredEnv('SEED_ADMIN_EMAIL').toLowerCase();
-  const adminPassword = getRequiredEnv('SEED_ADMIN_PASSWORD');
-  const adminName = process.env.SEED_ADMIN_NAME || 'System Administrator';
-  const adminPhone = process.env.SEED_ADMIN_PHONE || null;
-  const adminRole = process.env.SEED_ADMIN_ROLE || 'SHOP_ADMIN';
-
-  if (!['SUPER_ADMIN', 'SHOP_ADMIN'].includes(adminRole)) {
-    throw new Error('SEED_ADMIN_ROLE must be SUPER_ADMIN or SHOP_ADMIN');
-  }
-
-  const passwordHash = await bcrypt.hash(adminPassword, 12);
-  await prisma.user.upsert({
-    where: { email: adminEmail },
-    update: {
-      storeId: store.id,
-      name: adminName,
-      phone: adminPhone,
-      role: adminRole,
+      name: 'OptiVision',
       isActive: true,
     },
     create: {
-      storeId: store.id,
-      name: adminName,
-      email: adminEmail,
-      phone: adminPhone,
-      role: adminRole,
-      passwordHash, // ✅ only set during creation
+      id: 'store-optivision-001',
+      name: 'OptiVision',
+      address: 'Main Branch, India',
+      phone: '9999999999',
+      email: 'info@optivision.in',
+      gstEnabled: false,
+      invoicePrefix: 'OV',
+      invoiceCounter: 1000,
       isActive: true,
     }
   });
+  console.log('✅ Store ready:', store.name, `(${store.id})`);
 
-  console.log('Production seed completed.');
-  console.log(`Admin: ${adminEmail}`);
+  // ─── Step 2: Admin User ──────────────────────────────────
+  const adminHash = await bcrypt.hash('Admin@123', 12);
+  const admin = await prisma.user.upsert({
+    where: { email: 'admin@optivision.in' },
+    update: {
+      passwordHash: adminHash,
+      isActive: true,
+      role: 'SHOP_ADMIN',
+      storeId: store.id,
+    },
+    create: {
+      storeId: store.id,
+      name: 'Admin',
+      email: 'admin@optivision.in',
+      phone: '9999999999',
+      passwordHash: adminHash,
+      role: 'SHOP_ADMIN',
+      isActive: true,
+    }
+  });
+  console.log('✅ Admin ready:', admin.email);
+
+  // ─── Step 3: Staff User ──────────────────────────────────
+  const staffHash = await bcrypt.hash('Staff@123', 12);
+  const staff = await prisma.user.upsert({
+    where: { email: 'priya@optivision.in' },
+    update: {
+      passwordHash: staffHash,
+      isActive: true,
+      storeId: store.id,
+    },
+    create: {
+      storeId: store.id,
+      name: 'Priya Sharma',
+      email: 'priya@optivision.in',
+      phone: '8888888888',
+      passwordHash: staffHash,
+      role: 'STAFF',
+      isActive: true,
+    }
+  });
+  console.log('✅ Staff ready:', staff.email);
+
+  // ─── Done ────────────────────────────────────────────────
+  console.log('\n🎉 Seeding complete!\n');
+  console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+  console.log('🔐 Login Credentials:');
+  console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+  console.log('👤 Admin  → admin@optivision.in / Admin@123');
+  console.log('👤 Staff  → priya@optivision.in / Staff@123');
+  console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n');
 }
 
 main()
-  .catch((e) => {
-    console.error('Seed failed:', e.message);
+  .catch(e => {
+    console.error('❌ Seed failed:', e.message);
+    console.error(e);
     process.exit(1);
   })
-  .finally(() => prisma.$disconnect());
+  .finally(async () => {
+    await prisma.$disconnect();
+  });

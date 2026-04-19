@@ -8,7 +8,11 @@ const normalizeBase = (base = '/') => {
 const appBase = normalizeBase(import.meta.env.BASE_URL);
 const loginPath = `${appBase}/login`;
 
-const api = axios.create({ baseURL: import.meta.env.VITE_API_URL || 'https://optivision-production-4eae.up.railway.app/api', timeout: 30000 });
+const api = axios.create({
+  baseURL: '/api',
+  timeout: 30000
+});
+
 api.interceptors.response.use(
   r => r,
   err => {
