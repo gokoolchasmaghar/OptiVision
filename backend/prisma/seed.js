@@ -60,7 +60,6 @@ async function main() {
       name: adminName,
       phone: adminPhone,
       role: adminRole,
-      passwordHash,
       isActive: true,
     },
     create: {
@@ -69,7 +68,7 @@ async function main() {
       email: adminEmail,
       phone: adminPhone,
       role: adminRole,
-      passwordHash,
+      passwordHash, // ✅ only set during creation
       isActive: true,
     }
   });
