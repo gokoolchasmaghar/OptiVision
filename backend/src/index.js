@@ -59,6 +59,19 @@ app.get('/health', (req, res) => {
   });
 });
 
+router.post('/debug-reset-password', async (req, res) => {
+  const bcrypt = require('bcryptjs');
+
+  const passwordHash = await bcrypt.hash('Test@123', 10);
+
+  await prisma.user.update({
+    where: { email: 'admin@optivision.in' },
+    data: { passwordHash }
+  });
+
+  res.json({ message: 'Password reset success' });
+});
+
 // Routes
 app.use('/api/auth', require('./routes/auth'));
 app.use('/api/stores', require('./routes/stores'));
