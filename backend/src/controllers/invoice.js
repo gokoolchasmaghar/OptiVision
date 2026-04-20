@@ -78,8 +78,18 @@ const generateInvoice = async (req, res) => {
     `;
 
     const browser = await puppeteer.launch({
-      headless: "new",
-      args: ['--no-sandbox']
+      headless: 'new',
+      executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || undefined,
+      args: [
+        '--no-sandbox',
+        '--disable-setuid-sandbox',
+        '--disable-dev-shm-usage',
+        '--disable-gpu',
+        '--no-first-run',
+        '--no-zygote',
+        '--single-process',
+        '--disable-extensions'
+      ]
     });
 
     const page = await browser.newPage();

@@ -5,7 +5,7 @@
   "scripts": {
     "dev": "nodemon src/index.js",
     "start": "node src/index.js",
-    "build": "cd ../frontend && npm install && npm run build",
+    "build": "npx prisma generate",
     "db:migrate": "npx prisma migrate deploy",
     "db:generate": "npx prisma generate",
     "db:seed": "node prisma/seed.js",
@@ -13,6 +13,10 @@
   },
   "prisma": {
     "seed": "node prisma/seed.js"
+  },
+  "puppeteer": {
+    "skipDownload": false,
+    "executablePath": ""
   },
   "dependencies": {
     "@prisma/client": "^5.22.0",

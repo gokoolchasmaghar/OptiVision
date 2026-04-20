@@ -14,17 +14,17 @@ const PORT = process.env.PORT || 8080;
 const corsOptions = {
   origin: function (origin, callback) {
     const allowedOrigins = [
-      'https://opti-vision-plum.vercel.app',
+      process.env.FRONTEND_URL,
       'http://localhost:5173',
       'http://localhost:3000',
       'http://localhost:4173'
-    ];
+    ].filter(Boolean);
     // Allow requests with no origin (mobile apps, curl, Postman)
     if (!origin) return callback(null, true);
     if (allowedOrigins.includes(origin)) {
       callback(null, true);
     } else {
-      callback(null, true); // Temporary: allow all origins
+      callback(new Error('Not allowed by CORS'));
     }
   },
   credentials: true,
