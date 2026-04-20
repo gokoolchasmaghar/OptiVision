@@ -7,9 +7,9 @@ async function main() {
   console.log('🌱 Seeding started...\n');
 
   // Read from env — set these in Railway env vars
-  const adminEmail = process.env.SEED_ADMIN_EMAIL || 'admin@optivision.in';
+  const adminEmail = process.env.SEED_ADMIN_EMAIL || 'admin@gmail.com';
   const adminPassword = process.env.SEED_ADMIN_PASSWORD;
-  const staffEmail = process.env.SEED_STAFF_EMAIL || 'staff@optivision.in';
+  const staffEmail = process.env.SEED_STAFF_EMAIL || 'staff@gmail.com';
   const staffPassword = process.env.SEED_STAFF_PASSWORD;
 
   if (!adminPassword || !staffPassword) {
