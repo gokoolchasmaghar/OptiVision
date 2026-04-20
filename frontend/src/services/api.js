@@ -9,7 +9,7 @@ const appBase = normalizeBase(import.meta.env.BASE_URL);
 const loginPath = `${appBase}/login`;
 
 const api = axios.create({
-  baseURL: '/api',
+  baseURL: import.meta.env.VITE_API_URL || '/api',
   timeout: 30000
 });
 
