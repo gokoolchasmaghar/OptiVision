@@ -12,6 +12,25 @@ async function main() {
   const staffEmail = process.env.SEED_STAFF_EMAIL || 'staff@gmail.com';
   const staffPassword = process.env.SEED_STAFF_PASSWORD;
 
+  const adminEmail = process.env.SEED_ADMIN_EMAIL;
+
+  const existing = await prisma.user.findUnique({
+    where: { email: adminEmail }
+  });
+
+  if (!existing) {
+    await prisma.user.create({
+      data: {
+        email: adminEmail,
+        password: hashedPassword,
+        role: "ADMIN"
+      }
+    });
+    console.log("Admin created");
+  } else {
+    console.log("Admin already exists");
+  }
+
   if (!adminPassword || !staffPassword) {
     throw new Error('❌ SEED_ADMIN_PASSWORD and SEED_STAFF_PASSWORD must be set in env');
   }

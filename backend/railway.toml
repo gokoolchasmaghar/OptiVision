@@ -2,5 +2,5 @@
 builder = "dockerfile"
 
 [deploy]
-startCommand = "node prisma/seed.js"
+startCommand = "node src/index.js"
 restartPolicyType = "on_failure"
