@@ -132,7 +132,7 @@ export default function Inventory() {
               {allFrames.map(f => <option key={f.id} value={f.id}>{f.brand} {f.model} ({f.stockQty})</option>)}
             </select>
           </div>
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
               <label className="field-label">Type</label>
               <select className="field-select" value={adjForm.type} onChange={e => setAdjForm(f => ({ ...f, type: e.target.value }))}>

@@ -1,4 +1,5 @@
 // backend/prisma/seed.js
+require('dotenv').config();
 const { PrismaClient } = require('@prisma/client');
 const bcrypt = require('bcryptjs');
 const prisma = new PrismaClient();
@@ -6,35 +7,16 @@ const prisma = new PrismaClient();
 async function main() {
   console.log('🌱 Seeding started...\n');
 
-  // Read from env — set these in Railway env vars
   const adminEmail = process.env.SEED_ADMIN_EMAIL || 'admin@gmail.com';
   const adminPassword = process.env.SEED_ADMIN_PASSWORD;
   const staffEmail = process.env.SEED_STAFF_EMAIL || 'staff@gmail.com';
   const staffPassword = process.env.SEED_STAFF_PASSWORD;
 
-  const adminEmail = process.env.SEED_ADMIN_EMAIL;
-
-  const existing = await prisma.user.findUnique({
-    where: { email: adminEmail }
-  });
-
-  if (!existing) {
-    await prisma.user.create({
-      data: {
-        email: adminEmail,
-        password: hashedPassword,
-        role: "ADMIN"
-      }
-    });
-    console.log("Admin created");
-  } else {
-    console.log("Admin already exists");
-  }
-
   if (!adminPassword || !staffPassword) {
     throw new Error('❌ SEED_ADMIN_PASSWORD and SEED_STAFF_PASSWORD must be set in env');
   }
 
+  // Create store
   const store = await prisma.store.upsert({
     where: { id: 'store-optivision-001' },
     update: { name: 'OptiVision', isActive: true },
@@ -52,10 +34,17 @@ async function main() {
   });
   console.log('✅ Store:', store.name);
 
+  // Admin
   const adminHash = await bcrypt.hash(adminPassword, 12);
+
   await prisma.user.upsert({
     where: { email: adminEmail },
-    update: { passwordHash: adminHash, isActive: true, role: 'SHOP_ADMIN', storeId: store.id },
+    update: {
+      passwordHash: adminHash,
+      isActive: true,
+      role: 'SHOP_ADMIN',
+      storeId: store.id
+    },
     create: {
       storeId: store.id,
       name: 'Admin',
@@ -68,10 +57,16 @@ async function main() {
   });
   console.log('✅ Admin:', adminEmail);
 
+  // Staff
   const staffHash = await bcrypt.hash(staffPassword, 12);
+
   await prisma.user.upsert({
     where: { email: staffEmail },
-    update: { passwordHash: staffHash, isActive: true, storeId: store.id },
+    update: {
+      passwordHash: staffHash,
+      isActive: true,
+      storeId: store.id
+    },
     create: {
       storeId: store.id,
       name: 'Staff',
@@ -88,5 +83,8 @@ async function main() {
 }
 
 main()
-  .catch(e => { console.error('❌ Seed failed:', e.message); process.exit(1); })
+  .catch(e => {
+    console.error('❌ Seed failed:', e.message);
+    process.exit(1);
+  })
   .finally(async () => await prisma.$disconnect());

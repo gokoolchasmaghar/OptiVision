@@ -127,19 +127,21 @@ export default function OrderCreate() {
       </button>
 
       {/* Step indicator */}
-      <div className="flex items-center mb-8">
-        {STEPS.map((s, i) => (
-          <div key={i} className="flex items-center flex-1">
-            <div className={`flex items-center justify-center w-8 h-8 rounded-full text-sm font-bold transition-all ${i < step ? 'bg-emerald-500 text-white' : i === step ? 'bg-primary-600 text-white' : 'bg-slate-100 text-slate-400'}`}>
-              {i < step ? <Check size={14}/> : i+1}
+      <div className="mb-8 overflow-x-auto scrollbar-hide">
+        <div className="flex items-center min-w-[560px]">
+          {STEPS.map((s, i) => (
+            <div key={i} className="flex items-center flex-1">
+              <div className={`flex items-center justify-center w-8 h-8 rounded-full text-sm font-bold transition-all ${i < step ? 'bg-emerald-500 text-white' : i === step ? 'bg-primary-600 text-white' : 'bg-slate-100 text-slate-400'}`}>
+                {i < step ? <Check size={14}/> : i+1}
+              </div>
+              <div className={`text-xs font-semibold ml-2 hidden sm:block ${i === step ? 'text-primary-600' : i < step ? 'text-emerald-600' : 'text-slate-400'}`}>{s}</div>
+              {i < STEPS.length-1 && <div className={`flex-1 h-0.5 mx-3 ${i < step ? 'bg-emerald-300' : 'bg-slate-100'}`}/>}
             </div>
-            <div className={`text-xs font-semibold ml-2 hidden sm:block ${i === step ? 'text-primary-600' : i < step ? 'text-emerald-600' : 'text-slate-400'}`}>{s}</div>
-            {i < STEPS.length-1 && <div className={`flex-1 h-0.5 mx-3 ${i < step ? 'bg-emerald-300' : 'bg-slate-100'}`}/>}
-          </div>
-        ))}
+          ))}
+        </div>
       </div>
 
-      <div className="card p-6">
+      <div className="card p-4 sm:p-6">
         {/* Step 0: Select Customer */}
         {step === 0 && (
           <div>
@@ -175,7 +177,7 @@ export default function OrderCreate() {
               <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"/>
               <input className="field-input pl-9" value={frameSearch} onChange={e => { setFrameSearch(e.target.value); searchFrames(e.target.value); }} placeholder="Search brand, model…"/>
             </div>
-            <div className="grid grid-cols-2 gap-3 max-h-80 overflow-y-auto">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-h-80 overflow-y-auto">
               {frames.filter(f => f.stockQty > 0).map(f => (
                 <div key={f.id} onClick={() => setSelFrame(f)}
                   className={`p-3 rounded-xl border cursor-pointer transition-all ${selFrame?.id===f.id?'border-primary-400 bg-primary-50':'border-slate-100 hover:border-primary-200'}`}>
@@ -195,7 +197,7 @@ export default function OrderCreate() {
           <div>
             <h2 className="font-bold text-lg text-slate-900 mb-4">Prescription</h2>
             {prescriptions.length > 0 && (
-              <div className="flex gap-2 mb-4">
+              <div className="flex flex-wrap gap-2 mb-4">
                 <button onClick={() => setUseExistingRx(true)} className={`btn-sm ${useExistingRx?'btn-primary':'btn-secondary'}`}>Use Existing</button>
                 <button onClick={() => setUseExistingRx(false)} className={`btn-sm ${!useExistingRx?'btn-primary':'btn-secondary'}`}>New Rx</button>
               </div>
@@ -206,7 +208,7 @@ export default function OrderCreate() {
                   <div key={rx.id} onClick={() => setSelRx(rx)}
                     className={`p-3 rounded-xl border cursor-pointer transition-all ${selRx?.id===rx.id?'border-primary-400 bg-primary-50':'border-slate-100 hover:border-primary-200'}`}>
                     <div className="flex justify-between mb-2 text-xs"><span className="font-semibold text-slate-700">{i===0?'Latest Rx':''} {rx.doctorName}</span>{selRx?.id===rx.id&&<Check size={14} className="text-primary-600"/>}</div>
-                    <div className="grid grid-cols-3 gap-1 text-xs text-center">
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-1 text-xs text-center">
                       <div className="text-slate-500">OD: {rx.rightSph||'—'} / {rx.rightCyl||'—'} × {rx.rightAxis||'—'}</div>
                       <div className="text-slate-500">OS: {rx.leftSph||'—'} / {rx.leftCyl||'—'} × {rx.leftAxis||'—'}</div>
                       <div className="text-slate-500">PD: {rx.pd||'—'}</div>
@@ -218,19 +220,21 @@ export default function OrderCreate() {
             ) : (
               <div>
                 <div className="mb-3"><label className="field-label">Doctor Name</label><input className="field-input" value={newRx.doctorName} onChange={e=>setNewRx(f=>({...f,doctorName:e.target.value}))} placeholder="Dr. Smith"/></div>
-                <table className="w-full text-sm border border-slate-100 rounded-xl overflow-hidden mb-3">
-                  <thead><tr className="bg-slate-50"><th className="px-3 py-2 text-left text-xs text-slate-500">Field</th><th className="px-3 py-2 text-center text-xs text-blue-700">Right (OD)</th><th className="px-3 py-2 text-center text-xs text-emerald-700 border-l border-slate-100">Left (OS)</th></tr></thead>
-                  <tbody>
-                    {[['SPH','Sph'],['CYL','Cyl'],['AXIS','Axis'],['ADD','Add']].map(([l,k])=>(
-                      <tr key={l} className="border-t border-slate-100">
-                        <td className="px-3 py-2 text-xs font-semibold bg-slate-50">{l}</td>
-                        <td className="px-3 py-2 border-l border-slate-100"><input className="w-full text-center text-sm border border-slate-200 rounded py-1 px-1 focus:outline-none focus:ring-1 focus:ring-primary-400" type="number" step="0.25" placeholder="0.00" value={newRx[`right${k}`]} onChange={e=>setNewRx(f=>({...f,[`right${k}`]:e.target.value}))}/></td>
-                        <td className="px-3 py-2 border-l border-slate-100"><input className="w-full text-center text-sm border border-slate-200 rounded py-1 px-1 focus:outline-none focus:ring-1 focus:ring-primary-400" type="number" step="0.25" placeholder="0.00" value={newRx[`left${k}`]} onChange={e=>setNewRx(f=>({...f,[`left${k}`]:e.target.value}))}/></td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-                <div className="max-w-xs"><label className="field-label">PD (mm)</label><input className="field-input" type="number" step="0.5" value={newRx.pd} onChange={e=>setNewRx(f=>({...f,pd:e.target.value}))} placeholder="63"/></div>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm border border-slate-100 rounded-xl overflow-hidden mb-3">
+                    <thead><tr className="bg-slate-50"><th className="px-3 py-2 text-left text-xs text-slate-500">Field</th><th className="px-3 py-2 text-center text-xs text-blue-700">Right (OD)</th><th className="px-3 py-2 text-center text-xs text-emerald-700 border-l border-slate-100">Left (OS)</th></tr></thead>
+                    <tbody>
+                      {[['SPH','Sph'],['CYL','Cyl'],['AXIS','Axis'],['ADD','Add']].map(([l,k])=>(
+                        <tr key={l} className="border-t border-slate-100">
+                          <td className="px-3 py-2 text-xs font-semibold bg-slate-50">{l}</td>
+                          <td className="px-3 py-2 border-l border-slate-100"><input className="w-full text-center text-sm border border-slate-200 rounded py-1 px-1 focus:outline-none focus:ring-1 focus:ring-primary-400" type="number" step="0.25" placeholder="0.00" value={newRx[`right${k}`]} onChange={e=>setNewRx(f=>({...f,[`right${k}`]:e.target.value}))}/></td>
+                          <td className="px-3 py-2 border-l border-slate-100"><input className="w-full text-center text-sm border border-slate-200 rounded py-1 px-1 focus:outline-none focus:ring-1 focus:ring-primary-400" type="number" step="0.25" placeholder="0.00" value={newRx[`left${k}`]} onChange={e=>setNewRx(f=>({...f,[`left${k}`]:e.target.value}))}/></td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+                <div className="w-full sm:max-w-xs"><label className="field-label">PD (mm)</label><input className="field-input" type="number" step="0.5" value={newRx.pd} onChange={e=>setNewRx(f=>({...f,pd:e.target.value}))} placeholder="63"/></div>
               </div>
             )}
           </div>
@@ -241,7 +245,7 @@ export default function OrderCreate() {
           <div>
             <h2 className="font-bold text-lg text-slate-900 mb-4">Select Lens Package</h2>
             <button onClick={() => setSelLens(null)} className={`mb-4 btn-sm ${!selLens?'btn-primary':'btn-secondary'}`}>No Lens (Frame Only)</button>
-            <div className="grid grid-cols-2 gap-3 max-h-80 overflow-y-auto">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-h-80 overflow-y-auto">
               {lenses.map(l => (
                 <div key={l.id} onClick={() => setSelLens(l)}
                   className={`p-4 rounded-xl border cursor-pointer transition-all ${selLens?.id===l.id?'border-primary-400 bg-primary-50':'border-slate-100 hover:border-primary-200'}`}>
@@ -282,7 +286,7 @@ export default function OrderCreate() {
                 <div><label className="field-label">Discount ₹</label><input className="field-input" type="number" value={discount} onChange={e=>setDiscount(Number(e.target.value))}/></div>
                 <div>
                   <label className="field-label">Payment Method</label>
-                  <div className="grid grid-cols-3 gap-2">
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
                     {['CASH','UPI','CARD'].map(m => (
                       <button key={m} onClick={() => setPayMethod(m)}
                         className={`py-2 rounded-xl text-xs font-bold border transition-all ${payMethod===m?'bg-primary-600 text-white border-primary-600':'bg-white text-slate-600 border-slate-200 hover:border-primary-300'}`}>
@@ -301,18 +305,18 @@ export default function OrderCreate() {
         )}
 
         {/* Navigation */}
-        <div className="flex items-center justify-between mt-6 pt-5 border-t border-slate-100">
-          <button onClick={() => step > 0 ? setStep(s => s-1) : navigate('/orders')} className="btn-secondary btn-md">
+        <div className="flex flex-col-reverse sm:flex-row items-stretch sm:items-center justify-between gap-3 mt-6 pt-5 border-t border-slate-100">
+          <button onClick={() => step > 0 ? setStep(s => s-1) : navigate('/orders')} className="btn-secondary btn-md w-full sm:w-auto justify-center">
             <ArrowLeft size={15}/> {step === 0 ? 'Cancel' : 'Back'}
           </button>
           {step < STEPS.length-1 ? (
             <button onClick={() => setStep(s => s+1)}
               disabled={(step===0 && !selCustomer) || (step===1 && !selFrame)}
-              className="btn-primary btn-md">
+              className="btn-primary btn-md w-full sm:w-auto justify-center">
               Next <ArrowRight size={15}/>
             </button>
           ) : (
-            <button onClick={handleSubmit} disabled={saving} className="btn-primary btn-md">
+            <button onClick={handleSubmit} disabled={saving} className="btn-primary btn-md w-full sm:w-auto justify-center">
               {saving ? 'Creating…' : '✓ Create Order'}
             </button>
           )}

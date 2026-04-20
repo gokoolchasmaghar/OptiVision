@@ -50,8 +50,8 @@ export default function Customers() {
         action={<button className="btn-primary btn-md" onClick={() => setShowModal(true)}><Plus size={15}/> Add Customer</button>}
       />
 
-      <div className="flex gap-3 mb-6">
-        <SearchInput value={search} onChange={setSearch} placeholder="Search by name, phone, email…" className="flex-1 max-w-sm"/>
+      <div className="flex flex-col sm:flex-row gap-3 mb-6">
+        <SearchInput value={search} onChange={setSearch} placeholder="Search by name, phone, email…" className="sm:flex-1 sm:max-w-sm"/>
       </div>
 
       {loading ? (
@@ -96,8 +96,8 @@ export default function Customers() {
           <button className="btn-secondary btn-md" onClick={() => setShowModal(false)}>Cancel</button>
           <button className="btn-primary btn-md" onClick={save} disabled={saving}>{saving ? 'Saving…' : 'Save Customer'}</button>
         </>}>
-        <div className="grid grid-cols-2 gap-4">
-          <div className="col-span-2">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div className="sm:col-span-2">
             <label className="field-label">Full Name *</label>
             <input className="field-input" value={form.name} onChange={e => setForm(f => ({...f, name: e.target.value}))} placeholder="Rajesh Kumar"/>
           </div>
@@ -122,7 +122,7 @@ export default function Customers() {
             <label className="field-label">Age</label>
             <input className="field-input" type="number" value={form.age} onChange={e => setForm(f => ({...f, age: e.target.value}))} placeholder="30" min="1" max="120"/>
           </div>
-          <div className="col-span-2">
+          <div className="sm:col-span-2">
             <label className="field-label">Address</label>
             <input className="field-input" value={form.address} onChange={e => setForm(f => ({...f, address: e.target.value}))} placeholder="City, State"/>
           </div>

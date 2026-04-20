@@ -30,39 +30,6 @@ router.post('/login',
   }
 );
 
-// router.post('/signup',
-//   body('email').isEmail().normalizeEmail(),
-//   body('password').isLength({ min: 6 }),
-//   body('name').notEmpty(),
-//   async (req, res, next) => {
-//     try {
-//       const errs = validationResult(req);
-//       if (!errs.isEmpty()) return res.status(400).json({ success: false, errors: errs.array() });
-      
-//       const { name, email, password } = req.body;
-      
-//       // Check if user already exists
-//       const existing = await prisma.user.findUnique({ where: { email } });
-//       if (existing) return res.status(409).json({ success: false, message: 'Email already registered' });
-      
-//       // Create new user
-//       const user = await prisma.user.create({
-//         data: { 
-//           storeId: 'store-1',
-//           name, 
-//           email, 
-//           phone: '',
-//           passwordHash: await bcrypt.hash(password, 12), 
-//           role: 'STAFF'
-//         },
-//         select: { id: true, name: true, email: true, role: true }
-//       });
-      
-//       res.status(201).json({ success: true, message: 'Account created successfully', user });
-//     } catch (e) { next(e); }
-//   }
-// );
-
 router.get('/me', authenticate, (req, res) => {
   const { passwordHash, ...safe } = req.user;
   res.json({ success: true, user: safe });

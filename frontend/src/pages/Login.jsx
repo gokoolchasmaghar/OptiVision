@@ -50,7 +50,7 @@ export default function Login() {
             Manage frames, lenses, prescriptions, billing and inventory — all in one place.
           </p>
 
-          <div className="grid grid-cols-2 gap-4 mt-8">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-8">
             {['👥 Customer CRM','🧾 GST Billing','📦 Inventory','📊 Analytics'].map(f => (
               <div key={f} className="flex items-center gap-2 text-sm text-slate-400 bg-white/5 rounded-xl px-3 py-2">
                 {f}

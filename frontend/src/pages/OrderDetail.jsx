@@ -382,7 +382,7 @@ export default function OrderDetail() {
                 </div>
 
                 <div className="p-4 space-y-3">
-                  <div className="grid grid-cols-3 gap-2">
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
                     <div className="rounded-xl border border-slate-200 bg-slate-50 px-2.5 py-2 text-center">
                       <div className="text-[10px] uppercase tracking-widest text-slate-400">Total</div>
                       <div className="text-xs font-bold text-slate-700">{fmt(order.totalAmount)}</div>
@@ -466,27 +466,29 @@ export default function OrderDetail() {
           {order.status !== 'CANCELLED' && (
             <div className="card p-5 no-print">
               <h3 className="font-bold text-slate-800 mb-4 text-sm">Order Progress</h3>
-              <div className="flex items-start">
-                {STATUS_FLOW.map((s, i) => {
-                  const done = i <= curIdx;
-                  const cur = i === curIdx;
-                  return (
-                    <div key={s} className="flex items-center flex-1">
-                      <div className="flex flex-col items-center gap-1.5">
-                        <div className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold transition-all flex-shrink-0
-                          ${done ? (cur ? 'bg-primary-600 text-white ring-4 ring-primary-100' : 'bg-emerald-500 text-white') : 'bg-slate-100 text-slate-400'}`}>
-                          {done && !cur ? <Check size={12} /> : i + 1}
+              <div className="overflow-x-auto scrollbar-hide pb-1">
+                <div className="flex items-start min-w-[560px]">
+                  {STATUS_FLOW.map((s, i) => {
+                    const done = i <= curIdx;
+                    const cur = i === curIdx;
+                    return (
+                      <div key={s} className="flex items-center flex-1">
+                        <div className="flex flex-col items-center gap-1.5">
+                          <div className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold transition-all flex-shrink-0
+                            ${done ? (cur ? 'bg-primary-600 text-white ring-4 ring-primary-100' : 'bg-emerald-500 text-white') : 'bg-slate-100 text-slate-400'}`}>
+                            {done && !cur ? <Check size={12} /> : i + 1}
+                          </div>
+                          <div className={`text-[10px] font-semibold text-center leading-tight ${cur ? 'text-primary-600' : done ? 'text-emerald-600' : 'text-slate-400'}`}>
+                            {s.replace('_', '\n')}
+                          </div>
                         </div>
-                        <div className={`text-[10px] font-semibold text-center leading-tight ${cur ? 'text-primary-600' : done ? 'text-emerald-600' : 'text-slate-400'}`}>
-                          {s.replace('_', '\n')}
-                        </div>
+                        {i < STATUS_FLOW.length - 1 && (
+                          <div className={`flex-1 h-0.5 mx-1 mb-5 ${i < curIdx ? 'bg-emerald-400' : 'bg-slate-100'}`} />
+                        )}
                       </div>
-                      {i < STATUS_FLOW.length - 1 && (
-                        <div className={`flex-1 h-0.5 mx-1 mb-5 ${i < curIdx ? 'bg-emerald-400' : 'bg-slate-100'}`} />
-                      )}
-                    </div>
-                  );
-                })}
+                    );
+                  })}
+                </div>
               </div>
             </div>
           )}
@@ -545,24 +547,26 @@ export default function OrderDetail() {
           {order.prescription && (
             <div className="card p-5">
               <h3 className="font-bold text-slate-800 mb-3 text-sm">Prescription</h3>
-              <table className="w-full text-sm border border-slate-100 rounded-xl overflow-hidden">
-                <thead>
-                  <tr className="bg-primary-50">
-                    <th className="px-4 py-2 text-left text-xs text-slate-500">Field</th>
-                    <th className="px-4 py-2 text-center text-xs text-primary-700">Right Eye (OD)</th>
-                    <th className="px-4 py-2 text-center text-xs text-primary-700 border-l border-primary-100">Left Eye (OS)</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {[['SPH', 'rightSph', 'leftSph'], ['CYL', 'rightCyl', 'leftCyl'], ['AXIS', 'rightAxis', 'leftAxis'], ['ADD', 'rightAdd', 'leftAdd'], ['PD', 'rightPd', 'leftPd']].map(([l, r, le]) => (
-                    <tr key={l} className="border-t border-slate-100">
-                      <td className="px-4 py-2 text-xs font-semibold text-slate-500 bg-slate-50">{l}</td>
-                      <td className="px-4 py-2 text-center font-mono text-sm">{order.prescription[r] ?? (l === 'PD' ? order.prescription.pd : null) ?? '—'}</td>
-                      <td className="px-4 py-2 text-center font-mono text-sm border-l border-slate-100">{order.prescription[le] ?? (l === 'PD' ? order.prescription.pd : null) ?? '—'}</td>
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm border border-slate-100 rounded-xl overflow-hidden">
+                  <thead>
+                    <tr className="bg-primary-50">
+                      <th className="px-4 py-2 text-left text-xs text-slate-500">Field</th>
+                      <th className="px-4 py-2 text-center text-xs text-primary-700">Right Eye (OD)</th>
+                      <th className="px-4 py-2 text-center text-xs text-primary-700 border-l border-primary-100">Left Eye (OS)</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody>
+                    {[['SPH', 'rightSph', 'leftSph'], ['CYL', 'rightCyl', 'leftCyl'], ['AXIS', 'rightAxis', 'leftAxis'], ['ADD', 'rightAdd', 'leftAdd'], ['PD', 'rightPd', 'leftPd']].map(([l, r, le]) => (
+                      <tr key={l} className="border-t border-slate-100">
+                        <td className="px-4 py-2 text-xs font-semibold text-slate-500 bg-slate-50">{l}</td>
+                        <td className="px-4 py-2 text-center font-mono text-sm">{order.prescription[r] ?? (l === 'PD' ? order.prescription.pd : null) ?? '—'}</td>
+                        <td className="px-4 py-2 text-center font-mono text-sm border-l border-slate-100">{order.prescription[le] ?? (l === 'PD' ? order.prescription.pd : null) ?? '—'}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
               {order.prescription.doctorName && <p className="text-xs text-slate-400 mt-2">Dr. {order.prescription.doctorName}</p>}
             </div>
           )}
@@ -679,7 +683,7 @@ export default function OrderDetail() {
           </div>
           <div>
             <label className="field-label">Method</label>
-            <div className="grid grid-cols-3 gap-2">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
               {['CASH', 'UPI', 'CARD'].map(m => (
                 <button key={m} onClick={() => setPayForm(f => ({ ...f, method: m }))}
                   className={`py-2 rounded-xl text-xs font-bold border transition-all ${payForm.method === m ? 'bg-primary-600 text-white border-primary-600' : 'bg-white text-slate-600 border-slate-200'}`}>
@@ -697,5 +701,3 @@ export default function OrderDetail() {
     </div>
   );
 }
-
-

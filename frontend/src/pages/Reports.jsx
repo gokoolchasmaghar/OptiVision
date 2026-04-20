@@ -59,7 +59,7 @@ export default function Reports() {
 
       {/* Summary cards */}
       {profit && (
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
           {[
             { label: 'Total Revenue', value: fmt(profit.totalRevenue), icon: '💰', color: 'bg-blue-50 text-blue-700' },
             { label: 'Gross Profit', value: fmt(profit.grossProfit), icon: '📈', color: 'bg-emerald-50 text-emerald-700' },

@@ -86,7 +86,7 @@ export default function CustomerDetail() {
             {cust.email && <div className="flex items-center gap-2 text-sm text-slate-600"><Mail size={14}/> {cust.email}</div>}
             {cust.address && <div className="flex items-center gap-2 text-sm text-slate-600"><MapPin size={14}/> {cust.address}</div>}
           </div>
-          <div className="mt-5 pt-5 border-t border-slate-100 grid grid-cols-2 gap-3 text-center">
+          <div className="mt-5 pt-5 border-t border-slate-100 grid grid-cols-1 sm:grid-cols-2 gap-3 text-center">
             <div><div className="text-lg font-bold text-slate-800">{cust.orders?.length || 0}</div><div className="text-xs text-slate-500">Orders</div></div>
             <div><div className="text-lg font-bold text-slate-800">{cust.prescriptions?.length || 0}</div><div className="text-xs text-slate-500">Prescriptions</div></div>
           </div>
@@ -194,7 +194,7 @@ export default function CustomerDetail() {
         </div>
         <div>
           <label className="field-label">PD (mm)</label>
-          <input className="field-input max-w-xs" type="number" step="0.5" value={rxForm.pd} onChange={e => setRxForm(f => ({...f, pd: e.target.value}))} placeholder="63"/>
+          <input className="field-input w-full sm:max-w-xs" type="number" step="0.5" value={rxForm.pd} onChange={e => setRxForm(f => ({...f, pd: e.target.value}))} placeholder="63"/>
         </div>
       </Modal>
     </div>

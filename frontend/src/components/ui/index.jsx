@@ -47,7 +47,7 @@ export function PageHeader({ title, subtitle, action }) {
         <h1 className="page-title">{title}</h1>
         {subtitle && <p className="page-subtitle">{subtitle}</p>}
       </div>
-      {action && <div className="flex items-center gap-2">{action}</div>}
+      {action && <div className="flex w-full sm:w-auto items-center gap-2 flex-wrap sm:justify-end">{action}</div>}
     </div>
   );
 }
@@ -69,7 +69,7 @@ export function StatCard({ icon, label, value, sub, subColor = 'green', bg = 'bl
 
 export function SearchInput({ value, onChange, placeholder = 'Search...', className = '' }) {
   return (
-    <div className={`relative ${className}`}>
+    <div className={`relative w-full ${className}`}>
       <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none">🔍</span>
       <input
         value={value}
@@ -100,10 +100,10 @@ export function StatusBadge({ status }) {
 
 export function Tabs({ tabs, active, onChange }) {
   return (
-    <div className="flex gap-1 bg-slate-100 rounded-xl p-1 w-fit">
+    <div className="flex gap-1 bg-slate-100 rounded-xl p-1 w-full sm:w-fit overflow-x-auto scrollbar-hide">
       {tabs.map(t => (
         <button key={t.id} onClick={() => onChange(t.id)}
-          className={`px-4 py-1.5 rounded-lg text-sm font-semibold transition-all ${active === t.id ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>
+          className={`px-4 py-1.5 rounded-lg text-sm font-semibold whitespace-nowrap transition-all ${active === t.id ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>
           {t.label}
         </button>
       ))}

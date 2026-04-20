@@ -80,7 +80,7 @@ export default function Settings() {
         {tab === 'store' && isAdmin && (
           <div className="card p-6 space-y-4">
             <h3 className="font-bold text-slate-800">Store Information</h3>
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="col-span-2 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 flex items-start justify-between gap-4">
                 <div>
                   <div className="font-semibold text-slate-800">GST on new orders</div>
@@ -129,7 +129,7 @@ export default function Settings() {
           <div className="space-y-5">
             <div className="card p-5 space-y-4">
               <h3 className="font-bold text-slate-800">Add User</h3>
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div><label className="field-label">Name *</label><input className="field-input" value={userForm.name} onChange={e => setUserForm(f => ({ ...f, name: e.target.value }))} /></div>
                 <div><label className="field-label">Email *</label><input className="field-input" type="email" value={userForm.email} onChange={e => setUserForm(f => ({ ...f, email: e.target.value }))} /></div>
                 <div><label className="field-label">Phone</label><input className="field-input" value={userForm.phone} onChange={e => setUserForm(f => ({ ...f, phone: e.target.value }))} /></div>
