@@ -117,3 +117,24 @@
     width: 100%;
   }
 }
+
+@media print {
+  body * {
+    visibility: hidden;
+  }
+
+  #print-label, #print-label * {
+    visibility: visible;
+  }
+
+  #print-label {
+    position: absolute;
+    top: 0;
+    left: 0;
+  }
+}
+
+@page {
+  size: 101.6mm 14.3mm;
+  margin: 0;
+}

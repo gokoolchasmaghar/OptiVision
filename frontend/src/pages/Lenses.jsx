@@ -4,7 +4,7 @@ import api from '../services/api';
 import { Modal, PageHeader, Spinner, Empty } from '../components/ui';
 import toast from 'react-hot-toast';
 import { Html5Qrcode } from 'html5-qrcode';
-import Label from '../components/Label';
+import Label, { PrintLabelButton } from '../components/Label';
 
 const fmt = n => `₹${Number(n || 0).toLocaleString('en-IN')}`;
 const LENS_TYPES = ['SINGLE_VISION', 'BIFOCAL', 'PROGRESSIVE', 'READING'];
@@ -27,6 +27,7 @@ export default function Lenses() {
   const [saving, setSaving] = useState(false);
   const [scanning, setScanning] = useState(false);
   const [selectedLens, setSelectedLens] = useState(null);
+  const [printQty, setPrintQty] = useState(1);
   const scannerRef = useRef(null);
   const scannerReadyRef = useRef(false);
 
@@ -181,7 +182,7 @@ export default function Lenses() {
                   <div className="text-xs text-slate-400">Stock: {l.stockQty}</div>
                 </div>
                 <div className="flex gap-2">
-                  <button onClick={() => setSelectedLens(l)} className="btn-secondary btn-xs">Print Label</button>
+                  <button onClick={() => { setSelectedLens(l); setPrintQty(1); }} className="btn-secondary btn-xs">Print Label</button>
                   <button onClick={() => openEdit(l)} className="btn-ghost btn-xs">Edit</button>
                   <button onClick={async () => { if (confirm('Delete?')) { await api.delete(`/lenses/${l.id}`); load(); } }} className="btn-danger btn-xs">Del</button>
                 </div>
@@ -300,22 +301,39 @@ export default function Lenses() {
       {selectedLens && (
         <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
           <div className="bg-white p-6 rounded-xl shadow-lg max-w-[95vw]">
+
+            {/* Quantity */}
+            <div className="mt-4 flex items-center gap-2">
+              <label className="text-sm font-medium">Quantity:</label>
+              <input
+                type="number"
+                min="1"
+                value={printQty}
+                onChange={(e) => setPrintQty(Math.max(1, Number(e.target.value)))}
+                className="field-input w-20"
+              />
+            </div>
+
             <Label product={selectedLens} />
             <div className="flex justify-end gap-2 mt-4">
-              <button className="btn-secondary btn-sm" onClick={() => setSelectedLens(null)}>Close</button>
-              <button className="btn-primary btn-sm" onClick={() => {
-                const el = document.getElementById('print-label-lens');
-                if (el) { el.style.display = 'block'; window.print(); el.style.display = 'none'; }
-              }}>Print</button>
+              <button
+                className="btn-secondary btn-sm"
+                onClick={() => setSelectedLens(null)}
+              >
+                Close
+              </button>
+
+              <PrintLabelButton
+                product={selectedLens}
+                quantity={printQty}
+                className="btn-primary btn-sm"
+              />
             </div>
+
           </div>
         </div>
       )}
-      {selectedLens && (
-        <div id="print-label-lens" style={{ display: 'none' }}>
-          <Label product={selectedLens} />
-        </div>
-      )}
+
     </div>
   );
 }

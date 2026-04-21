@@ -1,123 +1,231 @@
 import { useEffect, useRef } from "react";
 import JsBarcode from "jsbarcode";
 
+
+// ─────────────────────────────────────────────────────────────
+// 🖨️ PRINT HELPER (THERMAL ROLL MODE - MULTIPLE LABELS)
+// ─────────────────────────────────────────────────────────────
+export function printLabels(labelHtml) {
+  const win = window.open("", "_blank", "width=400,height=600");
+  if (!win) {
+    alert("Please allow popups to print labels.");
+    return;
+  }
+
+  win.document.write(`
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <meta charset="utf-8" />
+      <title>Print Labels</title>
+
+      <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+          font-family: Arial, sans-serif;
+          background: #fff;
+        }
+
+        /* Container = roll width */
+        .container {
+          width: 58mm;
+          margin: 0 auto;
+        }
+
+        /* Each label */
+        .label {
+          width: 100%;
+          height: 25mm;
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          padding: 2mm;
+          font-size: 10px;
+
+          gap: 5mm;
+        }
+
+        .left {
+          display: flex;
+          flex-direction: column;
+          line-height: 1.2;
+        }
+
+        .bold { font-weight: 700; }
+
+        .right {
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+        }
+
+        .barcode-text {
+          font-size: 8px;
+        }
+
+        @media print {
+          @page {
+            size: 58mm auto;
+            margin: 0;
+          }
+
+          body {
+            margin: 0;
+          }
+
+          .label {
+            page-break-inside: avoid;
+          }
+        }
+      </style>
+    </head>
+
+    <body>
+      <div class="container">
+        ${labelHtml}
+      </div>
+
+      <script>
+        window.onload = function () {
+          setTimeout(function () {
+            window.print();
+            window.close();
+          }, 400);
+        };
+      </script>
+    </body>
+    </html>
+  `);
+
+  win.document.close();
+}
+
+
+// ─────────────────────────────────────────────────────────────
+// 🔢 BARCODE GENERATOR
+// ─────────────────────────────────────────────────────────────
+function buildBarcodeSvg(barcode) {
+  if (!barcode) return "";
+
+  try {
+    const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+
+    JsBarcode(svg, barcode, {
+      format: "CODE128",
+      width: 1.2,
+      height: 30,
+      displayValue: true,
+      fontSize: 8,
+      margin: 0,
+    });
+
+    return svg.outerHTML;
+  } catch (e) {
+    console.error("Barcode error:", e);
+    return "";
+  }
+}
+
+
+// ─────────────────────────────────────────────────────────────
+// 🧩 PREVIEW COMPONENT (UI)
+// ─────────────────────────────────────────────────────────────
 export default function Label({ product }) {
-  const barcodeRef = useRef(null);
+  const ref = useRef(null);
 
   useEffect(() => {
-    const svg = barcodeRef.current;
-    if (!svg) return;
+    if (!ref.current || !product?.barcode) return;
 
-    if (!product?.barcode) {
-      svg.innerHTML = "";
-      return;
-    }
-
-    JsBarcode(svg, product.barcode, {
+    JsBarcode(ref.current, product.barcode, {
       format: "CODE128",
-      width: 1.8,
-      height: 60,
+      width: 1.2,
+      height: 35,
       displayValue: true,
-      fontSize: 14,
+      fontSize: 12,
       margin: 0,
     });
   }, [product]);
 
   if (!product) return null;
 
-  const isLens = product.lensType; // Check if it's a lens
-  const model = isLens ? product.name : product.model;
-  const color = isLens ? product.lensType?.replace('_', ' ') : product.color;
-  const size = isLens ? product.lensIndex : product.size;
-
   return (
-    <div
-      style={{
-        display: "flex",
-        justifyContent: "space-between",
-        alignItems: "center",
-        padding: "18px 20px",
-        borderRadius: "22px",
-        background: "#ffffff",
-        width: "450px",
-        minHeight: "100px",
-        boxShadow: "0 10px 30px rgba(0, 0, 0, 0.08)",
-        fontFamily: "Inter, system-ui, sans-serif",
-      }}
-    >
-      <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={{ marginBottom: "10px" }}>
-          <h2
-            style={{
-              margin: 0,
-              fontSize: "26px",
-              letterSpacing: "-0.03em",
-              color: "#111827",
-            }}
-          >
-            {product.brand}
-          </h2>
-          <p
-            style={{
-              margin: "6px 0 0",
-              fontSize: "14px",
-              color: "#6B7280",
-              textTransform: "uppercase",
-              letterSpacing: "0.08em",
-            }}
-          >
-            {model}
-          </p>
-        </div>
-
-        <div style={{ margin: "16px 0 18px" }}>
-          <span
-            style={{
-              fontSize: "30px",
-              fontWeight: 700,
-              color: "#111827",
-            }}
-          >
-            ₹{product.sellingPrice}
-          </span>
-        </div>
-
-        <div
-          style={{
-            display: "flex",
-            gap: "18px",
-            alignItems: "center",
-            fontSize: "13px",
-            color: "#4B5563",
-            textTransform: "uppercase",
-            letterSpacing: "0.08em",
-          }}
-        >
-          <span style={{ fontWeight: 700 }}>{color || "N/A"}</span>
-          <span
-            style={{
-              width: "1px",
-              height: "20px",
-              background: "#D1D5DB",
-              display: "inline-block",
-            }}
-          />
-          <span>{isLens ? `Index ${size}` : `Size ${size || "—"}`}</span>
-        </div>
-      </div>
-
+    <div style={{ padding: 10 }}>
       <div
         style={{
+          width: 400,
+          height: 80,
+          border: "1px solid #ccc",
           display: "flex",
-          flexDirection: "column",
-          alignItems: "center",
-          justifyContent: "center",
-          minWidth: "185px",
-          marginLeft: "18px",
+          padding: 8,
         }}
       >
-        <svg ref={barcodeRef} style={{ width: "100%", maxWidth: "190px" }} />
+        <div style={{ flex: 1 }}>
+          <div style={{ fontWeight: "bold" }}>
+            {product.brand} {product.model}
+          </div>
+          <div style={{ fontSize: 12 }}>{product.color}</div>
+          <div style={{ fontSize: 12 }}>
+            ₹{product.sellingPrice}
+          </div>
+        </div>
+
+        <div>
+          <svg ref={ref}></svg>
+        </div>
       </div>
     </div>
+  );
+}
+
+
+// ─────────────────────────────────────────────────────────────
+// 🖨️ PRINT BUTTON (MULTI-LABEL SUPPORT)
+// ─────────────────────────────────────────────────────────────
+export function PrintLabelButton({ product, quantity = 1, className = "" }) {
+  const handlePrint = () => {
+    if (!product) return;
+
+    const isLens = !!product.lensType;
+
+    const line1 = isLens
+      ? `${product.name || ""} ${product.brand || ""}`
+      : `${product.brand || ""} ${product.model || ""}`;
+
+    const line2 = isLens
+      ? `${product.lensType || ""} ${product.lensIndex || ""}`
+      : `${product.color || ""} ${product.size ? `Size ${product.size}` : ""}`;
+
+    const price = `₹${Number(product.sellingPrice || 0).toLocaleString("en-IN")}`;
+
+    const barcode = buildBarcodeSvg(product.barcode);
+
+    let labelsHtml = "";
+
+    for (let i = 0; i < quantity; i++) {
+      labelsHtml += `
+        <div class="label">
+          
+          <div class="left">
+            <div class="bold">${line1}</div>
+            <div>${line2}</div>
+            <div class="bold">${price}</div>
+          </div>
+
+          <div class="right">
+            ${barcode}
+          </div>
+
+        </div>
+      `;
+    }
+
+    printLabels(labelsHtml);
+  };
+
+  return (
+    <button onClick={handlePrint} className={className}>
+      Print Label
+    </button>
   );
 }

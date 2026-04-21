@@ -1,10 +1,10 @@
 import { useEffect, useState, useRef } from 'react';
-import { Plus, Grid, List } from 'lucide-react';
+import { Plus, Grid, List, Package, Filter } from 'lucide-react';
 import api from '../services/api';
-import { Modal, PageHeader, SearchInput, Spinner, Empty } from '../components/ui';
+import { Modal, PageHeader, SearchInput, StatusBadge, Spinner, Empty, Badge } from '../components/ui';
 import toast from 'react-hot-toast';
-import Label from '../components/Label';
-import { Html5Qrcode } from 'html5-qrcode';
+import Label, { PrintLabelButton } from '../components/Label';
+import { Html5Qrcode } from "html5-qrcode";
 
 const SHAPES = ['ROUND', 'OVAL', 'RECTANGLE', 'SQUARE', 'CAT_EYE', 'AVIATOR', 'WAYFARER', 'GEOMETRIC', 'RIMLESS', 'SEMI_RIMLESS'];
 const fmt = n => `₹${Number(n || 0).toLocaleString('en-IN')}`;
@@ -15,12 +15,6 @@ function StockBadge({ qty, alert }) {
   return <span className="badge-green badge">{qty} in stock</span>;
 }
 
-const EMPTY_FORM = {
-  brand: '', model: '', shape: 'RECTANGLE', size: '', color: '',
-  material: '', gender: '', purchasePrice: '', sellingPrice: '',
-  stockQty: '', lowStockAlert: '5', barcode: '', modelCode: ''
-};
-
 export default function Frames() {
   const [frames, setFrames] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -30,14 +24,13 @@ export default function Frames() {
   const [view, setView] = useState('grid');
   const [modal, setModal] = useState(false);
   const [editFrame, setEditFrame] = useState(null);
-  const [form, setForm] = useState(EMPTY_FORM);
+  const [form, setForm] = useState({ brand: '', model: '', shape: 'RECTANGLE', size: '', color: '', material: '', gender: '', purchasePrice: '', sellingPrice: '', stockQty: '', lowStockAlert: '5', barcode: '' });
   const [saving, setSaving] = useState(false);
   const [selectedFrame, setSelectedFrame] = useState(null);
   const [scanning, setScanning] = useState(false);
+  const [printQty, setPrintQty] = useState(1);
   const scannerRef = useRef(null);
-  const scannerReadyRef = useRef(false);
 
-  // ── Barcode generation ──────────────────────────────────────────────────────
   const generateEAN13 = () => {
     const digits = Array.from({ length: 12 }, () => Math.floor(Math.random() * 10));
     const checksum = digits.reduce((sum, d, i) => sum + d * (i % 2 === 0 ? 1 : 3), 0);
@@ -46,101 +39,73 @@ export default function Frames() {
   };
 
   const handleGenerateBarcode = () => {
-    setForm(f => ({ ...f, barcode: generateEAN13() }));
+    const code = generateEAN13();
+    setForm(f => ({ ...f, barcode: code }));
     toast.success('Barcode generated!');
   };
 
-  // ── Scanner ─────────────────────────────────────────────────────────────────
-  const stopScanner = async () => {
-    scannerReadyRef.current = false;
+  const stopScanner = () => {
     if (scannerRef.current) {
-      try { await scannerRef.current.stop(); } catch { /* ignore */ }
-      try { await scannerRef.current.clear(); } catch { /* ignore */ }
-      scannerRef.current = null;
+      scannerRef.current.stop().then(() => {
+        setScanning(false);
+        document.getElementById("reader").style.display = "none";
+      }).catch(() => { }); // ignore errors
     }
-    setScanning(false);
-  };
-
-  const startScanner = async () => {
-    if (scannerRef.current || scannerReadyRef.current) return;
-
-    // Ensure the div exists in DOM before initialising
-    await new Promise(r => setTimeout(r, 50));
-
-    const scanner = new Html5Qrcode('reader-frames');
-    scannerRef.current = scanner;
-
-    const onSuccess = async (decodedText) => {
-      setForm(f => ({ ...f, barcode: decodedText }));
-      toast.success('Barcode scanned!');
-      await stopScanner();
-    };
-
-    const tryStart = async (constraints) => {
-      try {
-        await scanner.start(constraints, { fps: 10, qrbox: { width: 250, height: 150 } }, onSuccess, () => { });
-        scannerReadyRef.current = true;
-        setScanning(true);
-      } catch {
-        if (constraints.facingMode === 'environment') {
-          await tryStart({ facingMode: 'user' });
-        } else if (constraints.facingMode === 'user') {
-          await tryStart({});
-        } else {
-          scannerRef.current = null;
-          toast.error('Could not access camera. Please allow camera permission.');
-        }
-      }
-    };
-
-    await tryStart({ facingMode: 'environment' });
   };
 
   const toggleScanner = () => {
-    if (scanning) { stopScanner(); } else { startScanner(); }
+    if (scanning) {
+      stopScanner();
+    } else {
+      const scanner = new Html5Qrcode("reader");
+      scannerRef.current = scanner;
+
+      const tryStartScanner = (constraints) => {
+        scanner.start(
+          constraints,
+          { fps: 10, qrbox: 250 },
+          (decodedText) => {
+            setForm(f => ({ ...f, barcode: decodedText }));
+            toast.success('Barcode scanned successfully!');
+            stopScanner();
+          },
+          (error) => {
+            // ignore scan errors
+          }
+        ).then(() => {
+          setScanning(true);
+          document.getElementById("reader").style.display = "block";
+        }).catch((err) => {
+          // Try next constraint if available
+          if (constraints.facingMode === "environment") {
+            tryStartScanner({ facingMode: "user" });
+          } else if (constraints.facingMode === "user") {
+            tryStartScanner({});
+          } else {
+            toast.error('Failed to start camera: ' + err);
+          }
+        });
+      };
+
+      tryStartScanner({ facingMode: "environment" });
+    }
   };
 
-  // Stop scanner when modal closes
-  const handleModalClose = () => {
-    if (scanning) stopScanner();
-    setModal(false);
-  };
-
-  // ── Data ────────────────────────────────────────────────────────────────────
   const load = async (q = '', f = {}) => {
     setLoading(true);
     try {
       const r = await api.get('/frames', { params: { search: q, ...f, limit: 60 } });
       setFrames(r.data.data);
       if (r.data.filters?.brands?.length) setBrands(r.data.filters.brands);
-    } catch { toast.error('Failed to load frames'); }
+    } catch (e) { toast.error('Failed to load frames'); }
     setLoading(false);
   };
 
   useEffect(() => { load(); }, []);
-  useEffect(() => {
-    const t = setTimeout(() => load(search, filters), 350);
-    return () => clearTimeout(t);
-  }, [search, filters]);
+  useEffect(() => { const t = setTimeout(() => load(search, filters), 350); return () => clearTimeout(t); }, [search, filters]);
 
-  const openAdd = () => {
-    setEditFrame(null);
-    setForm(EMPTY_FORM);
-    setModal(true);
-  };
-
-  const openEdit = f => {
-    setEditFrame(f);
-    setForm({
-      brand: f.brand, model: f.model || '', shape: f.shape,
-      size: f.size || '', color: f.color || '', material: f.material || '',
-      gender: f.gender || '', purchasePrice: f.purchasePrice,
-      sellingPrice: f.sellingPrice, stockQty: f.stockQty,
-      lowStockAlert: f.lowStockAlert, barcode: f.barcode || '',
-      modelCode: f.modelCode || ''
-    });
-    setModal(true);
-  };
+  const openAdd = () => { setEditFrame(null); setForm({ brand: '', model: '', shape: 'RECTANGLE', size: '', color: '', material: '', gender: '', purchasePrice: '', sellingPrice: '', stockQty: '', lowStockAlert: '5', barcode: '' }); setModal(true); };
+  const openEdit = f => { setEditFrame(f); setForm({ brand: f.brand, model: f.model || '', shape: f.shape, size: f.size || '', color: f.color || '', material: f.material || '', gender: f.gender || '', purchasePrice: f.purchasePrice, sellingPrice: f.sellingPrice, stockQty: f.stockQty, lowStockAlert: f.lowStockAlert, barcode: f.barcode || '' }); setModal(true); };
 
   const save = async () => {
     if (!form.brand || !form.sellingPrice) return toast.error('Brand and selling price required');
@@ -153,39 +118,30 @@ export default function Frames() {
         await api.post('/frames', form);
         toast.success('Frame added');
       }
-      setModal(false);
-      load(search, filters);
-    } catch (e) { toast.error(e.response?.data?.message || 'Error saving frame'); }
+      setModal(false); load(search, filters);
+    } catch (e) { toast.error(e.response?.data?.message || 'Error'); }
     setSaving(false);
   };
 
   const del = async id => {
     if (!confirm('Delete this frame?')) return;
     try { await api.delete(`/frames/${id}`); toast.success('Deleted'); load(search, filters); }
-    catch { toast.error('Error deleting frame'); }
+    catch (e) { toast.error('Error'); }
   };
-
-  const f = form; // shorthand for JSX below
-  const margin = f.purchasePrice && f.sellingPrice
-    ? Math.round((f.sellingPrice - f.purchasePrice) / f.sellingPrice * 100)
-    : null;
 
   return (
     <div>
-      <PageHeader
-        title="Frames"
-        subtitle={`${frames.length} items`}
-        action={<button className="btn-primary btn-md" onClick={openAdd}><Plus size={15} /> Add Frame</button>}
-      />
+      <PageHeader title="Frames" subtitle={`${frames.length} items`}
+        action={<button className="btn-primary btn-md" onClick={openAdd}><Plus size={15} /> Add Frame</button>} />
 
       {/* Filters */}
-      <div className="flex flex-col sm:flex-row gap-3 mb-5 flex-wrap items-stretch sm:items-center">
-        <SearchInput value={search} onChange={setSearch} placeholder="Search brand, model, barcode…" className="sm:flex-1 sm:min-w-48 sm:max-w-72" />
-        <select className="field-select w-full sm:w-40" value={filters.brand} onChange={e => setFilters(f => ({ ...f, brand: e.target.value }))}>
+      <div className="flex gap-3 mb-5 flex-wrap items-center">
+        <SearchInput value={search} onChange={setSearch} placeholder="Search brand, model, barcode…" className="flex-1 min-w-48 max-w-72" />
+        <select className="field-select w-40" value={filters.brand} onChange={e => setFilters(f => ({ ...f, brand: e.target.value }))}>
           <option value="">All Brands</option>
           {brands.map(b => <option key={b}>{b}</option>)}
         </select>
-        <select className="field-select w-full sm:w-44" value={filters.shape} onChange={e => setFilters(f => ({ ...f, shape: e.target.value }))}>
+        <select className="field-select w-44" value={filters.shape} onChange={e => setFilters(f => ({ ...f, shape: e.target.value }))}>
           <option value="">All Shapes</option>
           {SHAPES.map(s => <option key={s}>{s.replace('_', ' ')}</option>)}
         </select>
@@ -195,7 +151,6 @@ export default function Frames() {
         </div>
       </div>
 
-      {/* Frame list */}
       {loading ? (
         <div className="flex justify-center py-16"><Spinner size={28} /></div>
       ) : frames.length === 0 ? (
@@ -230,7 +185,15 @@ export default function Frames() {
                   <StockBadge qty={fr.stockQty} alert={fr.lowStockAlert} />
                 </div>
                 <div className="mt-3">
-                  <button onClick={() => setSelectedFrame(fr)} className="btn-secondary btn-xs w-full">Print Label</button>
+                  <button
+                    onClick={() => {
+                      setSelectedFrame(fr);
+                      setPrintQty(1); // reset
+                    }}
+                    className="btn-secondary btn-xs w-full"
+                  >
+                    Print Label
+                  </button>
                 </div>
               </div>
             </div>
@@ -265,102 +228,120 @@ export default function Frames() {
         </div>
       )}
 
-      {/* Add / Edit Modal */}
-      <Modal
-        open={modal}
-        onClose={handleModalClose}
-        title={editFrame ? 'Edit Frame' : 'Add Frame'}
-        size="lg"
-        footer={
-          <>
-            <button className="btn-secondary btn-md" onClick={handleModalClose}>Cancel</button>
-            <button className="btn-primary btn-md" onClick={save} disabled={saving}>
-              {saving ? 'Saving…' : editFrame ? 'Update' : 'Add Frame'}
-            </button>
-          </>
-        }
-      >
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+      <Modal open={modal} onClose={() => { if (scanning) stopScanner(); setModal(false); }} title={editFrame ? 'Edit Frame' : 'Add Frame'} size="lg"
+        footer={<>
+          <button className="btn-secondary btn-md" onClick={() => setModal(false)}>Cancel</button>
+          <button className="btn-primary btn-md" onClick={save} disabled={saving}>{saving ? 'Saving…' : editFrame ? 'Update' : 'Add Frame'}</button>
+        </>}>
+        <div className="grid grid-cols-2 gap-4">
           <div><label className="field-label">Brand *</label><input className="field-input" value={form.brand} onChange={e => setForm(f => ({ ...f, brand: e.target.value }))} placeholder="Titan, Ray-Ban…" /></div>
           <div><label className="field-label">Model</label><input className="field-input" value={form.model} onChange={e => setForm(f => ({ ...f, model: e.target.value }))} placeholder="Octane" /></div>
-          <div><label className="field-label">Model Code</label><input className="field-input" value={form.modelCode} onChange={e => setForm(f => ({ ...f, modelCode: e.target.value }))} placeholder="VO5645I" /></div>
           <div><label className="field-label">Shape</label><select className="field-select" value={form.shape} onChange={e => setForm(f => ({ ...f, shape: e.target.value }))}>{SHAPES.map(s => <option key={s} value={s}>{s.replace('_', ' ')}</option>)}</select></div>
           <div><label className="field-label">Size</label><input className="field-input" value={form.size} onChange={e => setForm(f => ({ ...f, size: e.target.value }))} placeholder="Small / Medium / Large" /></div>
           <div><label className="field-label">Color</label><input className="field-input" value={form.color} onChange={e => setForm(f => ({ ...f, color: e.target.value }))} placeholder="Black, Gold…" /></div>
           <div><label className="field-label">Material</label><input className="field-input" value={form.material} onChange={e => setForm(f => ({ ...f, material: e.target.value }))} placeholder="Metal, Acetate…" /></div>
           <div><label className="field-label">Gender</label><select className="field-select" value={form.gender} onChange={e => setForm(f => ({ ...f, gender: e.target.value }))}><option value="">Unisex</option><option value="Male">Male</option><option value="Female">Female</option></select></div>
+          <div>
+            <label className="field-label">Barcode</label>
+
+            <div className="flex gap-2">
+              <input
+                className="field-input flex-1"
+                value={form.barcode}
+                onChange={e => setForm(f => ({ ...f, barcode: e.target.value }))}
+                placeholder="Auto-generated or manual"
+              />
+
+              {/* Generate button */}
+              <button
+                type="button"
+                onClick={handleGenerateBarcode}
+                className="btn-secondary btn-sm"
+              >
+                🔄
+              </button>
+
+              {/* Scanner button */}
+              <button
+                type="button"
+                onClick={toggleScanner}
+                className="btn-secondary btn-sm"
+              >
+                {scanning ? "Stop" : "📷"}
+              </button>
+            </div>
+
+            {/* Scanner container */}
+            {scanning && (
+              <div className="text-sm text-blue-600 font-medium mt-2 flex items-center gap-2">
+                <div className="w-2 h-2 bg-blue-500 rounded-full animate-pulse"></div>
+                Scanning for QR code... Point camera at the barcode.
+              </div>
+            )}
+            <div
+              id="reader"
+              style={{
+                width: "100%",
+                maxWidth: "400px",
+                height: "300px",
+                marginTop: "10px",
+                display: "none",
+                border: scanning ? "2px solid #3b82f6" : "none",
+                borderRadius: "8px",
+                overflow: "hidden",
+              }}
+            ></div>
+          </div>
+          <div><label className="field-label">Model Code</label><input className="field-input" value={form.modelCode || ''} onChange={e => setForm(f => ({ ...f, modelCode: e.target.value }))} placeholder="VO5645I" /></div>
           <div><label className="field-label">Purchase Price ₹</label><input className="field-input" type="number" value={form.purchasePrice} onChange={e => setForm(f => ({ ...f, purchasePrice: e.target.value }))} placeholder="800" /></div>
           <div><label className="field-label">Selling Price ₹ *</label><input className="field-input" type="number" value={form.sellingPrice} onChange={e => setForm(f => ({ ...f, sellingPrice: e.target.value }))} placeholder="1999" /></div>
           <div><label className="field-label">Stock Qty</label><input className="field-input" type="number" value={form.stockQty} onChange={e => setForm(f => ({ ...f, stockQty: e.target.value }))} placeholder="10" /></div>
           <div><label className="field-label">Low Stock Alert</label><input className="field-input" type="number" value={form.lowStockAlert} onChange={e => setForm(f => ({ ...f, lowStockAlert: e.target.value }))} placeholder="5" /></div>
-
-          {/* Margin indicator */}
-          {margin !== null && (
-            <div className="sm:col-span-2 bg-emerald-50 border border-emerald-100 rounded-xl p-3 text-sm">
-              <span className="text-emerald-700 font-semibold">Margin: {margin}%</span>
+          {form.purchasePrice && form.sellingPrice && (
+            <div className="col-span-2 bg-emerald-50 border border-emerald-100 rounded-xl p-3 text-sm">
+              <span className="text-emerald-700 font-semibold">Margin: {Math.round((form.sellingPrice - form.purchasePrice) / form.sellingPrice * 100)}%</span>
               <span className="text-emerald-600 ml-3">Profit: {fmt(form.sellingPrice - form.purchasePrice)} per unit</span>
             </div>
           )}
-
-          {/* Barcode field */}
-          <div className="sm:col-span-2">
-            <label className="field-label">Barcode</label>
-            <div className="flex gap-2 mb-2">
-              <input
-                className="field-input flex-1 font-mono"
-                value={form.barcode}
-                onChange={e => setForm(f => ({ ...f, barcode: e.target.value }))}
-                placeholder="Scan or enter barcode number"
-              />
-              <button type="button" onClick={handleGenerateBarcode} className="btn-secondary btn-sm whitespace-nowrap" title="Auto-generate EAN-13 barcode">
-                🔄 Generate
-              </button>
-              <button type="button" onClick={toggleScanner} className={`btn-sm whitespace-nowrap ${scanning ? 'btn-danger' : 'btn-secondary'}`} title={scanning ? 'Stop camera' : 'Scan with camera'}>
-                {scanning ? '⏹ Stop' : '📷 Scan'}
-              </button>
-            </div>
-
-            {/* Camera feed — always in DOM, height toggled */}
-            <div
-              id="reader-frames"
-              style={{
-                width: '100%',
-                height: scanning ? '260px' : '0px',
-                overflow: 'hidden',
-                borderRadius: '8px',
-                border: scanning ? '2px solid #3b82f6' : 'none',
-                transition: 'height 0.2s ease',
-                background: '#000',
-              }}
-            />
-            {scanning && (
-              <p className="text-xs text-blue-600 font-medium mt-1 flex items-center gap-1.5">
-                <span className="inline-block w-2 h-2 bg-blue-500 rounded-full animate-pulse" />
-                Align barcode inside the frame — it will scan automatically.
-              </p>
-            )}
-          </div>
         </div>
       </Modal>
 
-      {/* Print label modal */}
       {selectedFrame && (
         <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
-          <div className="bg-white p-4 sm:p-6 rounded-xl shadow-lg max-w-[95vw]">
-            <Label product={selectedFrame} />
-            <div className="flex justify-end gap-2 mt-4">
-              <button className="btn-secondary btn-sm" onClick={() => setSelectedFrame(null)}>Close</button>
-              <button className="btn-primary btn-sm" onClick={() => {
-                const el = document.getElementById('print-label-frame');
-                if (el) { el.style.display = 'block'; window.print(); el.style.display = 'none'; }
-              }}>Print</button>
+          <div className="bg-white p-6 rounded-xl shadow-lg">
+
+            <div className="mt-4 flex items-center gap-2">
+
+              <label className="text-sm font-medium">Quantity:</label>
+              <input
+                type="number"
+                min="1"
+                value={printQty}
+                onChange={(e) => setPrintQty(Number(e.target.value) || 1)}
+                className="field-input w-20"
+              />
             </div>
+
+            {/* Preview only */}
+            <Label product={selectedFrame} />
+
+            <div className="flex justify-end gap-2 mt-4">
+              <button
+                className="btn-secondary btn-sm"
+                onClick={() => setSelectedFrame(null)}
+              >
+                Close
+              </button>
+
+              {/* REAL PRINT */}
+              <PrintLabelButton
+                product={selectedFrame}
+                quantity={printQty}
+                className="btn-primary btn-sm"
+              />
+            </div>
+
           </div>
-        </div>
-      )}
-      {selectedFrame && (
-        <div id="print-label-frame" style={{ display: 'none' }}>
-          <Label product={selectedFrame} />
         </div>
       )}
     </div>
