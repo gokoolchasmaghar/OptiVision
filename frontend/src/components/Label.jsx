@@ -2,12 +2,12 @@ import { useEffect, useRef } from "react";
 import JsBarcode from "jsbarcode";
 
 // ─────────────────────────────────────────────────────────────
-// 🖨️ PRINT HELPER (JEWELRY/FRAME TAG LAYOUT)
+// 🖨️ PRINT HELPER (FRAME TAG LAYOUT)
 // ─────────────────────────────────────────────────────────────
 export function printLabels(labelHtml) {
   const win = window.open("", "_blank", "width=600,height=400");
   if (!win) {
-    alert("Please allow popups to print labels.");
+    toast.error("Enable popups to print labels");
     return;
   }
 
@@ -90,7 +90,7 @@ function buildBarcodeSvg(barcode) {
     JsBarcode(svg, barcode, {
       format: "CODE128",
       width: 1.0,
-      height: 35,
+      height: 30,
       displayValue: true,
       fontSize: 9,
       margin: 0,
@@ -108,13 +108,19 @@ export default function Label({ product }) {
   const ref = useRef(null);
 
   useEffect(() => {
-    if (!ref.current || !product?.barcode) return;
+    if (!ref.current) return;
+
+    ref.current.innerHTML = ""; //CLEAR OLD SVG
+
+    if (!product?.barcode) return;
+
     JsBarcode(ref.current, product.barcode, {
       format: "CODE128",
-      width: 1.1,
-      height: 40,
+      width: 1.3,
+      height: 42,
       displayValue: true,
       fontSize: 10,
+      margin: 0,
     });
   }, [product]);
 
@@ -126,7 +132,7 @@ export default function Label({ product }) {
         width: "100%",
         maxWidth: "360px",
         aspectRatio: "3.5 / 1",
-        height: "90px",
+        height: "80px",
         border: "1px solid #000",
         borderRadius: "8px",
         display: "flex",
@@ -146,8 +152,9 @@ export default function Label({ product }) {
           <svg
             ref={ref}
             style={{
-              width: "100%",
+              width: "85%",
               height: "auto",
+              maxHeight: "60px",
             }}
           />
         </div>
@@ -162,9 +169,36 @@ export default function Label({ product }) {
             overflow: "hidden",
           }}
         >
-          <div style={{ fontWeight: "bold", fontSize: "12px" }}>{product.brand} {product.model}</div>
-          <div style={{ fontSize: "11px" }}>{product.color} | {product.size}</div>
-          <div style={{ fontWeight: "bold", fontSize: "clamp(10px, 2.5vw, 12px)", marginTop: "2px" }}>₹{product.sellingPrice}</div>
+          <div style={{
+            fontWeight: "bold",
+            fontSize: "12px",
+            whiteSpace: "nowrap",
+            overflow: "hidden",
+            textOverflow: "ellipsis"
+          }}>
+            {product.brand}
+          </div>
+
+          <div style={{
+            fontSize: "11px",
+            whiteSpace: "nowrap",
+            overflow: "hidden",
+            textOverflow: "ellipsis"
+          }}>
+            {product.model || product.name || ""}
+          </div>
+
+          <div style={{ fontSize: "10px" }}>
+            {[product.color, product.size].filter(Boolean).join(" | ")}
+          </div>
+
+          <div style={{
+            fontWeight: "bold",
+            fontSize: "clamp(10px, 2.5vw, 12px)",
+            marginTop: "2px"
+          }}>
+            ₹{product.sellingPrice}
+          </div>
         </div>
       </div>
     </div>
@@ -201,7 +235,7 @@ export function PrintLabelButton({ product, quantity = 1, className = "" }) {
 
   return (
     <button onClick={handlePrint} className={className}>
-      Print Frame Label
+      Print Label
     </button>
   );
 }

@@ -123,10 +123,32 @@ export default function Frames() {
     setSaving(false);
   };
 
-  const del = async id => {
-    if (!confirm('Delete this frame?')) return;
-    try { await api.delete(`/frames/${id}`); toast.success('Deleted'); load(search, filters); }
-    catch (e) { toast.error('Error'); }
+  const del = async (id) => {
+    const ok = window.confirm("Delete this frame?");
+    if (!ok) return;
+
+    try {
+      await api.delete(`/frames/${id}`);
+
+      // ✅ Update UI AFTER success
+      setFrames(prev => prev.filter(f => f.id !== id));
+
+      toast.success("Frame deleted");
+
+      // Close modal if needed
+      if (selectedFrame?.id === id) {
+        setSelectedFrame(null);
+      }
+
+    } catch (e) {
+      if (e.response?.status === 403) {
+        toast.error("Only admin can delete frames");
+      } else {
+        toast.error(e.response?.data?.message || "Failed to delete");
+      }
+
+      load(search, filters);
+    }
   };
 
   return (
@@ -317,13 +339,13 @@ export default function Frames() {
                 type="number"
                 min="1"
                 value={printQty}
-                onChange={(e) => setPrintQty(Number(e.target.value) || 1)}
+                onChange={(e) => setPrintQty(Math.max(1, Number(e.target.value)))}
                 className="field-input w-20"
               />
             </div>
 
             {/* Preview only */}
-            <Label product={selectedFrame} />
+            <Label key={selectedFrame.id} product={selectedFrame} />
 
             <div className="flex justify-end gap-2 mt-4">
               <button

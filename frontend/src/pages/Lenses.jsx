@@ -182,7 +182,7 @@ export default function Lenses() {
                   <div className="text-xs text-slate-400">Stock: {l.stockQty}</div>
                 </div>
                 <div className="flex gap-2">
-                  <button onClick={() => { setSelectedLens(l); setPrintQty(1); }} className="btn-secondary btn-xs">Label</button>
+                  <button onClick={() => { setSelectedLens(l); setPrintQty(1); }} className="btn-secondary btn-xs">Print Label</button>
                   <button onClick={() => openEdit(l)} className="btn-ghost btn-xs">Edit</button>
                   <button onClick={async () => { if (confirm('Delete?')) { await api.delete(`/lenses/${l.id}`); load(); } }} className="btn-danger btn-xs">Del</button>
                 </div>
@@ -314,7 +314,7 @@ export default function Lenses() {
               />
             </div>
 
-            <Label product={selectedLens} />
+            <Label key={selectedLens.id} product={selectedLens} />
             <div className="flex justify-end gap-2 mt-4">
               <button
                 className="btn-secondary btn-sm"

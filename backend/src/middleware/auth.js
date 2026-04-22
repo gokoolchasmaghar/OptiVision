@@ -22,6 +22,5 @@ const requireRole = (...roles) => (req, res, next) => {
   next();
 };
 
-const requireAdmin = requireRole('SUPER_ADMIN', 'SHOP_ADMIN');
-
+const requireAdmin = requireRole('SUPER_ADMIN', 'SHOP_ADMIN', 'Admin');
 module.exports = { authenticate, requireRole, requireAdmin };
