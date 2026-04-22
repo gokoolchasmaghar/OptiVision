@@ -192,7 +192,7 @@ export default function Frames() {
                     }}
                     className="btn-secondary btn-xs w-full"
                   >
-                    Print Label
+                    Label
                   </button>
                 </div>
               </div>
