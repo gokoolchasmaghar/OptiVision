@@ -59,6 +59,22 @@ router.get('/:code', async (req, res, next) => {
       });
     }
 
+    // 🔍 ORDER
+    const order = await prisma.order.findFirst({
+      where: {
+        orderNumber: code,
+        storeId: req.storeId,
+      },
+    });
+
+    if (order) {
+      return res.json({
+        success: true,
+        type: "ORDER",
+        data: order,
+      });
+    }
+
     return res.status(404).json({
       success: false,
       message: "Product not found"

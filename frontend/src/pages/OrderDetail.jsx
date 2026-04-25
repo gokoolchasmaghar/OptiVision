@@ -6,6 +6,12 @@ import { StatusBadge, Modal, Spinner } from '../components/ui';
 import { format } from 'date-fns';
 import toast from 'react-hot-toast';
 
+import {
+  downloadInvoice,
+  printInvoice,
+  shareOnWhatsApp,
+} from '../components/Invoice';
+
 const fmt = n => `₹${Number(n || 0).toLocaleString('en-IN')}`;
 const STATUS_FLOW = ['CREATED', 'LENS_ORDERED', 'GRINDING', 'FITTING', 'READY', 'DELIVERED'];
 const NEXT_MAP = { CREATED: 'LENS_ORDERED', LENS_ORDERED: 'GRINDING', GRINDING: 'FITTING', FITTING: 'READY', READY: 'DELIVERED' };
@@ -30,6 +36,7 @@ export default function OrderDetail() {
         setInvoiceMenu(false);
       }
     };
+
     const onEscape = event => {
       if (event.key === 'Escape') setInvoiceMenu(false);
     };
@@ -56,6 +63,19 @@ export default function OrderDetail() {
     setSaving(false);
   };
 
+  const handleCancelOrder = async () => {
+    const ok = window.confirm("Are you sure you want to cancel this order?");
+    if (!ok) return;
+
+    try {
+      await api.patch(`/orders/${id}/status`, { status: 'CANCELLED' });
+      toast.success('Order cancelled successfully');
+      load();
+    } catch (err) {
+      toast.error('Failed to cancel order');
+    }
+  };
+
   if (loading) return <div className="flex justify-center py-16"><Spinner size={28} /></div>;
   if (!order) return <div className="text-center text-red-500 py-16">Order not found</div>;
 
@@ -64,276 +84,37 @@ export default function OrderDetail() {
   const paidAmount = Math.max(0, Number(order.totalAmount || 0) - Number(order.balanceAmount || 0));
   const paidPercent = order.totalAmount > 0 ? Math.round((paidAmount / Number(order.totalAmount)) * 100) : 0;
 
-  const fetchInvoiceBlob = async () => {
-    const res = await api.get(`/orders/${order.id}/invoice`, {
-      responseType: 'blob'
-    });
-    return res.data;
-  };
+  const subtotal = order.items.reduce(
+    (sum, i) => sum + Number(i.totalPrice || 0),
+    0
+  );
 
-  const downloadInvoice = async () => {
-    try {
-      const blob = await fetchInvoiceBlob();
+  let remainingDiscount = Number(order.discountAmount || 0);
+  const itemsWithDiscount = order.items.map((item, index) => {
+    const itemTotal = Number(item.totalPrice || 0);
+    const ratio = subtotal > 0 ? itemTotal / subtotal : 0;
+    let discountAmount = Number((ratio * remainingDiscount).toFixed(2));
 
-      const url = window.URL.createObjectURL(blob);
-
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `invoice-${order.orderNumber}.pdf`;
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-
-      window.URL.revokeObjectURL(url);
-
-    } catch (err) {
-      console.error(err);
-      toast.error('Download failed');
-    }
-  };
-
-  const printInvoice = () => {
-    try {
-      const printWindow = window.open('', '_blank');
-
-      if (!printWindow) {
-        toast.error('Popup blocked! Please allow popups.');
-        return;
-      }
-
-      const paidAmount = Math.max(0, Number(order.totalAmount || 0) - Number(order.balanceAmount || 0));
-      const itemRows = order.items.map((i, idx) => `
-        <tr>
-          <td class="mono">${idx + 1}</td>
-          <td>${i.name}</td>
-          <td>${String(i.itemType || '').toUpperCase()}</td>
-          <td class="right mono">${i.quantity}</td>
-          <td class="right mono">INR ${Number(i.unitPrice || 0).toLocaleString('en-IN')}</td>
-          <td class="right mono">INR ${Number(i.totalPrice || 0).toLocaleString('en-IN')}</td>
-        </tr>
-      `).join('');
-
-      const html = `
-      <!doctype html>
-      <html>
-        <head>
-          <meta charset="utf-8" />
-          <title>Invoice ${order.orderNumber}</title>
-          <style>
-            :root { color-scheme: light; }
-            * { box-sizing: border-box; }
-            body { margin: 0; padding: 24px; background: #f8fafc; color: #0f172a; font-family: "Segoe UI", Arial, sans-serif; }
-            .sheet { max-width: 860px; margin: 0 auto; background: #fff; border: 1px solid #e2e8f0; border-radius: 16px; overflow: hidden; }
-            .head { display: flex; justify-content: space-between; gap: 16px; padding: 24px; background: linear-gradient(135deg, #0f172a, #1e293b); color: #fff; }
-            h1 { margin: 0; font-size: 24px; letter-spacing: .02em; }
-            .muted { color: #94a3b8; font-size: 12px; margin-top: 4px; }
-            .pill { display: inline-block; padding: 4px 10px; border-radius: 999px; background: rgba(148,163,184,.2); font-size: 11px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; }
-            .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; padding: 20px 24px; border-bottom: 1px solid #e2e8f0; }
-            .card { border: 1px solid #e2e8f0; border-radius: 12px; padding: 12px; background: #f8fafc; }
-            .label { color: #64748b; font-size: 11px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; margin-bottom: 6px; }
-            .val { color: #0f172a; font-size: 14px; font-weight: 600; margin: 2px 0; }
-            table { width: 100%; border-collapse: collapse; }
-            thead th { background: #f8fafc; color: #64748b; border-bottom: 1px solid #e2e8f0; text-transform: uppercase; letter-spacing: .06em; font-size: 11px; text-align: left; padding: 12px; }
-            tbody td { border-bottom: 1px solid #f1f5f9; font-size: 13px; padding: 12px; }
-            .right { text-align: right; }
-            .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace; }
-            .summary-wrap { display: flex; justify-content: flex-end; padding: 18px 24px 24px; }
-            .summary { width: 320px; border: 1px solid #e2e8f0; border-radius: 12px; padding: 14px; }
-            .row { display: flex; justify-content: space-between; margin: 8px 0; color: #475569; font-size: 13px; }
-            .row.total { border-top: 1px solid #e2e8f0; margin-top: 10px; padding-top: 10px; color: #0f172a; font-size: 16px; font-weight: 800; }
-            .row.good { color: #059669; font-weight: 700; }
-            .row.due { color: #dc2626; font-weight: 700; }
-            .foot { padding: 0 24px 20px; color: #94a3b8; font-size: 11px; }
-            @media print {
-              body { background: #fff; padding: 0; }
-              .sheet { max-width: none; border: none; border-radius: 0; }
-            }
-          </style>
-        </head>
-        <body>
-          <div class="sheet">
-            <div class="head">
-              <div>
-                <h1>Invoice</h1>
-                <div class="muted">Order ${order.orderNumber}</div>
-              </div>
-              <div style="text-align:right">
-                <span
-                  style={{
-                    padding: '4px 10px',
-                    borderRadius: '6px',
-                    fontSize: '12px',
-                    fontWeight: 600,
-                    background:
-                      order.paymentStatus === 'PAID' ? '#d1fae5' :
-                      order.paymentStatus === 'PARTIAL' ? '#fef3c7' :
-                      order.paymentStatus === 'REFUNDED' ? '#fee2e2' :
-                      '#e5e7eb',
-                    color:
-                      order.paymentStatus === 'PAID' ? '#065f46' :
-                      order.paymentStatus === 'PARTIAL' ? '#92400e' :
-                      order.paymentStatus === 'REFUNDED' ? '#991b1b' :
-                      '#374151'
-                  }}
-                >
-                  {order.paymentStatus}
-                </span>
-                
-                <div class="muted">Issued ${format(new Date(order.createdAt), 'MMM d, yyyy h:mm a')}</div>
-              </div>
-            </div>
-
-            <div class="grid">
-              <div class="card">
-                <div class="label">Bill To</div>
-                <div class="val">${order.customer?.name || '-'}</div>
-                <div class="val">${order.customer?.phone || '-'}</div>
-                <div class="val">${order.customer?.address || '-'}</div>
-              </div>
-              <div class="card">
-                <div class="label">Order Details</div>
-                <div class="val">Payment: ${order.paymentMethod || '-'}</div>
-                <div class="val">Created: ${format(new Date(order.createdAt), 'MMM d, yyyy')}</div>
-                <div class="val">Delivery: ${order.deliveryDate ? format(new Date(order.deliveryDate), 'MMM d, yyyy') : '-'}</div>
-              </div>
-            </div>
-
-            <table>
-              <thead>
-                <tr>
-                  <th>#</th>
-                  <th>Item</th>
-                  <th>Type</th>
-                  <th class="right">Qty</th>
-                  <th class="right">Unit</th>
-                  <th class="right">Line Total</th>
-                </tr>
-              </thead>
-              <tbody>
-                ${itemRows}
-              </tbody>
-            </table>
-
-            <div class="summary-wrap">
-              <div class="summary">
-
-                <div class="row">
-                  <span>Subtotal</span>
-                  <span>INR ${Number(order.subtotal || 0).toLocaleString('en-IN')}</span>
-                </div>
-
-                ${order.discountAmount > 0 ? `
-                  <div class="row">
-                    <span>Discount</span>
-                    <span>- INR ${Number(order.discountAmount || 0).toLocaleString('en-IN')}</span>
-                  </div>` : ''}
-
-                <div class="row">
-                  <span>GST (${order.taxPct || 0}%)</span>
-                  <span>INR ${Number(order.taxAmount || 0).toLocaleString('en-IN')}</span>
-                </div>
-
-                <div class="row total">
-                  <span>Total</span>
-                  <span>INR ${Number(order.totalAmount || 0).toLocaleString('en-IN')}</span>
-                </div>
-
-                ${order.paymentStatus === 'REFUNDED'
-                      ? `
-                    <div class="row good">
-                      <span>Refunded</span>
-                      <span style="color:red;">
-                        - INR ${Number(order.totalAmount || 0).toLocaleString('en-IN')}
-                      </span>
-                    </div>
-                    `
-                      : `
-                    <div class="row good">
-                      <span>Paid</span>
-                      <span>INR ${paidAmount.toLocaleString('en-IN')}</span>
-                    </div>
-                    `
-                    }
-
-                <div class="row due">
-                  <span>Balance Due</span>
-                  <span>
-                    INR ${order.paymentStatus === 'REFUNDED'
-                      ? '0'
-                      : Number(order.balanceAmount || 0).toLocaleString('en-IN')
-                    }
-                  </span>
-                </div>
-
-                ${order.paymentStatus === 'REFUNDED'
-                      ? `
-                    <div style="margin-top:12px; font-size:12px; color:#c0392b;">
-                      Full amount refunded to customer.
-                    </div>
-                    `
-                      : ''
-                    }
-
-              </div>
-            </div>
-
-            <div class="foot">Generated by OptiVision POS</div>
-          </div>
-        </body>
-      </html>
-    `;
-
-      printWindow.document.open();
-      printWindow.document.write(html);
-      printWindow.document.close();
-
-      setTimeout(() => {
-        printWindow.focus();
-        printWindow.print();
-        printWindow.close();
-      }, 300);
-
-    } catch (err) {
-      console.error(err);
-      toast.error('Print failed');
-    }
-  };
-
-  const shareOnWhatsApp = () => {
-    const phone = String(order.customer?.phone || '').replace(/[^\d]/g, '');
-    if (!phone) {
-      toast.error('Customer phone is missing');
-      return;
+    if (index === order.items.length - 1) {
+      discountAmount = Number(remainingDiscount.toFixed(2));
     }
 
-    const message = `🧾 *Invoice: ${order.orderNumber}*
-    👤 ${order.customer?.name}
-    💰 Total: ₹${order.totalAmount}
+    remainingDiscount -= discountAmount;
+    const discountPct =
+      itemTotal > 0 ? (discountAmount / itemTotal) * 100 : 0;
 
-    👉 Download Invoice:
-    ${window.location.origin}/api/orders/${order.id}/invoice
+    return {
+      ...item,
+      discountAmount,
+      discountPct,
+      finalPrice: itemTotal - discountAmount,
+    };
+  });
 
-    Thank you for choosing us! 😊`;
-
-    window.open(`https://api.whatsapp.com/send?phone=${phone}&text=${encodeURIComponent(message)}`, '_blank');
-  };
-  const handleCancelOrder = async () => {
-    if (!confirm("Are you sure you want to cancel this order?")) return;
-
-    try {
-      await api.delete(`/orders/${id}`, {
-        data: {
-          reason: "Cancelled by staff"
-        }
-      });
-
-      toast.success("Order cancelled");
-      load();
-
-    } catch (e) {
-      toast.error(e?.response?.data?.message || "Cancel failed");
-    }
-  };
+  const subtotalAfterDiscount = itemsWithDiscount.reduce(
+    (sum, i) => sum + Number(i.finalPrice || 0),
+    0
+  );
 
   return (
     <div>
@@ -384,7 +165,7 @@ export default function OrderDetail() {
                 <div className="p-4 space-y-3">
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
                     <div className="rounded-xl border border-slate-200 bg-slate-50 px-2.5 py-2 text-center">
-                      <div className="text-[10px] uppercase tracking-widest text-slate-400">Total</div>
+                      <div className="text-[10px] uppercase tracking-widest text-slate-400">Items Total</div>
                       <div className="text-xs font-bold text-slate-700">{fmt(order.totalAmount)}</div>
                     </div>
                     <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-2.5 py-2 text-center">
@@ -408,7 +189,7 @@ export default function OrderDetail() {
                   </div>
 
                   <button
-                    onClick={() => { setInvoiceMenu(false); downloadInvoice(); }}
+                    onClick={() => { setInvoiceMenu(false); downloadInvoice(order); }}
                     className="w-full text-left border border-slate-200 rounded-xl px-3 py-2.5 hover:border-primary-300 hover:bg-primary-50 transition-colors flex items-center gap-3"
                   >
                     <div className="w-9 h-9 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center"><Download size={15} /></div>
@@ -419,7 +200,7 @@ export default function OrderDetail() {
                   </button>
 
                   <button
-                    onClick={() => { setInvoiceMenu(false); printInvoice(); }}
+                    onClick={() => { setInvoiceMenu(false); printInvoice(order); }}
                     className="w-full text-left border border-slate-200 rounded-xl px-3 py-2.5 hover:border-primary-300 hover:bg-primary-50 transition-colors flex items-center gap-3"
                   >
                     <div className="w-9 h-9 rounded-xl bg-violet-50 text-violet-600 flex items-center justify-center"><Printer size={15} /></div>
@@ -430,7 +211,7 @@ export default function OrderDetail() {
                   </button>
 
                   <button
-                    onClick={() => { setInvoiceMenu(false); shareOnWhatsApp(); }}
+                    onClick={() => { setInvoiceMenu(false); shareOnWhatsApp(order); }}
                     className="w-full text-left border border-slate-200 rounded-xl px-3 py-2.5 hover:border-emerald-300 hover:bg-emerald-50 transition-colors flex items-center gap-3"
                   >
                     <div className="w-9 h-9 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center"><MessageCircle size={15} /></div>
@@ -444,11 +225,8 @@ export default function OrderDetail() {
             )}
           </div>
 
-          {order.status !== 'CANCELLED' && curIdx < 4 && (
-            <button
-              onClick={handleCancelOrder}
-              className="btn-danger btn-md"
-            >
+          {typeof handleCancelOrder === 'function' && (
+            <button onClick={handleCancelOrder} className="btn-danger btn-md">
               Cancel Order
             </button>
           )}
@@ -497,15 +275,16 @@ export default function OrderDetail() {
           <div className="card overflow-hidden">
             <div className="px-5 py-4 border-b border-slate-100"><h3 className="font-bold text-slate-800 text-sm">Order Items</h3></div>
             <table className="tbl">
-              <thead><tr><th>Item</th><th>Type</th><th className="text-right">Qty</th><th className="text-right">Unit Price</th><th className="text-right">Total</th></tr></thead>
+              <thead><tr><th>Item</th><th>Type</th><th className="text-right">Qty</th><th className="text-right">Unit Price</th><th className="text-right">Discount</th><th className="text-right">Total</th></tr></thead>
               <tbody>
-                {order.items.map(item => (
+                {itemsWithDiscount.map(item => (
                   <tr key={item.id}>
                     <td className="font-semibold text-slate-800">{item.name}</td>
                     <td><span className="badge-gray badge capitalize">{item.itemType}</span></td>
                     <td className="text-right">{item.quantity}</td>
                     <td className="text-right text-slate-500">{fmt(item.unitPrice)}</td>
-                    <td className="text-right font-semibold">{fmt(item.totalPrice)}</td>
+                    <td className="text-right text-red-500">{item.discountPct.toFixed(2)}%</td>
+                    <td className="text-right font-semibold">{fmt(item.finalPrice)}</td>
                   </tr>
                 ))}
               </tbody>
@@ -513,7 +292,7 @@ export default function OrderDetail() {
             {/* Bill summary */}
             <div className="px-5 py-4 border-t border-slate-100 space-y-2 bg-slate-50/50">
               {[
-                ['Subtotal', fmt(order.subtotal)],
+                ['Items Total', fmt(order.subtotal)],
 
                 order.discountAmount > 0
                   ? ['Discount', `−${fmt(order.discountAmount)}`]
@@ -528,7 +307,7 @@ export default function OrderDetail() {
                 <div key={k} className="flex justify-between text-sm text-slate-600"><span>{k}</span><span>{v}</span></div>
               ))}
               <div className="flex justify-between font-bold text-base border-t border-slate-200 pt-2">
-                <span>Total</span><span>{fmt(order.totalAmount)}</span>
+                <span>Total Payable</span><span>{fmt(order.totalAmount)}</span>
               </div>
               {order.advanceAmount > 0 && (
                 <div className="flex justify-between text-sm text-emerald-600 font-semibold">

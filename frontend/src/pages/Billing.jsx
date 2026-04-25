@@ -44,18 +44,20 @@ export default function Billing() {
     return () => { stopScanner(); };
   }, []);
 
-  // Keep barcode input focused when scanner is closed
   useEffect(() => {
-    if (!scannerOpen) {
-      const t = setInterval(() => {
-        if (document.activeElement !== inputRef.current) inputRef.current?.focus();
-      }, 600);
-      return () => clearInterval(t);
-    }
+    const handler = (e) => {
+      if (e.key === '/' && !scannerOpen) {
+        e.preventDefault();
+        inputRef.current?.focus();
+      }
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
   }, [scannerOpen]);
 
   useEffect(() => { const t = setTimeout(() => searchCust(custSearch), 300); return () => clearTimeout(t); }, [custSearch]);
   useEffect(() => { const t = setTimeout(() => searchProd(prodSearch), 300); return () => clearTimeout(t); }, [prodSearch]);
+  useEffect(() => { setRedeemPoints(0); }, [selCustomer]);
 
   // ── Search ──────────────────────────────────────────────────────────────────
   const searchCust = async q => {
@@ -375,8 +377,25 @@ export default function Billing() {
 
             {selCustomer && (
               <div>
-                <label className="field-label">Use Loyalty Points (max {selCustomer.loyaltyPoints || 0})</label>
-                <input className="field-input" type="number" value={redeemPoints} onChange={e => setRedeemPoints(e.target.value)} placeholder="0" />
+                <label className="field-label">
+                  Use Loyalty Points (max {selCustomer.loyaltyPoints || 0})
+                </label>
+
+                <input
+                  type="number"
+                  className="field-input"
+                  value={redeemPoints}
+                  placeholder="0"
+                  onChange={e => {
+                    let val = Math.max(0, Number(e.target.value) || 0);
+
+                    if (selCustomer) {
+                      val = Math.min(val, selCustomer.loyaltyPoints || 0);
+                    }
+
+                    setRedeemPoints(val);
+                  }}
+                />
               </div>
             )}
 

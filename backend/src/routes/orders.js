@@ -2,8 +2,11 @@ const router = require('express').Router();
 const prisma = require('../utils/prisma');
 const { authenticate, requireAdmin } = require('../middleware/auth');
 const { generateInvoice } = require('../controllers/invoice');
+const { generatePublicInvoice } = require('../controllers/invoice');
 
 const roundMoney = value => Math.round((Number(value) || 0) * 100) / 100;
+
+router.get('/public/:id/invoice', generatePublicInvoice);
 
 router.use(authenticate);
 
@@ -56,7 +59,7 @@ router.post('/', async (req, res, next) => {
 
     const customer = await prisma.customer.findFirst({
       where: { id: customerId, storeId: req.storeId },
-      select: { id: true },
+      select: { id: true, loyaltyPoints: true },
     });
     if (!customer) return res.status(400).json({ success: false, message: 'Invalid customer for this store' });
 
@@ -68,17 +71,36 @@ router.post('/', async (req, res, next) => {
       if (!prescription) return res.status(400).json({ success: false, message: 'Invalid prescription for this customer' });
     }
 
-    const calculatedSubtotal = roundMoney(items.reduce((sum, item) => sum + (Number(item.totalPrice) || 0), 0));
-    const safeDiscount = Math.min(Math.max(roundMoney(discountAmount), 0), calculatedSubtotal);
-    const loyaltyUsed = Number(redeemPoints || 0);
-    const taxableAmount = calculatedSubtotal - safeDiscount;
-    const effectiveTaxRate = store.gstEnabled ? Math.max(0, Number(store.taxRate) || 0) : 0;
-    const calculatedTax = roundMoney((taxableAmount * effectiveTaxRate) / 100);
-    const calculatedTotal = roundMoney(taxableAmount + calculatedTax);
+    const calculatedSubtotal = roundMoney(
+      items.reduce((sum, item) => sum + (Number(item.totalPrice) || 0), 0)
+    );
 
-    if (calculatedTotal <= 0) {
-      return res.status(400).json({ success: false, message: 'Order total must be greater than zero' });
-    }
+    const safeDiscount = Math.min(
+      Math.max(roundMoney(discountAmount), 0),
+      calculatedSubtotal
+    );
+
+    const taxableAmount = calculatedSubtotal - safeDiscount;
+
+    const effectiveTaxRate = store.gstEnabled
+      ? Math.max(0, Number(store.taxRate) || 0)
+      : 0;
+
+    const calculatedTax = roundMoney(
+      (taxableAmount * effectiveTaxRate) / 100
+    );
+
+    // ✅ SAFE LOYALTY POINTS
+    const safeRedeemPoints = Math.min(
+      Math.max(Number(redeemPoints) || 0, 0),
+      customer.loyaltyPoints || 0,
+      taxableAmount + calculatedTax
+    );
+
+    // ✅ FINAL TOTAL
+    const calculatedTotal = roundMoney(
+      taxableAmount + calculatedTax - safeRedeemPoints
+    );
 
     const orderNumber = `${store.invoicePrefix}-${String(store.invoiceCounter + 1).padStart(4, '0')}`;
 
@@ -114,7 +136,7 @@ router.post('/', async (req, res, next) => {
       const newOrder = await tx.order.create({
         data: {
           storeId: req.storeId, orderNumber, customerId, prescriptionId: prescriptionId || null, staffId: req.user.id,
-          subtotal: calculatedSubtotal, discountAmount: safeDiscount, redeemPoints: Number(redeemPoints || 0), taxAmount: calculatedTax, taxPct: effectiveTaxRate, totalAmount: calculatedTotal,
+          subtotal: calculatedSubtotal, discountAmount: safeDiscount, redeemPoints: safeRedeemPoints, taxAmount: calculatedTax, taxPct: effectiveTaxRate, totalAmount: calculatedTotal,
           advanceAmount: Number(advanceAmount), balanceAmount: Math.max(0, calculatedTotal - Number(advanceAmount)),
           paymentMethod, paymentStatus: Number(advanceAmount) >= calculatedTotal ? 'PAID' : Number(advanceAmount) > 0 ? 'PARTIAL' : 'PENDING',
           deliveryDate: deliveryDate ? new Date(deliveryDate) : null, frameDetails, lensDetails, notes,
@@ -134,7 +156,7 @@ router.post('/', async (req, res, next) => {
         where: { id: customerId, storeId: req.storeId },
         data: {
           loyaltyPoints: {
-            increment: earnedPoints - Number(redeemPoints || 0)
+            increment: earnedPoints - safeRedeemPoints
           }
         }
       });
@@ -162,8 +184,21 @@ router.patch('/:id/status', async (req, res, next) => {
 
     const existing = await prisma.order.findFirst({
       where: { id: req.params.id, storeId: req.storeId },
-      select: { id: true },
+      select: {
+        id: true,
+        customerId: true,
+        redeemPoints: true,
+        status: true
+      },
     });
+
+    if (existing.status === 'CANCELLED') {
+      return res.status(400).json({
+        success: false,
+        message: 'Order already cancelled'
+      });
+    }
+
     if (!existing) return res.status(404).json({ success: false, message: 'Not found' });
 
     const order = await prisma.$transaction(async tx => {
@@ -172,6 +207,17 @@ router.patch('/:id/status', async (req, res, next) => {
         data: { status, ...(status === 'DELIVERED' && { deliveredAt: new Date() }), ...(status === 'CANCELLED' && { cancelledAt: new Date(), cancelReason: note }) }
       });
       if (!result.count) throw Object.assign(new Error('Order not found'), { status: 404 });
+      // ✅ Refund loyalty points
+      if (status === 'CANCELLED' && existing.redeemPoints > 0) {
+        await tx.customer.update({
+          where: { id: existing.customerId },
+          data: {
+            loyaltyPoints: {
+              increment: existing.redeemPoints
+            }
+          }
+        });
+      }
       await tx.orderStatusLog.create({ data: { orderId: req.params.id, status, note } });
       return tx.order.findFirst({ where: { id: req.params.id, storeId: req.storeId } });
     });
