@@ -1,8 +1,9 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { AreaChart, Area, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import api from '../services/api';
 import { PageHeader, Tabs, Spinner } from '../components/ui';
 import { format, subDays } from 'date-fns';
+import toast from 'react-hot-toast';
 
 const fmt = n => `₹${Number(n || 0).toLocaleString('en-IN')}`;
 
@@ -15,25 +16,63 @@ export default function Reports() {
   const [frames, setFrames] = useState([]);
   const [customers, setCustomers] = useState([]);
   const [profit, setProfit] = useState(null);
+  const [lastUpdated, setLastUpdated] = useState(null);
+  const loadingRef = useRef(false);
 
-  const loadData = async () => {
-    setLoading(true);
+  const downloadBlob = (data, filename) => {
+    const blob = data instanceof Blob ? data : new Blob([data], { type: 'application/pdf' });
+    const url = window.URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.setAttribute('download', filename);
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    window.URL.revokeObjectURL(url);
+  };
+
+  const downloadDailyPdf = async () => {
+    try {
+      const res = await api.get('/reports/daily/pdf', {
+        params: { date: dateTo },
+        responseType: 'blob',
+      });
+      downloadBlob(res.data, `daily-report-${dateTo}.pdf`);
+      toast.success('Daily report downloaded');
+    } catch (err) {
+      console.error(err);
+      toast.error('Failed to download daily report');
+    }
+  };
+
+  const loadData = useCallback(async ({ showLoader = true } = {}) => {
+    if (loadingRef.current) return;
+    loadingRef.current = true;
+    if (showLoader) setLoading(true);
     try {
       const [sRes, fRes, cRes, pRes] = await Promise.all([
         api.get('/reports/sales', { params: { from: dateFrom, to: dateTo } }),
         api.get('/reports/frames', { params: { from: dateFrom, to: dateTo } }),
-        api.get('/reports/customers'),
+        api.get('/reports/customers', { params: { from: dateFrom, to: dateTo } }),
         api.get('/reports/profit', { params: { from: dateFrom, to: dateTo } }),
       ]);
       setSales(sRes.data.data);
       setFrames(fRes.data.data);
       setCustomers(cRes.data.data);
       setProfit(pRes.data.data);
+      setLastUpdated(new Date());
     } catch { }
-    setLoading(false);
-  };
+    loadingRef.current = false;
+    if (showLoader) setLoading(false);
+  }, [dateFrom, dateTo]);
 
-  useEffect(() => { loadData(); }, [dateFrom, dateTo]);
+  useEffect(() => { loadData({ showLoader: true }); }, [loadData]);
+  useEffect(() => {
+    const timer = setInterval(() => {
+      loadData({ showLoader: false });
+    }, 30000);
+    return () => clearInterval(timer);
+  }, [loadData]);
 
   const summary = sales.summary || {};
 
@@ -55,6 +94,12 @@ export default function Reports() {
           <button key={d} onClick={() => { setDateFrom(format(subDays(new Date(), d), 'yyyy-MM-dd')); setDateTo(format(new Date(), 'yyyy-MM-dd')); }}
             className="btn-secondary btn-sm">Last {d}d</button>
         ))}
+        <button onClick={downloadDailyPdf} className="btn-primary btn-sm">
+          Today's Report
+        </button>
+        <span className="text-xs text-slate-500">
+          Auto-refresh: 30s{lastUpdated ? ` • Updated ${format(lastUpdated, 'h:mm:ss a')}` : ''}
+        </span>
       </div>
 
       {/* Summary cards */}
