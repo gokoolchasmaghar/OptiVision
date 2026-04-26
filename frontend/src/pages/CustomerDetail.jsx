@@ -66,10 +66,10 @@ export default function CustomerDetail() {
   const downloadPrescription = async (id) => {
     try {
       const res = await api.get(`/prescriptions/${id}/pdf`, {
-        responseType: 'blob'
+        responseType: 'blob',
       });
 
-      const url = window.URL.createObjectURL(new Blob([res.data]));
+      const url = window.URL.createObjectURL(res.data);
 
       const link = document.createElement('a');
       link.href = url;
@@ -79,7 +79,9 @@ export default function CustomerDetail() {
       link.click();
       link.remove();
 
+      window.URL.revokeObjectURL(url); // cleanup
     } catch (err) {
+      console.error(err);
       toast.error('Failed to download PDF');
     }
   };

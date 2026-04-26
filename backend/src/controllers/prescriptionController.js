@@ -94,17 +94,27 @@ exports.downloadPrescription = async (req, res) => {
 `;
 
     const isProd = process.env.NODE_ENV === 'production';
-    const browser = await puppeteer.launch(
-      isProd
-        ? {
-          args: chromium.args,
-          executablePath: await chromium.executablePath(),
-          headless: chromium.headless
-        }
-        : {
-          headless: 'new'
-        }
-    );
+
+    let browser;
+
+    if (isProd) {
+      // 🚀 Railway (use sparticuz chromium)
+      browser = await puppeteer.launch({
+        args: chromium.args,
+        executablePath: await chromium.executablePath() || undefined,
+        headless: chromium.headless,
+        defaultViewport: chromium.defaultViewport,
+      });
+    } else {
+      // 💻 LOCAL (use full puppeteer)
+      const puppeteerFull = require('puppeteer');
+
+      browser = await puppeteerFull.launch({
+        headless: 'new'
+      });
+    }
+
+    console.log("PDF size:", pdf?.length);
 
     const page = await browser.newPage();
     await page.setContent(html, {
@@ -127,7 +137,8 @@ exports.downloadPrescription = async (req, res) => {
 
     res.set({
       'Content-Type': 'application/pdf',
-      'Content-Disposition': `attachment; filename=Prescription-${rx.customer.name}.pdf`
+      'Content-Disposition': `attachment; filename=Prescription-${id}.pdf`,
+      'Content-Length': pdf.length,
     });
 
     res.send(pdf);
