@@ -18,6 +18,8 @@ export default function Reports() {
   const [profit, setProfit] = useState(null);
   const [lastUpdated, setLastUpdated] = useState(null);
   const loadingRef = useRef(false);
+  const [month, setMonth] = useState('');
+  const [year, setYear] = useState(new Date().getFullYear());
 
   const downloadBlob = (data, filename) => {
     const blob = data instanceof Blob ? data : new Blob([data], { type: 'application/pdf' });
@@ -42,6 +44,59 @@ export default function Reports() {
     } catch (err) {
       console.error(err);
       toast.error('Failed to download daily report');
+    }
+  };
+
+  const downloadMonthlyPdf = async () => {
+    try {
+      const now = new Date();
+      const month = now.toISOString().slice(0, 7); // YYYY-MM
+
+      const res = await api.get(`/reports/monthly/pdf`, {
+        params: { month },
+        responseType: 'blob',
+      });
+
+      const url = window.URL.createObjectURL(res.data);
+
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `monthly-report-${month}.pdf`;
+
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+
+      window.URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error(err);
+      toast.error('Monthly report failed');
+    }
+  };
+
+  const downloadYearlyPdf = async () => {
+    try {
+      const year = new Date().getFullYear();
+
+      const res = await api.get(`/reports/yearly/pdf`, {
+        params: { year },
+        responseType: 'blob',
+      });
+
+      const url = window.URL.createObjectURL(res.data);
+
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `yearly-report-${year}.pdf`;
+
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+
+      window.URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error(err);
+      toast.error('Yearly report failed');
     }
   };
 
@@ -100,6 +155,7 @@ export default function Reports() {
         <span className="text-xs text-slate-500">
           Auto-refresh: 30s{lastUpdated ? ` • Updated ${format(lastUpdated, 'h:mm:ss a')}` : ''}
         </span>
+
       </div>
 
       {/* Summary cards */}
@@ -180,6 +236,49 @@ export default function Reports() {
               </table>
             </div>
           )}
+      </div>
+
+      <div className="card p-5 space-y-4 mt-6">
+
+        <h3 className="font-bold text-lg text-slate-800">Reports</h3>
+
+        {/* Daily */}
+        <button
+          onClick={downloadDailyPdf}
+          className="w-full py-3 rounded-xl bg-blue-600 text-white font-semibold hover:bg-blue-700 transition"
+        >
+          📄 Download Today's Report
+        </button>
+
+        {/* Monthly */}
+        <div className="flex items-center justify-between bg-slate-50 p-3 rounded-xl">
+          <div>
+            <div className="font-semibold text-slate-800">This Month</div>
+            <div className="text-xs text-slate-500">1st → Today</div>
+          </div>
+
+          <button
+            onClick={downloadMonthlyPdf}
+            className="px-4 py-2 rounded-lg bg-indigo-600 text-white text-sm hover:bg-indigo-700 transition"
+          >
+            Download
+          </button>
+        </div>
+
+        {/* Yearly */}
+        <div className="flex items-center justify-between bg-slate-50 p-3 rounded-xl">
+          <div>
+            <div className="font-semibold text-slate-800">This Year</div>
+            <div className="text-xs text-slate-500">Jan → Today</div>
+          </div>
+
+          <button
+            onClick={downloadYearlyPdf}
+            className="px-4 py-2 rounded-lg bg-green-600 text-white text-sm hover:bg-green-700 transition"
+          >
+            Download
+          </button>
+        </div>
       </div>
     </div>
   );
