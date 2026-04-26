@@ -16,7 +16,21 @@ export const generateInvoice = async (req, res) => {
         customer: true,
         items: true,
         payments: true,
-        prescription: true,
+        prescription: {
+          create: {
+            rightSph: data.rightSph,
+            rightCyl: data.rightCyl,
+            rightAxis: data.rightAxis,
+            rightAdd: data.rightAdd,
+
+            leftSph: data.leftSph,
+            leftCyl: data.leftCyl,
+            leftAxis: data.leftAxis,
+            leftAdd: data.leftAdd,
+
+            pd: data.pd,
+          }
+        },
       }
     });
 
@@ -40,6 +54,16 @@ export const generateInvoice = async (req, res) => {
 
     const barcodeBase64 = barcodeBuffer.toString('base64');
     const barcodeImg = `data:image/png;base64,${barcodeBase64}`;
+
+    const formatPower = (val) => {
+      if (val === null || val === undefined) return "0.00";
+      return Number(val).toFixed(2);
+    };
+
+    const formatPD = (val) => {
+      if (val === null || val === undefined || isNaN(val)) return "-";
+      return Number(val).toFixed(0);
+    };
 
     // ----------------------
     // HTML TEMPLATE
@@ -131,24 +155,40 @@ export const generateInvoice = async (req, res) => {
         <h3>Customer Eye Power</h3>
         <table>
           <tr>
-            <th>Eye</th>
-            <th>Sphere</th>
-            <th>Cylinder</th>
-            <th>Axis</th>
+            <td>SPH</td>
+            <td>${formatPower(rx.rightSph)}</td>
+            <td>${formatPower(rx.leftSph)}</td>
           </tr>
+
           <tr>
-            <td>RE</td>
-            <td>${order.prescription.rightSph || '-'}</td>
-            <td>${order.prescription.rightCyl || '-'}</td>
-            <td>${order.prescription.rightAxis || '-'}</td>
+            <td>CYL</td>
+            <td>${formatPower(rx.rightCyl)}</td>
+            <td>${formatPower(rx.leftCyl)}</td>
           </tr>
+
           <tr>
-            <td>LE</td>
-            <td>${order.prescription.leftSph || '-'}</td>
-            <td>${order.prescription.leftCyl || '-'}</td>
-            <td>${order.prescription.leftAxis || '-'}</td>
+            <td>AXIS</td>
+            <td>${rx.rightAxis ?? '-'}</td>
+            <td>${rx.leftAxis ?? '-'}</td>
+          </tr>
+
+          <tr>
+            <td>ADD</td>
+            <td>${formatPower(rx.rightAdd)}</td>
+            <td>${formatPower(rx.leftAdd)}</td>
+          </tr>
+
+          <tr>
+            <td>ADD</td>
+            <td>${formatPower(rx.rightAdd)}</td>
+            <td>${formatPower(rx.leftAdd)}</td>
           </tr>
         </table>
+
+        <!-- PD -->
+        <div style="margin-top:10px;">
+          <b>PD (mm):</b> ${formatPD(rx.pd)}
+        </div>
       </div>
       ` : ''}
 
@@ -270,9 +310,26 @@ export const generatePublicInvoice = async (req, res) => {
         customer: true,
         items: true,
         payments: true,
-        prescription: true,
+        prescription: {
+          create: {
+            rightSph: data.rightSph,
+            rightCyl: data.rightCyl,
+            rightAxis: data.rightAxis,
+            rightAdd: data.rightAdd,
+
+            leftSph: data.leftSph,
+            leftCyl: data.leftCyl,
+            leftAxis: data.leftAxis,
+            leftAdd: data.leftAdd,
+
+            pd: data.pd,
+          }
+        }
       }
     });
+
+    console.log("FULL ORDER:", order);
+    console.log("PRESCRIPTION:", order.prescription);
 
     if (!order) {
       return res.status(404).send('Invoice not found');
@@ -400,24 +457,34 @@ export const generatePublicInvoice = async (req, res) => {
         <h3>Customer Eye Power</h3>
         <table>
           <tr>
-            <th>Eye</th>
-            <th>Sphere</th>
-            <th>Cylinder</th>
-            <th>Axis</th>
+            <td>SPH</td>
+            <td>${formatPower(rx.rightSph)}</td>
+            <td>${formatPower(rx.leftSph)}</td>
           </tr>
+
           <tr>
-            <td>RE</td>
-            <td>${order.prescription.rightSph || '-'}</td>
-            <td>${order.prescription.rightCyl || '-'}</td>
-            <td>${order.prescription.rightAxis || '-'}</td>
+            <td>CYL</td>
+            <td>${formatPower(rx.rightCyl)}</td>
+            <td>${formatPower(rx.leftCyl)}</td>
           </tr>
+
           <tr>
-            <td>LE</td>
-            <td>${order.prescription.leftSph || '-'}</td>
-            <td>${order.prescription.leftCyl || '-'}</td>
-            <td>${order.prescription.leftAxis || '-'}</td>
+            <td>AXIS</td>
+            <td>${rx.rightAxis ?? '-'}</td>
+            <td>${rx.leftAxis ?? '-'}</td>
+          </tr>
+
+          <tr>
+            <td>ADD</td>
+            <td>${formatPower(rx.rightAdd)}</td>
+            <td>${formatPower(rx.leftAdd)}</td>
           </tr>
         </table>
+
+        <!-- PD -->
+        <div style="margin-top:10px;">
+          <b>PD (mm):</b> ${formatPD(rx.pd)}
+        </div>
       </div>
       ` : ''}
 

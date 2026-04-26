@@ -169,6 +169,16 @@ const generateInvoiceHTML = (order) => {
     </tr>
   `).join('');
 
+  const formatPower = (val) => {
+    if (val === null || val === undefined) return "0.00";
+    return Number(val).toFixed(2);
+  };
+
+  const formatPD = (val) => {
+    if (val === null || val === undefined || isNaN(val)) return "-";
+    return Number(val).toFixed(0);
+  };
+
   // ----------------------
   // 🔥 HTML
   // ----------------------
@@ -258,24 +268,34 @@ const generateInvoiceHTML = (order) => {
       <h3>Customer Eye Power</h3>
       <table>
         <tr>
-          <th>Eye</th>
-          <th>Sphere</th>
-          <th>Cylinder</th>
-          <th>Axis</th>
+          <td>SPH</td>
+          <td>${formatPower(rx.rightSph)}</td>
+          <td>${formatPower(rx.leftSph)}</td>
         </tr>
+
         <tr>
-          <td>RE</td>
-          <td>${rx.rightSph || '-'}</td>
-          <td>${rx.rightCyl || '-'}</td>
-          <td>${rx.rightAxis || '-'}</td>
+          <td>CYL</td>
+          <td>${formatPower(rx.rightCyl)}</td>
+          <td>${formatPower(rx.leftCyl)}</td>
         </tr>
+
         <tr>
-          <td>LE</td>
-          <td>${rx.leftSph || '-'}</td>
-          <td>${rx.leftCyl || '-'}</td>
-          <td>${rx.leftAxis || '-'}</td>
+          <td>AXIS</td>
+          <td>${rx.rightAxis ?? '-'}</td>
+          <td>${rx.leftAxis ?? '-'}</td>
+        </tr>
+
+        <tr>
+          <td>ADD</td>
+          <td>${formatPower(rx.rightAdd)}</td>
+          <td>${formatPower(rx.leftAdd)}</td>
         </tr>
       </table>
+
+      <!-- PD -->
+      <div style="margin-top:10px;">
+        <b>PD (mm):</b> ${formatPD(rx.pd)}
+      </div>
     </div>
 
     <!-- PRODUCTS -->

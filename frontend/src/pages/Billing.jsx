@@ -181,7 +181,8 @@ export default function Billing() {
 
   // ── Totals ──────────────────────────────────────────────────────────────────
   const subtotal = cart.reduce((s, x) => s + x.sellingPrice * x.qty, 0);
-  const discAmt = Math.min(Math.max(Number(discount) || 0, 0), subtotal);
+  const discountPct = Math.max(0, Math.min(100, Number(discount) || 0));
+  const discAmt = (subtotal * discountPct) / 100;
   const gstRate = storePricing.gstEnabled ? Number(storePricing.taxRate) || 0 : 0;
   const taxable = subtotal - discAmt;
   const tax = (taxable * gstRate) / 100;
@@ -371,7 +372,7 @@ export default function Billing() {
             <h3 className="font-bold text-slate-800">Payment Summary</h3>
 
             <div>
-              <label className="field-label">Discount ₹</label>
+              <label className="field-label">Discount %</label>
               <input className="field-input" type="number" value={discount} onChange={e => setDiscount(e.target.value)} placeholder="0" />
             </div>
 

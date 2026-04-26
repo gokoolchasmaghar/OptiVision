@@ -1,6 +1,8 @@
 const router = require('express').Router();
 const prisma = require('../utils/prisma');
 const { authenticate } = require('../middleware/auth');
+const { downloadPrescription } = require('../controllers/prescriptionController');
+
 router.use(authenticate);
 
 router.get('/customer/:customerId', async (req, res, next) => {
@@ -78,5 +80,7 @@ router.put('/:id', async (req, res, next) => {
     res.json({ success: true, data: rx });
   } catch (e) { next(e); }
 });
+
+router.get('/:id/pdf', downloadPrescription);
 
 module.exports = router;

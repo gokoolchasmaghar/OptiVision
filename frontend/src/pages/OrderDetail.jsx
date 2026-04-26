@@ -116,6 +116,72 @@ export default function OrderDetail() {
     0
   );
 
+  const sendWhatsAppUpdate = (status) => {
+    const phone = order.customer?.phone;
+    if (!phone) return toast.error('Customer phone not available');
+
+    const cleanPhone = phone.replace(/\D/g, '');
+
+    const messages = {
+      CREATED: `Hi ${order.customer.name},
+
+Thank you for choosing us 😊
+Your order *${order.orderNumber}* has been successfully placed.
+
+We have started processing it and will keep you updated at every step.
+
+If you have any questions, feel free to reach out anytime!`,
+
+      LENS_ORDERED: `Hi ${order.customer.name},
+
+Quick update on your order *${order.orderNumber}* 👓
+Your lenses have been ordered and are on the way.
+
+We will notify you once they reach the next stage.`,
+
+      GRINDING: `Hi ${order.customer.name},
+
+Your order *${order.orderNumber}* is now in the grinding process 🔧
+We are carefully preparing your lenses for the perfect fit.
+
+Will update you again shortly!`,
+
+      FITTING: `Hi ${order.customer.name},
+
+Good news! Your glasses for order *${order.orderNumber}* are now in the fitting stage 👓✨
+
+We are almost done - final touches in progress!`,
+
+      READY: `Hi ${order.customer.name},
+
+Great news! 🎉
+Your order *${order.orderNumber}* is ready for pickup.
+
+You can visit our store at your convenience.
+We look forward to seeing you 😊`,
+
+      DELIVERED: `Hi ${order.customer.name},
+
+Your order *${order.orderNumber}* has been successfully delivered ✅
+
+We hope you love your new glasses!
+If you need any adjustments or support, we are always here to help.
+
+Thank you for trusting us 🙏`
+    };
+
+    const message = messages[status] || 'Order update';
+
+    const text = encodeURIComponent(
+      message.replace(/\n/g, '\r\n')
+    );
+
+    window.open(
+      `https://api.whatsapp.com/send?phone=${cleanPhone}&text=${text}`,
+      '_blank'
+    );
+  };
+
   return (
     <div>
       <button onClick={() => navigate('/orders')} className="flex items-center gap-2 text-sm text-slate-500 hover:text-slate-700 mb-5 font-medium no-print">
@@ -252,14 +318,33 @@ export default function OrderDetail() {
                     return (
                       <div key={s} className="flex items-center flex-1">
                         <div className="flex flex-col items-center gap-1.5">
-                          <div className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold transition-all flex-shrink-0
-                            ${done ? (cur ? 'bg-primary-600 text-white ring-4 ring-primary-100' : 'bg-emerald-500 text-white') : 'bg-slate-100 text-slate-400'}`}>
+
+                          {/* Step circle */}
+                          <div className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold
+      ${done ? (cur ? 'bg-primary-600 text-white' : 'bg-emerald-500 text-white') : 'bg-slate-100 text-slate-400'}`}>
                             {done && !cur ? <Check size={12} /> : i + 1}
                           </div>
-                          <div className={`text-[10px] font-semibold text-center leading-tight ${cur ? 'text-primary-600' : done ? 'text-emerald-600' : 'text-slate-400'}`}>
-                            {s.replace('_', '\n')}
+
+                          {/* Label */}
+                          <div className={`text-[10px] font-semibold text-center ${cur ? 'text-primary-600' : done ? 'text-emerald-600' : 'text-slate-400'}`}>
+                            {s.replace('_', ' ')}
                           </div>
+
+                          {/* 🔥 WhatsApp Button */}
+                          <button
+                            onClick={() => sendWhatsAppUpdate(s)}
+                            disabled={!cur}
+                            className={`mt-1 text-[9px] px-2 py-1 rounded-full border
+        ${cur
+                                ? 'bg-emerald-500 text-white border-emerald-500 hover:bg-emerald-600'
+                                : 'bg-slate-100 text-slate-400 border-slate-200 cursor-not-allowed'
+                              }`}
+                          >
+                            WhatsApp
+                          </button>
+
                         </div>
+
                         {i < STATUS_FLOW.length - 1 && (
                           <div className={`flex-1 h-0.5 mx-1 mb-5 ${i < curIdx ? 'bg-emerald-400' : 'bg-slate-100'}`} />
                         )}

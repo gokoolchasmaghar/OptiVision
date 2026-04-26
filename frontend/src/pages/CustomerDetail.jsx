@@ -6,7 +6,7 @@ import { Tabs, StatusBadge, Spinner, Empty, Modal } from '../components/ui';
 import toast from 'react-hot-toast';
 import { format } from 'date-fns';
 
-const fmt = n => `₹${Number(n||0).toLocaleString('en-IN')}`;
+const fmt = n => `₹${Number(n || 0).toLocaleString('en-IN')}`;
 
 function RxTable({ rx }) {
   const row = (label, right, left) => (
@@ -46,7 +46,7 @@ export default function CustomerDetail() {
   const [loading, setLoading] = useState(true);
   const [tab, setTab] = useState('rx');
   const [rxModal, setRxModal] = useState(false);
-  const [rxForm, setRxForm] = useState({ doctorName:'', rightSph:'', rightCyl:'', rightAxis:'', rightAdd:'', leftSph:'', leftCyl:'', leftAxis:'', leftAdd:'', pd:'' });
+  const [rxForm, setRxForm] = useState({ doctorName: '', rightSph: '', rightCyl: '', rightAxis: '', rightAdd: '', leftSph: '', leftCyl: '', leftAxis: '', leftAdd: '', pd: '' });
   const [savingRx, setSavingRx] = useState(false);
 
   const load = () => api.get(`/customers/${id}`).then(r => setCust(r.data.data)).catch(() => toast.error('Failed to load')).finally(() => setLoading(false));
@@ -63,13 +63,34 @@ export default function CustomerDetail() {
     setSavingRx(false);
   };
 
-  if (loading) return <div className="flex justify-center py-16"><Spinner size={28}/></div>;
+  const downloadPrescription = async (id) => {
+    try {
+      const res = await api.get(`/prescriptions/${id}/pdf`, {
+        responseType: 'blob'
+      });
+
+      const url = window.URL.createObjectURL(new Blob([res.data]));
+
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', `Prescription-${id}.pdf`);
+
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+
+    } catch (err) {
+      toast.error('Failed to download PDF');
+    }
+  };
+
+  if (loading) return <div className="flex justify-center py-16"><Spinner size={28} /></div>;
   if (!cust) return <div className="text-center text-red-500 py-16">Customer not found</div>;
 
   return (
     <div>
       <button onClick={() => navigate('/customers')} className="flex items-center gap-2 text-sm text-slate-500 hover:text-slate-700 mb-5 font-medium">
-        <ArrowLeft size={15}/> Back to Customers
+        <ArrowLeft size={15} /> Back to Customers
       </button>
 
       <div className="grid lg:grid-cols-4 gap-5">
@@ -82,23 +103,23 @@ export default function CustomerDetail() {
           <h2 className="font-bold text-slate-900 text-lg">{cust.name}</h2>
           {cust.gender && <div className="text-sm text-slate-500 mt-1">{cust.gender} · {cust.age ? `${cust.age} yrs` : ''}</div>}
           <div className="mt-4 space-y-2.5">
-            <div className="flex items-center gap-2 text-sm text-slate-600"><Phone size={14}/> {cust.phone}</div>
-            {cust.email && <div className="flex items-center gap-2 text-sm text-slate-600"><Mail size={14}/> {cust.email}</div>}
-            {cust.address && <div className="flex items-center gap-2 text-sm text-slate-600"><MapPin size={14}/> {cust.address}</div>}
+            <div className="flex items-center gap-2 text-sm text-slate-600"><Phone size={14} /> {cust.phone}</div>
+            {cust.email && <div className="flex items-center gap-2 text-sm text-slate-600"><Mail size={14} /> {cust.email}</div>}
+            {cust.address && <div className="flex items-center gap-2 text-sm text-slate-600"><MapPin size={14} /> {cust.address}</div>}
           </div>
           <div className="mt-5 pt-5 border-t border-slate-100 grid grid-cols-1 sm:grid-cols-2 gap-3 text-center">
             <div><div className="text-lg font-bold text-slate-800">{cust.orders?.length || 0}</div><div className="text-xs text-slate-500">Orders</div></div>
             <div><div className="text-lg font-bold text-slate-800">{cust.prescriptions?.length || 0}</div><div className="text-xs text-slate-500">Prescriptions</div></div>
           </div>
           <button onClick={() => navigate(`/orders/new?customerId=${id}`)} className="btn-primary btn-sm w-full mt-4 justify-center">
-            <Plus size={13}/> New Order
+            <Plus size={13} /> New Order
           </button>
         </div>
 
         {/* Tabs */}
         <div className="lg:col-span-3 space-y-4">
           <Tabs
-            tabs={[{ id:'rx', label:'Prescriptions' }, { id:'orders', label:'Orders' }]}
+            tabs={[{ id: 'rx', label: 'Prescriptions' }, { id: 'orders', label: 'Orders' }]}
             active={tab} onChange={setTab}
           />
 
@@ -106,21 +127,47 @@ export default function CustomerDetail() {
             <div className="card p-5">
               <div className="flex items-center justify-between mb-4">
                 <h3 className="font-bold text-slate-800">Prescription History</h3>
-                <button className="btn-primary btn-sm" onClick={() => setRxModal(true)}><Plus size={13}/> Add Rx</button>
+                <button className="btn-primary btn-sm" onClick={() => setRxModal(true)}><Plus size={13} /> Add Rx</button>
               </div>
               {cust.prescriptions?.length === 0 ? (
-                <Empty icon="👓" title="No prescriptions" desc="Add a prescription for this customer"/>
+                <Empty icon="👓" title="No prescriptions" desc="Add a prescription for this customer" />
               ) : (
                 <div className="space-y-5">
                   {cust.prescriptions.map((rx, i) => (
                     <div key={rx.id}>
-                      {i > 0 && <div className="border-t border-slate-100 my-5"/>}
+                      {i > 0 && <div className="border-t border-slate-100 my-5" />}
+
+                      {/* Header badges */}
                       <div className="flex items-center gap-2 mb-3">
-                        <span className="badge-blue badge">#{cust.prescriptions.length - i}</span>
+                        <span className="badge-blue badge">
+                          #{cust.prescriptions.length - i}
+                        </span>
                         {i === 0 && <span className="badge-green badge">Latest</span>}
                       </div>
-                      <RxTable rx={rx}/>
-                      {rx.notes && <div className="mt-2 text-xs text-slate-500 bg-slate-50 rounded-lg px-3 py-2">{rx.notes}</div>}
+
+                      {/* ✅ Prescription Table */}
+                      <RxTable rx={rx} />
+
+                      {/* ✅ Footer (date + download button) */}
+                      <div className="flex justify-between items-center mt-3">
+                        <span className="text-xs text-slate-400">
+                          {format(new Date(rx.date), 'MMM d, yyyy')}
+                        </span>
+
+                        <button
+                          className="btn-secondary btn-sm"
+                          onClick={() => downloadPrescription(rx.id)}
+                        >
+                          ⬇ Download PDF
+                        </button>
+                      </div>
+
+                      {/* Notes */}
+                      {rx.notes && (
+                        <div className="mt-2 text-xs text-slate-500 bg-slate-50 rounded-lg px-3 py-2">
+                          {rx.notes}
+                        </div>
+                      )}
                     </div>
                   ))}
                 </div>
@@ -131,7 +178,7 @@ export default function CustomerDetail() {
           {tab === 'orders' && (
             <div className="card overflow-hidden">
               {cust.orders?.length === 0 ? (
-                <div className="p-5"><Empty icon="📋" title="No orders" desc="Create an order for this customer"/></div>
+                <div className="p-5"><Empty icon="📋" title="No orders" desc="Create an order for this customer" /></div>
               ) : (
                 <table className="tbl">
                   <thead><tr><th>Order #</th><th>Date</th><th>Amount</th><th>Status</th><th>Payment</th><th></th></tr></thead>
@@ -141,8 +188,8 @@ export default function CustomerDetail() {
                         <td className="font-mono text-primary-600 font-semibold">{o.orderNumber}</td>
                         <td className="text-slate-500 text-xs">{format(new Date(o.createdAt), 'MMM d, yyyy')}</td>
                         <td className="font-semibold">{fmt(o.totalAmount)}</td>
-                        <td><StatusBadge status={o.status}/></td>
-                        <td><StatusBadge status={o.paymentStatus}/></td>
+                        <td><StatusBadge status={o.status} /></td>
+                        <td><StatusBadge status={o.paymentStatus} /></td>
                         <td className="text-primary-600 text-xs font-semibold">View →</td>
                       </tr>
                     ))}
@@ -162,7 +209,7 @@ export default function CustomerDetail() {
         </>}>
         <div className="mb-4">
           <label className="field-label">Doctor Name</label>
-          <input className="field-input" value={rxForm.doctorName} onChange={e => setRxForm(f => ({...f, doctorName: e.target.value}))} placeholder="Dr. Smith"/>
+          <input className="field-input" value={rxForm.doctorName} onChange={e => setRxForm(f => ({ ...f, doctorName: e.target.value }))} placeholder="Dr. Smith" />
         </div>
         <div className="overflow-x-auto">
           <table className="w-full text-sm border border-slate-100 rounded-xl overflow-hidden mb-4">
@@ -174,18 +221,18 @@ export default function CustomerDetail() {
               </tr>
             </thead>
             <tbody>
-              {[['SPH','Sph'],['CYL','Cyl'],['AXIS','Axis'],['ADD','Add']].map(([label, key]) => (
+              {[['SPH', 'Sph'], ['CYL', 'Cyl'], ['AXIS', 'Axis'], ['ADD', 'Add']].map(([label, key]) => (
                 <tr key={label} className="border-t border-slate-100">
                   <td className="px-3 py-2 text-xs font-semibold text-slate-500 bg-slate-50">{label}</td>
                   <td className="px-3 py-2 border-l border-slate-100">
                     <input className="w-full text-center text-sm border border-slate-200 rounded-lg py-1 px-2 focus:outline-none focus:ring-1 focus:ring-primary-400"
                       type="number" step="0.25" placeholder="0.00"
-                      value={rxForm[`right${key}`]} onChange={e => setRxForm(f => ({...f, [`right${key}`]: e.target.value}))}/>
+                      value={rxForm[`right${key}`]} onChange={e => setRxForm(f => ({ ...f, [`right${key}`]: e.target.value }))} />
                   </td>
                   <td className="px-3 py-2 border-l border-slate-100">
                     <input className="w-full text-center text-sm border border-slate-200 rounded-lg py-1 px-2 focus:outline-none focus:ring-1 focus:ring-primary-400"
                       type="number" step="0.25" placeholder="0.00"
-                      value={rxForm[`left${key}`]} onChange={e => setRxForm(f => ({...f, [`left${key}`]: e.target.value}))}/>
+                      value={rxForm[`left${key}`]} onChange={e => setRxForm(f => ({ ...f, [`left${key}`]: e.target.value }))} />
                   </td>
                 </tr>
               ))}
@@ -194,7 +241,7 @@ export default function CustomerDetail() {
         </div>
         <div>
           <label className="field-label">PD (mm)</label>
-          <input className="field-input w-full sm:max-w-xs" type="number" step="0.5" value={rxForm.pd} onChange={e => setRxForm(f => ({...f, pd: e.target.value}))} placeholder="63"/>
+          <input className="field-input w-full sm:max-w-xs" type="number" step="0.5" value={rxForm.pd} onChange={e => setRxForm(f => ({ ...f, pd: e.target.value }))} placeholder="63" />
         </div>
       </Modal>
     </div>
