@@ -499,6 +499,13 @@ router.get('/daily/pdf', async (req, res, next) => {
 router.get('/monthly/pdf', async (req, res, next) => {
   try {
     const { month } = req.query;
+    const now = new Date();
+    const selected = new Date(month + "-01");
+    if (selected > now) {
+      return res.status(400).json({
+        message: "Future month report not allowed"
+      });
+    }
     const { start, end } = parseMonthlyDateRange(month);
     const fileSlug = `monthly-report-${start.toISOString().slice(0, 7)}`;
     return await generatePeriodPdf({ req, res, start, end, title: 'Monthly Report', fileSlug });
@@ -508,6 +515,13 @@ router.get('/monthly/pdf', async (req, res, next) => {
 router.get('/yearly/pdf', async (req, res, next) => {
   try {
     const { year } = req.query;
+    const currentYear = new Date().getFullYear();
+
+    if (Number(year) > currentYear) {
+      return res.status(400).json({
+        message: "Future year report not allowed"
+      });
+    }
     const { start, end } = parseYearlyDateRange(year);
     const fileSlug = `yearly-report-${start.getFullYear()}`;
     return await generatePeriodPdf({ req, res, start, end, title: 'Yearly Report', fileSlug });

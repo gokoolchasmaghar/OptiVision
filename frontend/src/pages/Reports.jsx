@@ -20,6 +20,12 @@ export default function Reports() {
   const loadingRef = useRef(false);
   const [month, setMonth] = useState('');
   const [year, setYear] = useState(new Date().getFullYear());
+  const [selectedMonth, setSelectedMonth] = useState(
+    new Date().toISOString().slice(0, 7) // default current month
+  );
+  const [selectedYear, setSelectedYear] = useState(
+    new Date().getFullYear().toString()
+  );
 
   const downloadBlob = (data, filename) => {
     const blob = data instanceof Blob ? data : new Blob([data], { type: 'application/pdf' });
@@ -49,11 +55,8 @@ export default function Reports() {
 
   const downloadMonthlyPdf = async () => {
     try {
-      const now = new Date();
-      const month = now.toISOString().slice(0, 7);
-
       const res = await api.get(`/reports/monthly/pdf`, {
-        params: { month },
+        params: { month: selectedMonth },
         responseType: 'blob',
       });
 
@@ -61,7 +64,7 @@ export default function Reports() {
 
       const a = document.createElement('a');
       a.href = url;
-      a.download = `monthly-report-${month}.pdf`;
+      a.download = `monthly-report-${selectedMonth}.pdf`;
 
       document.body.appendChild(a);
       a.click();
@@ -76,10 +79,8 @@ export default function Reports() {
 
   const downloadYearlyPdf = async () => {
     try {
-      const year = new Date().getFullYear();
-
       const res = await api.get(`/reports/yearly/pdf`, {
-        params: { year },
+        params: { year: selectedYear },
         responseType: 'blob',
       });
 
@@ -87,7 +88,7 @@ export default function Reports() {
 
       const a = document.createElement('a');
       a.href = url;
-      a.download = `yearly-report-${year}.pdf`;
+      a.download = `yearly-report-${selectedYear}.pdf`;
 
       document.body.appendChild(a);
       a.click();
@@ -130,6 +131,15 @@ export default function Reports() {
   }, [loadData]);
 
   const summary = sales.summary || {};
+
+  const formatMonth = (m) => {
+    if (!m) return '';
+    const d = new Date(m + "-01");
+    return d.toLocaleString('default', { month: 'long', year: 'numeric' });
+  };
+
+  const currentYear = new Date().getFullYear();
+  const years = Array.from({ length: 6 }, (_, i) => currentYear - i);
 
   return (
     <div>
@@ -250,37 +260,65 @@ export default function Reports() {
 
         {/* Monthly */}
         <div className="flex items-center justify-between bg-slate-50 p-4 rounded-xl">
+
           <div>
             <div className="font-semibold text-slate-800">Monthly Report</div>
-            <div className="text-xs text-slate-500">
-              Full current month (1st → last day)
-            </div>
+
+            <span className="text-xs text-slate-500">
+              {formatMonth(selectedMonth)}
+            </span>
           </div>
 
-          <button
-            onClick={downloadMonthlyPdf}
-            className="px-4 py-2 rounded-lg bg-indigo-600 text-white text-sm hover:bg-indigo-700 transition"
-          >
-            Download
-          </button>
+          <div className="flex items-center gap-2">
+            <input
+              type="month"
+              value={selectedMonth}
+              onChange={(e) => setSelectedMonth(e.target.value)}
+              max={new Date().toISOString().slice(0, 7)}
+              className="px-2 py-1 border rounded-lg text-sm"
+            />
+
+            <button
+              onClick={downloadMonthlyPdf}
+              className="px-4 py-2 rounded-lg bg-indigo-600 text-white text-sm hover:bg-indigo-700 transition"
+            >
+              Download
+            </button>
+          </div>
+
         </div>
 
         {/* Yearly */}
-        <div className="flex items-center justify-between bg-slate-50 p-4 rounded-xl">
+        <div className="flex items-center justify-between bg-slate-50 p-4 rounded-xl mt-3">
           <div>
             <div className="font-semibold text-slate-800">Yearly Report</div>
-            <div className="text-xs text-slate-500">
-              Full current year (Jan → Dec)
-            </div>
+            <span className="text-xs text-slate-500">
+              Year: {selectedYear}
+            </span>
           </div>
 
-          <button
-            onClick={downloadYearlyPdf}
-            className="px-4 py-2 rounded-lg bg-green-600 text-white text-sm hover:bg-green-700 transition"
-          >
-            Download
-          </button>
+          <div className="flex items-center gap-2">
+            <select
+              value={selectedYear}
+              onChange={(e) => setSelectedYear(e.target.value)}
+              className="px-3 py-2 border rounded-lg text-sm w-32"
+            >
+              {years.map((y) => (
+                <option key={y} value={y}>
+                  {y}
+                </option>
+              ))}
+            </select>
+
+            <button
+              onClick={downloadYearlyPdf}
+              className="px-4 py-2 rounded-lg bg-green-600 text-white text-sm hover:bg-green-700 transition"
+            >
+              Download
+            </button>
+          </div>
         </div>
+
       </div>
     </div>
   );
