@@ -27,9 +27,9 @@ exports.downloadPrescription = async (req, res) => {
     <div>
       <h2 style="margin:0; color:#2563eb;">OptiVision</h2>
       <div style="font-size:12px; color:#64748b; margin-top:4px;">
-        Your Store Address Line 1<br/>
-        City, State - 000000<br/>
-        Phone: +91 9876543210
+        235, Parbirata G.T. Road, Sripally near SBI<br/>
+        Burdwan, Purba Bardhaman, West Bengal - 713103 <br/>
+        Phone: +91 9832906048
       </div>
     </div>
 
@@ -94,7 +94,6 @@ exports.downloadPrescription = async (req, res) => {
 `;
 
     const isProd = process.env.NODE_ENV === 'production';
-
     const browser = await puppeteer.launch(
       isProd
         ? {
@@ -103,16 +102,25 @@ exports.downloadPrescription = async (req, res) => {
           headless: chromium.headless
         }
         : {
-          headless: 'new' // ✅ local Chrome
+          headless: 'new'
         }
     );
 
     const page = await browser.newPage();
-    await page.setContent(html, { waitUntil: 'domcontentloaded' });
+    await page.setContent(html, {
+      waitUntil: 'networkidle0',
+      timeout: 30000
+    });
 
     const pdf = await page.pdf({
       format: 'A4',
-      printBackground: true
+      printBackground: true,
+      margin: {
+        top: '20px',
+        bottom: '20px',
+        left: '20px',
+        right: '20px'
+      }
     });
 
     await browser.close();
@@ -133,9 +141,15 @@ exports.downloadPrescription = async (req, res) => {
 function row(label, r, l) {
   return `
     <tr>
-      <td style="padding:8px;border:1px solid #ccc;">${label}</td>
-      <td style="padding:8px;border:1px solid #ccc;text-align:center;">${r ?? '-'}</td>
-      <td style="padding:8px;border:1px solid #ccc;text-align:center;">${l ?? '-'}</td>
+      <td style="padding:10px; border:1px solid #e2e8f0; font-weight:bold; background:#f8fafc;">
+        ${label}
+      </td>
+      <td style="padding:10px; border:1px solid #e2e8f0; text-align:center;">
+        ${r ?? '—'}
+      </td>
+      <td style="padding:10px; border:1px solid #e2e8f0; text-align:center;">
+        ${l ?? '—'}
+      </td>
     </tr>
   `;
 }
