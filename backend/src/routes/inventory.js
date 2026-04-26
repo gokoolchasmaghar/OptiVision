@@ -33,6 +33,14 @@ router.post('/adjust', async (req, res, next) => {
     if (!['IN', 'OUT', 'ADJUSTMENT'].includes(type)) {
       return res.status(400).json({ success: false, message: 'Invalid movement type' });
     }
+    const qty = Number(quantity);
+    if (!Number.isInteger(qty) || qty <= 0) {
+      return res.status(400).json({ success: false, message: 'Quantity must be a positive integer' });
+    }
+    const selectedCount = [frameId, lensId, accessoryId].filter(Boolean).length;
+    if (selectedCount !== 1) {
+      return res.status(400).json({ success: false, message: 'Select exactly one item' });
+    }
 
     let item, idKey;
     if (frameId) {
@@ -48,7 +56,7 @@ router.post('/adjust', async (req, res, next) => {
 
     if (!item) return res.status(404).json({ success: false, message: 'Item not found' });
     const bef = item.stockQty;
-    const aft = type === 'IN' ? bef + Number(quantity) : type === 'OUT' ? Math.max(0, bef - Number(quantity)) : Number(quantity);
+    const aft = type === 'IN' ? bef + qty : type === 'OUT' ? Math.max(0, bef - qty) : qty;
     const updateResult = idKey === 'frameId'
       ? await prisma.frame.updateMany({ where: { id: item.id, storeId: req.storeId }, data: { stockQty: aft } })
       : idKey === 'lensId'
@@ -56,7 +64,7 @@ router.post('/adjust', async (req, res, next) => {
         : await prisma.accessory.updateMany({ where: { id: item.id, storeId: req.storeId }, data: { stockQty: aft } });
 
     if (!updateResult.count) return res.status(404).json({ success: false, message: 'Item not found' });
-    await prisma.stockMovement.create({ data: { storeId: req.storeId, [idKey]: item.id, type, quantity: Number(quantity), beforeQty: bef, afterQty: aft, reason } });
+    await prisma.stockMovement.create({ data: { storeId: req.storeId, [idKey]: item.id, type, quantity: qty, beforeQty: bef, afterQty: aft, reason } });
     res.json({ success: true, data: { beforeQty: bef, afterQty: aft } });
   } catch (e) { next(e); }
 });

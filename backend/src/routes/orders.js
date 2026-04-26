@@ -131,6 +131,31 @@ router.post('/', async (req, res, next) => {
             await tx.stockMovement.create({ data: { storeId: req.storeId, lensId: item.lensId, type: 'OUT', quantity: item.quantity, beforeQty: bef, afterQty: bef - item.quantity, reason: 'Order', reference: orderNumber } });
           }
         }
+        if (item.itemType === 'accessory' && item.accessoryId) {
+          const accessory = await tx.accessory.findFirst({
+            where: { id: item.accessoryId, storeId: req.storeId, isActive: true }
+          });
+          if (!accessory || accessory.stockQty < item.quantity) {
+            throw Object.assign(new Error(`Insufficient stock: ${item.name || 'accessory'}`), { status: 400 });
+          }
+          const bef = accessory.stockQty;
+          await tx.accessory.updateMany({
+            where: { id: item.accessoryId, storeId: req.storeId },
+            data: { stockQty: { decrement: item.quantity } }
+          });
+          await tx.stockMovement.create({
+            data: {
+              storeId: req.storeId,
+              accessoryId: item.accessoryId,
+              type: 'OUT',
+              quantity: item.quantity,
+              beforeQty: bef,
+              afterQty: bef - item.quantity,
+              reason: 'Order',
+              reference: orderNumber
+            }
+          });
+        }
       }
 
       const newOrder = await tx.order.create({
@@ -192,14 +217,14 @@ router.patch('/:id/status', async (req, res, next) => {
       },
     });
 
+    if (!existing) return res.status(404).json({ success: false, message: 'Not found' });
+
     if (existing.status === 'CANCELLED') {
       return res.status(400).json({
         success: false,
         message: 'Order already cancelled'
       });
     }
-
-    if (!existing) return res.status(404).json({ success: false, message: 'Not found' });
 
     const order = await prisma.$transaction(async tx => {
       const result = await tx.order.updateMany({

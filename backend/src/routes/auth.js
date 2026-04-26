@@ -7,11 +7,6 @@ const { authenticate, requireAdmin } = require('../middleware/auth');
 
 const sign = id => jwt.sign({ userId: id }, process.env.JWT_SECRET, { expiresIn: process.env.JWT_EXPIRES_IN || '7d' });
 
-router.get('/debug-users', async (req, res) => {
-  const users = await prisma.user.findMany();
-  res.json(users);
-});
-
 router.post('/login',
   body('email').isEmail().normalizeEmail(),
   body('password').notEmpty(),

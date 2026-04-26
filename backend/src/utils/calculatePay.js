@@ -1,4 +1,4 @@
-export const applyDiscount = (order) => {
+const applyDiscount = order => {
   const subtotal = Number(order.subtotal || 0);
   const totalDiscount = Number(order.discountAmount || 0);
 
@@ -7,7 +7,6 @@ export const applyDiscount = (order) => {
   return order.items.map((item, index) => {
     const itemTotal = Number(item.totalPrice || 0);
 
-    // ✅ Case 1: item has its own discount
     if (item.discountPct) {
       const discountAmount = Number(
         ((itemTotal * item.discountPct) / 100).toFixed(2)
@@ -21,9 +20,7 @@ export const applyDiscount = (order) => {
       };
     }
 
-    // ✅ Case 2: distribute remaining discount
     const ratio = subtotal > 0 ? itemTotal / subtotal : 0;
-
     let discountAmount = Number((ratio * remainingDiscount).toFixed(2));
 
     if (index === order.items.length - 1) {
@@ -44,7 +41,7 @@ export const applyDiscount = (order) => {
   });
 };
 
-export const calculateOrder = (order) => {
+const calculateOrder = order => {
   const subtotal = order.items.reduce(
     (sum, i) => sum + Number(i.totalPrice || 0),
     0
@@ -61,14 +58,9 @@ export const calculateOrder = (order) => {
   );
 
   const taxable = subtotal - totalDiscount;
-
-  const taxAmount =
-    (taxable * Number(order.taxPct || 0)) / 100;
-
+  const taxAmount = (taxable * Number(order.taxPct || 0)) / 100;
   const totalAmount = taxable + taxAmount;
-
-  const balance =
-    totalAmount - Number(order.advanceAmount || 0);
+  const balance = totalAmount - Number(order.advanceAmount || 0);
 
   return {
     items: discountedItems,
@@ -78,4 +70,9 @@ export const calculateOrder = (order) => {
     totalAmount,
     balance,
   };
+};
+
+module.exports = {
+  applyDiscount,
+  calculateOrder,
 };

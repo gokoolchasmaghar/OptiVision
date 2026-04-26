@@ -445,9 +445,17 @@ Thank you for trusting us 🙏`
                   {order.payments.map(p => (
                     <tr key={p.id}>
                       <td>
+                        {p.paidAt ? format(new Date(p.paidAt), 'MMM d, yyyy � h:mm a') : '-'}
+                      </td>
+
+                      <td>
                         {p.method === 'REFUND'
                           ? <span style={{ color: 'red', fontWeight: 600 }}>REFUND</span>
                           : p.method}
+                      </td>
+
+                      <td>
+                        {p.reference || p.note || '-'}
                       </td>
 
                       <td style={{ textAlign: 'right' }}>
@@ -458,10 +466,6 @@ Thank you for trusting us 🙏`
                         ) : (
                           `₹${Number(p.amount).toLocaleString('en-IN')}`
                         )}
-                      </td>
-
-                      <td>
-                        {p.note || '-'}
                       </td>
                     </tr>
                   ))}
@@ -565,3 +569,4 @@ Thank you for trusting us 🙏`
     </div>
   );
 }
+

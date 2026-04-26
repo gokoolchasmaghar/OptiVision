@@ -63,26 +63,39 @@ export default function CustomerDetail() {
     setSavingRx(false);
   };
 
+  const downloadPdfBlob = (data, filename) => {
+    const blob = data instanceof Blob ? data : new Blob([data], { type: 'application/pdf' });
+    const url = window.URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.setAttribute('download', filename);
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    window.URL.revokeObjectURL(url);
+  };
+
   const downloadPrescription = async (id) => {
     try {
       const res = await api.get(`/prescriptions/${id}/pdf`, {
         responseType: 'blob',
       });
-
-      const url = window.URL.createObjectURL(res.data);
-
-      const link = document.createElement('a');
-      link.href = url;
-      link.setAttribute('download', `Prescription-${id}.pdf`);
-
-      document.body.appendChild(link);
-      link.click();
-      link.remove();
-
-      window.URL.revokeObjectURL(url); // cleanup
+      downloadPdfBlob(res.data, `Prescription-${id}.pdf`);
     } catch (err) {
       console.error(err);
       toast.error('Failed to download PDF');
+    }
+  };
+
+  const downloadInvoice = async (orderId, orderNumber) => {
+    try {
+      const res = await api.get(`/orders/${orderId}/invoice`, {
+        responseType: 'blob',
+      });
+      downloadPdfBlob(res.data, `invoice-${orderNumber}.pdf`);
+    } catch (err) {
+      console.error(err);
+      toast.error('Failed to download invoice');
     }
   };
 
@@ -192,7 +205,21 @@ export default function CustomerDetail() {
                         <td className="font-semibold">{fmt(o.totalAmount)}</td>
                         <td><StatusBadge status={o.status} /></td>
                         <td><StatusBadge status={o.paymentStatus} /></td>
-                        <td className="text-primary-600 text-xs font-semibold">View →</td>
+                        <td>
+                          <div className="flex items-center gap-3 text-xs font-semibold">
+                            <button
+                              type="button"
+                              className="text-slate-500 hover:text-primary-600"
+                              onClick={e => {
+                                e.stopPropagation();
+                                downloadInvoice(o.id, o.orderNumber);
+                              }}
+                            >
+                              Invoice
+                            </button>
+                            <span className="text-primary-600">View →</span>
+                          </div>
+                        </td>
                       </tr>
                     ))}
                   </tbody>
