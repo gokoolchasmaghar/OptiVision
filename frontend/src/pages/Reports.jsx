@@ -50,7 +50,7 @@ export default function Reports() {
   const downloadMonthlyPdf = async () => {
     try {
       const now = new Date();
-      const month = now.toISOString().slice(0, 7); // YYYY-MM
+      const month = now.toISOString().slice(0, 7);
 
       const res = await api.get(`/reports/monthly/pdf`, {
         params: { month },
@@ -238,10 +238,8 @@ export default function Reports() {
           )}
       </div>
 
-      <div className="card p-5 space-y-4 mt-6">
-
+      <div className="card p-5 space-y-4">
         <h3 className="font-bold text-lg text-slate-800">Reports</h3>
-
         {/* Daily */}
         <button
           onClick={downloadDailyPdf}
@@ -251,10 +249,12 @@ export default function Reports() {
         </button>
 
         {/* Monthly */}
-        <div className="flex items-center justify-between bg-slate-50 p-3 rounded-xl">
+        <div className="flex items-center justify-between bg-slate-50 p-4 rounded-xl">
           <div>
-            <div className="font-semibold text-slate-800">This Month</div>
-            <div className="text-xs text-slate-500">1st → Today</div>
+            <div className="font-semibold text-slate-800">Monthly Report</div>
+            <div className="text-xs text-slate-500">
+              Full current month (1st → last day)
+            </div>
           </div>
 
           <button
@@ -266,10 +266,12 @@ export default function Reports() {
         </div>
 
         {/* Yearly */}
-        <div className="flex items-center justify-between bg-slate-50 p-3 rounded-xl">
+        <div className="flex items-center justify-between bg-slate-50 p-4 rounded-xl">
           <div>
-            <div className="font-semibold text-slate-800">This Year</div>
-            <div className="text-xs text-slate-500">Jan → Today</div>
+            <div className="font-semibold text-slate-800">Yearly Report</div>
+            <div className="text-xs text-slate-500">
+              Full current year (Jan → Dec)
+            </div>
           </div>
 
           <button
