@@ -18,11 +18,11 @@ async function main() {
 
   // Create store
   const store = await prisma.store.upsert({
-    where: { id: 'store-optivision-001' },
-    update: { name: 'OptiVision', isActive: true },
+    where: { id: 'store-GO-KOOL CHASMAGHAR-001' },
+    update: { name: 'GO-KOOL CHASMAGHAR', isActive: true },
     create: {
-      id: 'store-optivision-001',
-      name: 'OptiVision',
+      id: 'store-GO-KOOL CHASMAGHAR-001',
+      name: 'GO-KOOL CHASMAGHAR',
       address: 'Main Branch, India',
       phone: '9999999999',
       email: adminEmail,

@@ -8,7 +8,7 @@ A complete, production-ready Optical Shop Management & Billing System.
 
 ```bash
 # 1. Clone / extract the project
-cd optivision
+cd GO-KOOL CHASMAGHAR
 
 # 2. Start all services
 docker compose up -d --build
@@ -58,13 +58,16 @@ npm run dev
 ## 📦 Project Structure
 
 ```
-optivision/
+GO-KOOL CHASMAGHAR/
 ├── backend/
 │   ├── src/
 │   │   ├── index.js            # Express app entry
 │   │   ├── middleware/
 │   │   │   └── auth.js         # JWT auth middleware
 |   |   ├── controllers/
+|   |   |   ├── accessoryController.js
+|   |   |   ├── importController.js
+|   |   |   ├── productController.js
 |   |   |   ├── prescriptionController.js
 |   |   |   └── invoice.js      # Invoice
 │   │   ├── routes/
@@ -79,13 +82,15 @@ optivision/
 │   │   │   ├── orders.js          # Order
 │   │   │   ├── payments.js        # Payment Method
 │   │   │   ├── prescriptions.js   # Rx management
+|   |   |   ├── product.js         # Product (Frames & Lens) to scan
 │   │   │   ├── purchases.js       # Purchase orders
 │   │   │   ├── reports.js         # Analytics
 │   │   │   ├── stores.js          # Store settings
 │   │   │   ├── suppliers.js       # Suppliers
 │   │   │   └── upload.js          # Uploads
 │   │   └── utils/
-│   │       ├── calculatePay.js
+│   │       ├── calculatePay.js 
+|   |       ├── excelParser.js
 │   │       ├── pdfBrowser.js
 │   │       ├── prisma.js       # DB client
 │   │       └── logger.js       # Winston logger
@@ -234,7 +239,7 @@ curl -fsSL https://get.docker.com | sh
 
 # Clone & start
 git clone <repo>
-cd optivision
+cd GO-KOOL CHASMAGHAR
 docker compose up -d --build
 ```
 

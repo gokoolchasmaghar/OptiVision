@@ -99,7 +99,7 @@ app.use('/api/products', require('./routes/product'));
 
 // 404 handler
 app.use((req, res) => {
-  res.status(404).json({
+  res.status(404).json({ 
     success: false,
     message: 'Route not found'
   });

@@ -3,21 +3,22 @@ import { Outlet, NavLink, useLocation, useNavigate } from 'react-router-dom';
 import {
   LayoutDashboard, Users, Glasses, Eye, ClipboardList,
   IndianRupee, Package, BarChart3, Settings, LogOut,
-  ChevronLeft, ChevronRight, Bell, Plus, Menu, X
+  ChevronLeft, ChevronRight, Bell, Plus, Menu, X,
 } from 'lucide-react';
 import { useAuthStore } from '../../stores/authStore';
 import toast from 'react-hot-toast';
 
 const NAV = [
-  { to:'/dashboard', icon:LayoutDashboard, label:'Dashboard' },
-  { to:'/customers',  icon:Users,          label:'Customers' },
-  { to:'/frames',     icon:Glasses,        label:'Frames' },
-  { to:'/lenses',     icon:Eye,            label:'Lenses' },
-  { to:'/orders',     icon:ClipboardList,  label:'Orders' },
-  { to:'/billing',    icon:IndianRupee,    label:'Billing' },
-  { to:'/inventory',  icon:Package,        label:'Inventory' },
-  { to:'/reports',    icon:BarChart3,      label:'Reports' },
-  { to:'/settings',   icon:Settings,       label:'Settings' },
+  { to: '/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
+  { to: '/customers', icon: Users, label: 'Customers' },
+  { to: '/frames', icon: Glasses, label: 'Frames' },
+  { to: '/lenses', icon: Eye, label: 'Lenses' },
+  { to: '/accessories', icon: Package, label: 'Accessories' },
+  { to: '/orders', icon: ClipboardList, label: 'Orders' },
+  { to: '/billing', icon: IndianRupee, label: 'Billing' },
+  { to: '/inventory', icon: Package, label: 'Inventory' },
+  { to: '/reports', icon: BarChart3, label: 'Reports' },
+  { to: '/settings', icon: Settings, label: 'Settings' },
 ];
 
 export default function AppLayout() {
@@ -71,12 +72,12 @@ export default function AppLayout() {
           {isDesktop ? (
             <button onClick={() => setMini(!mini)}
               className="flex-shrink-0 p-1 rounded-lg text-slate-600 hover:text-white hover:bg-white/10 transition-colors">
-              {mini ? <ChevronRight size={13}/> : <ChevronLeft size={13}/>}
+              {mini ? <ChevronRight size={13} /> : <ChevronLeft size={13} />}
             </button>
           ) : (
             <button onClick={() => setMobileOpen(false)}
               className="flex-shrink-0 p-1 rounded-lg text-slate-500 hover:text-white hover:bg-white/10 transition-colors">
-              <X size={14}/>
+              <X size={14} />
             </button>
           )}
         </div>
@@ -89,7 +90,7 @@ export default function AppLayout() {
                 `nav-item ${isActive ? 'nav-active' : 'nav-inactive'} ${compact ? 'justify-center px-2' : ''}`
               }
               title={compact ? label : undefined}>
-              <Icon size={17} className="flex-shrink-0"/>
+              <Icon size={17} className="flex-shrink-0" />
               {!compact && <span className="truncate">{label}</span>}
             </NavLink>
           ))}
@@ -100,7 +101,7 @@ export default function AppLayout() {
           <div className="px-3 py-2">
             <button onClick={() => navigate('/orders/new')}
               className="w-full flex items-center justify-center gap-2 py-2 rounded-xl text-xs font-semibold text-white/80 border border-white/10 hover:bg-white/10 hover:text-white transition-all">
-              <Plus size={13}/> New Order
+              <Plus size={13} /> New Order
             </button>
           </div>
         )}
@@ -128,7 +129,7 @@ export default function AppLayout() {
           )}
           <button onClick={() => { logout(); toast.success('Signed out'); navigate('/login'); }}
             className={`w-full flex items-center gap-2.5 px-2 py-2 rounded-xl text-xs font-semibold text-red-400 hover:bg-red-500/10 hover:text-red-300 transition-colors ${compact ? 'justify-center' : ''}`}>
-            <LogOut size={14}/>
+            <LogOut size={14} />
             {!compact && 'Sign Out'}
           </button>
         </div>
@@ -144,12 +145,12 @@ export default function AppLayout() {
             className="md:hidden p-2 rounded-xl text-slate-500 hover:bg-slate-100 hover:text-slate-700 transition-colors"
             aria-label="Open navigation"
           >
-            <Menu size={17}/>
+            <Menu size={17} />
           </button>
-          <div className="flex-1"/>
+          <div className="flex-1" />
           <button className="p-2 rounded-xl text-slate-500 hover:bg-slate-100 hover:text-slate-700 transition-colors relative">
-            <Bell size={17}/>
-            <span className="absolute top-1.5 right-1.5 w-1.5 h-1.5 rounded-full bg-red-500"/>
+            <Bell size={17} />
+            <span className="absolute top-1.5 right-1.5 w-1.5 h-1.5 rounded-full bg-red-500" />
           </button>
           <div className="flex items-center gap-2 sm:gap-2.5 min-w-0">
             <div className="w-8 h-8 rounded-full flex items-center justify-center text-white font-bold text-xs"
@@ -166,7 +167,7 @@ export default function AppLayout() {
         {/* Page */}
         <main className="flex-1 overflow-y-auto p-3 sm:p-4 md:p-6 animate-fade-in">
           <div className="max-w-screen-2xl mx-auto">
-            <Outlet/>
+            <Outlet />
           </div>
         </main>
       </div>

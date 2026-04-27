@@ -16,6 +16,7 @@ import Reports from './pages/Reports';
 import Settings from './pages/Settings';
 import BulkImport from "./pages/BulkImport";
 import { ScannerProvider } from "./context/ScannerContext";
+import Accessories from './pages/Accessories';
 // import Auth from './pages/Auth';
 
 const Guard = ({ children }) => {
@@ -48,6 +49,7 @@ export default function App() {
           <Route path="reports" element={<Reports />} />
           <Route path="settings" element={<Settings />} />
           <Route path="bulk-import" element={<BulkImport />} />
+          <Route path="/accessories" element={<Accessories />} />
         </Route>
         <Route path="*" element={<Navigate to="/dashboard" replace />} />
       </Routes>

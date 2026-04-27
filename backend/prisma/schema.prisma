@@ -70,6 +70,14 @@ enum LensType {
   READING
 }
 
+enum AccessoryCategory {
+  SUNGLASSES
+  CASE
+  SOLUTION
+  CLOTH
+  OTHER
+}
+
 model Store {
   id              String   @id @default(uuid())
   name            String
@@ -243,7 +251,7 @@ model Accessory {
   id            String  @id @default(uuid())
   storeId       String
   name          String
-  category      String
+  category AccessoryCategory @default(OTHER)
   purchasePrice Float   @default(0)
   sellingPrice  Float
   stockQty      Int     @default(0)
