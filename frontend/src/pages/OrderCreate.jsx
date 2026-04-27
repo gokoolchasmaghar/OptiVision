@@ -24,7 +24,7 @@ export default function OrderCreate() {
   // Step 2: Frame
   const [frameSearch, setFrameSearch] = useState('');
   const [frames, setFrames] = useState([]);
-  const [selFrame, setSelFrame] = useState(null);
+  const [selFrames, setSelFrames] = useState([]);
 
   // Step 3: Prescription
   const [prescriptions, setPrescriptions] = useState([]);
@@ -44,6 +44,8 @@ export default function OrderCreate() {
   const [notes, setNotes] = useState('');
   const [saving, setSaving] = useState(false);
   const [storePricing, setStorePricing] = useState(DEFAULT_STORE_PRICING);
+
+  const [redeemPoints, setRedeemPoints] = useState(0);
 
   // Load initial customer if passed via URL
   useEffect(() => {
@@ -77,14 +79,16 @@ export default function OrderCreate() {
   useEffect(() => { if (step === 3) api.get('/lenses').then(r => setLenses(r.data.data)); }, [step]);
 
   // Financials
-  const frameCost = selFrame?.sellingPrice || 0;
-  const lensCost = selLens ? selLens.sellingPrice * 2 : 0;
+  const frameCost = selFrames.reduce((sum, f) => sum + f.sellingPrice, 0);
+  const lensCost = selLens ? selLens.sellingPrice * 2 * selFrames.length : 0;
   const subtotal = frameCost + lensCost;
-  const discountAmt = Math.min(Math.max(Number(discount) || 0, 0), subtotal);
+  const discountPct = Math.max(0, Math.min(100, Number(discount) || 0));
+  const discountAmt = (subtotal * discountPct) / 100;
   const gstRate = storePricing.gstEnabled ? Number(storePricing.taxRate) || 0 : 0;
   const taxable = subtotal - discountAmt;
+  const loyaltyDiscount = Math.min(Number(redeemPoints) || 0, selCustomer?.loyaltyPoints || 0);
   const tax = (taxable * gstRate) / 100;
-  const total = taxable + tax;
+  const total = Math.max(0, taxable + tax - loyaltyDiscount);
   const balance = Math.max(0, total - advance);
 
   const hasPrescription =
@@ -112,7 +116,7 @@ export default function OrderCreate() {
   };
 
   const handleSubmit = async () => {
-    if (!selCustomer || !selFrame) return toast.error('Customer and frame required');
+    if (!selCustomer || selFrames.length === 0) return toast.error('Customer and frame required');
     setSaving(true);
     try {
       let prescriptionId = selRx?.id;
@@ -126,26 +130,42 @@ export default function OrderCreate() {
       }
 
       const items = [];
-      items.push({ itemType: 'frame', frameId: selFrame.id, name: `${selFrame.brand} ${selFrame.model || ''}`.trim(), quantity: 1, unitPrice: selFrame.sellingPrice, totalPrice: selFrame.sellingPrice });
-      if (selLens) items.push({ itemType: 'lens', lensId: selLens.id, name: selLens.name, quantity: 2, unitPrice: selLens.sellingPrice, totalPrice: selLens.sellingPrice * 2 });
+      selFrames.forEach(f => {
+        items.push({
+          itemType: 'frame',
+          frameId: f.id,
+          name: `${f.brand} ${f.model || ''}`.trim(),
+          quantity: 1,
+          unitPrice: f.sellingPrice,
+          totalPrice: f.sellingPrice,
+        });
+      });
+      if (selLens) items.push({ itemType: 'lens', lensId: selLens.id, name: selLens.name, quantity: 2 * selFrames.length, unitPrice: selLens.sellingPrice, totalPrice: selLens.sellingPrice * 2 * selFrames.length });
 
       const r = await api.post('/orders', {
         customerId: selCustomer.id,
         prescriptionId,
         items,
         discountAmount: discountAmt,
+        redeemPoints: loyaltyDiscount,
         advanceAmount: advance,
         paymentMethod: payMethod,
         deliveryDate: delivDate || null,
         notes,
-        frameDetails: `${selFrame.brand} ${selFrame.model || ''} - ${selFrame.color || ''}`.trim(),
-        lensDetails: selLens ? `${selLens.name} x2` : '',
+        frameDetails: selFrames
+          .map(f => `${f.brand} ${f.model || ''} - ${f.color || ''}`.trim())
+          .join(', '),
+        lensDetails: selLens ? `${selLens.name} x${2 * selFrames.length}` : '',
       });
       toast.success(`Order ${r.data.data.orderNumber} created!`);
       navigate(`/orders/${r.data.data.id}`);
     } catch (e) { toast.error(e.response?.data?.message || 'Error creating order'); }
     setSaving(false);
   };
+
+  useEffect(() => {
+    setRedeemPoints(0);
+  }, [selCustomer]);
 
   return (
     <div className="max-w-3xl mx-auto">
@@ -206,13 +226,21 @@ export default function OrderCreate() {
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-h-80 overflow-y-auto">
               {frames.filter(f => f.stockQty > 0).map(f => (
-                <div key={f.id} onClick={() => setSelFrame(f)}
-                  className={`p-3 rounded-xl border cursor-pointer transition-all ${selFrame?.id === f.id ? 'border-primary-400 bg-primary-50' : 'border-slate-100 hover:border-primary-200'}`}>
+                <div key={f.id} onClick={() => {
+                  setSelFrames(prev => {
+                    const exists = prev.find(x => x.id === f.id);
+                    if (exists) {
+                      return prev.filter(x => x.id !== f.id); // remove
+                    }
+                    return [...prev, f]; // add
+                  });
+                }}
+                  className={`p-3 rounded-xl border cursor-pointer transition-all ${selFrames.some(x => x.id === f.id) ? 'border-primary-400 bg-primary-50' : 'border-slate-100 hover:border-primary-200'}`}>
                   <div className="text-2xl mb-1 text-center">👓</div>
                   <div className="font-semibold text-slate-800 text-xs text-center">{f.brand}</div>
                   <div className="text-xs text-slate-500 text-center">{f.model}</div>
                   <div className="font-bold text-center text-sm mt-1">{fmt(f.sellingPrice)}</div>
-                  {selFrame?.id === f.id && <div className="flex justify-center mt-1"><Check size={14} className="text-primary-600" /></div>}
+                  {selFrames.some(x => x.id === f.id) && <div className="flex justify-center mt-1"><Check size={14} className="text-primary-600" /></div>}
                 </div>
               ))}
             </div>
@@ -295,11 +323,17 @@ export default function OrderCreate() {
                 {/* Summary */}
                 <div className="bg-slate-50 rounded-xl p-4 text-sm space-y-2">
                   <div className="flex justify-between"><span className="text-slate-600">Customer</span><span className="font-semibold">{selCustomer?.name}</span></div>
-                  <div className="flex justify-between"><span className="text-slate-600">Frame</span><span className="font-semibold text-right max-w-36 truncate">{selFrame?.brand} {selFrame?.model}</span></div>
+                  <div className="flex justify-between"><span className="text-slate-600">Frame</span><span className="font-semibold text-right max-w-36 truncate">{selFrames.map(f => `${f.brand} ${f.model}`).join(', ')}</span></div>
                   {selLens && <div className="flex justify-between"><span className="text-slate-600">Lens</span><span className="font-semibold text-right max-w-36 truncate">{selLens.name} ×2</span></div>}
                   <div className="border-t border-slate-200 pt-2 mt-1 space-y-1">
                     <div className="flex justify-between text-slate-500"><span>Subtotal</span><span>{fmt(subtotal)}</span></div>
                     {discountAmt > 0 && <div className="flex justify-between text-red-500"><span>Discount</span><span>−{fmt(discountAmt)}</span></div>}
+                    {loyaltyDiscount > 0 && (
+                      <div className="flex justify-between text-emerald-600">
+                        <span>Loyalty Points</span>
+                        <span>−{fmt(loyaltyDiscount)}</span>
+                      </div>
+                    )}
                     {gstRate > 0 ? (
                       <div className="flex justify-between text-slate-500"><span>{`GST ${gstRate}%`}</span><span>{fmt(tax)}</span></div>
                     ) : (
@@ -310,7 +344,30 @@ export default function OrderCreate() {
                 </div>
               </div>
               <div className="space-y-3">
-                <div><label className="field-label">Discount ₹</label><input className="field-input" type="number" value={discount} onChange={e => setDiscount(Number(e.target.value))} /></div>
+                <div><label className="field-label">Discount %</label><input className="field-input" type="number" value={discount} onChange={e => setDiscount(Number(e.target.value))} /></div>
+                {selCustomer && (
+                  <div>
+                    <label className="field-label">
+                      Use Loyalty Points (max {selCustomer.loyaltyPoints || 0})
+                    </label>
+
+                    <input
+                      type="number"
+                      className="field-input"
+                      value={redeemPoints}
+                      placeholder="0"
+                      onChange={e => {
+                        let val = Math.max(0, Number(e.target.value) || 0);
+
+                        if (selCustomer) {
+                          val = Math.min(val, selCustomer.loyaltyPoints || 0);
+                        }
+
+                        setRedeemPoints(val);
+                      }}
+                    />
+                  </div>
+                )}
                 <div>
                   <label className="field-label">Payment Method</label>
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
@@ -338,7 +395,7 @@ export default function OrderCreate() {
           </button>
           {step < STEPS.length - 1 ? (
             <button onClick={() => setStep(s => s + 1)}
-              disabled={(step === 0 && !selCustomer) || (step === 1 && !selFrame)}
+              disabled={(step === 0 && !selCustomer) || (step === 1 && selFrames.length === 0)}
               className="btn-primary btn-md w-full sm:w-auto justify-center">
               Next <ArrowRight size={15} />
             </button>
