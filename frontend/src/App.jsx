@@ -14,6 +14,8 @@ import Billing from './pages/Billing';
 import Inventory from './pages/Inventory';
 import Reports from './pages/Reports';
 import Settings from './pages/Settings';
+import BulkImport from "./pages/BulkImport";
+import { ScannerProvider } from "./context/ScannerContext";
 // import Auth from './pages/Auth';
 
 const Guard = ({ children }) => {
@@ -27,25 +29,28 @@ const Public = ({ children }) => {
 
 export default function App() {
   return (
-    <Routes>
-      <Route path="/login" element={<Public><Login /></Public>} />
-      {/* <Route path="/auth" element={<Public><Auth /></Public>} /> */}
-      <Route path="/" element={<Guard><AppLayout /></Guard>}>
-        <Route index element={<Navigate to="/dashboard" replace />} />
-        <Route path="dashboard" element={<Dashboard />} />
-        <Route path="customers" element={<Customers />} />
-        <Route path="customers/:id" element={<CustomerDetail />} />
-        <Route path="frames" element={<Frames />} />
-        <Route path="lenses" element={<Lenses />} />
-        <Route path="orders" element={<Orders />} />
-        <Route path="orders/new" element={<OrderCreate />} />
-        <Route path="orders/:id" element={<OrderDetail />} />
-        <Route path="billing" element={<Billing />} />
-        <Route path="inventory" element={<Inventory />} />
-        <Route path="reports" element={<Reports />} />
-        <Route path="settings" element={<Settings />} />
-      </Route>
-      <Route path="*" element={<Navigate to="/dashboard" replace />} />
-    </Routes>
+    <ScannerProvider>
+      <Routes>
+        <Route path="/login" element={<Public><Login /></Public>} />
+        {/* <Route path="/auth" element={<Public><Auth /></Public>} /> */}
+        <Route path="/" element={<Guard><AppLayout /></Guard>}>
+          <Route index element={<Navigate to="/dashboard" replace />} />
+          <Route path="dashboard" element={<Dashboard />} />
+          <Route path="customers" element={<Customers />} />
+          <Route path="customers/:id" element={<CustomerDetail />} />
+          <Route path="frames" element={<Frames />} />
+          <Route path="lenses" element={<Lenses />} />
+          <Route path="orders" element={<Orders />} />
+          <Route path="orders/new" element={<OrderCreate />} />
+          <Route path="orders/:id" element={<OrderDetail />} />
+          <Route path="billing" element={<Billing />} />
+          <Route path="inventory" element={<Inventory />} />
+          <Route path="reports" element={<Reports />} />
+          <Route path="settings" element={<Settings />} />
+          <Route path="bulk-import" element={<BulkImport />} />
+        </Route>
+        <Route path="*" element={<Navigate to="/dashboard" replace />} />
+      </Routes>
+    </ScannerProvider>
   );
 }

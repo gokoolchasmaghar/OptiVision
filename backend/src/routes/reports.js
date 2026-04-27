@@ -255,7 +255,7 @@ const buildPdfHtml = ({ title, periodLabel, store, summary, orderRowsHtml, payme
       <div class="header">
         <div>
           <h1 class="title">${title}</h1>
-          <div class="muted"><strong>${esc(store?.name || 'OptiVision')}</strong></div>
+          <div class="muted"><strong>${esc(store?.name || 'GO-KOOL CHASMAGHAR')}</strong></div>
           <div class="muted">${esc(store?.address || '-')}</div>
           <div class="muted">${esc(store?.phone || '')} ${store?.email ? `| ${esc(store.email)}` : ''}</div>
         </div>

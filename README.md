@@ -1,4 +1,4 @@
-# 👁 OptiVision — Optical Shop Management SaaS
+# 👁 GO-KOOL CHASMAGHAR — Optical Shop Management SaaS
 
 A complete, production-ready Optical Shop Management & Billing System.
 
@@ -65,6 +65,7 @@ optivision/
 │   │   ├── middleware/
 │   │   │   └── auth.js         # JWT auth middleware
 |   |   ├── controllers/
+|   |   |   ├── prescriptionController.js
 |   |   |   └── invoice.js      # Invoice
 │   │   ├── routes/
 |   |   |   ├── accessories.js     # Products except frames & lenses.
@@ -84,6 +85,8 @@ optivision/
 │   │   │   ├── suppliers.js       # Suppliers
 │   │   │   └── upload.js          # Uploads
 │   │   └── utils/
+│   │       ├── calculatePay.js
+│   │       ├── pdfBrowser.js
 │   │       ├── prisma.js       # DB client
 │   │       └── logger.js       # Winston logger
 │   ├── prisma/
@@ -102,8 +105,11 @@ optivision/
 │   │   │   |   └── AppLayout.jsx     # AppLayout, Sidebar
 │   │   │   ├── ui/             
 │   │   │   |   └── index.jsx         # Shared components
-│   │   │   ├── BarcodeInput.jsx      # Barcode component         
+│   │   │   ├── BarcodeInput.jsx      # Barcode component  
+│   │   │   ├── ErrorBoundary.jsx
+│   │   │   ├── Invoice.jsx       
 |   |   |   └── Label.jsx             # Label for lenses, frames.
+│   │   │   ├── Prescription.jsx
 │   │   ├── pages/
 │   │   │   ├── Login.jsx
 │   │   │   ├── Dashboard.jsx         # KPI + charts

@@ -90,7 +90,7 @@ export default function Auth() {
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 rounded-xl flex items-center justify-center text-2xl" style={{ background: 'linear-gradient(135deg, #3b82f6, #1d4ed8)' }}>👁</div>
           <div>
-            <div className="font-bold text-white text-lg">OptiVision</div>
+            <div className="font-bold text-white text-lg">GO-KOOL CHASMAGHAR</div>
             <div className="text-xs text-slate-500">Optical Shop Management Suite</div>
           </div>
         </div>
@@ -116,7 +116,7 @@ export default function Auth() {
           </div>
         </div>
 
-        <div className="text-xs text-slate-600">© 2025 OptiVision. All rights reserved.</div>
+        <div className="text-xs text-slate-600">© 2025 GO-KOOL CHASMAGHAR. All rights reserved.</div>
       </div>
 
       {/* Right Panel */}
@@ -124,7 +124,7 @@ export default function Auth() {
         <div className="w-full max-w-md">
           <div className="lg:hidden flex items-center gap-2 justify-center mb-8">
             <div className="w-10 h-10 rounded-xl flex items-center justify-center text-2xl" style={{ background: 'linear-gradient(135deg, #3b82f6, #1d4ed8)' }}>👁</div>
-            <span className="font-bold text-white text-xl">OptiVision</span>
+            <span className="font-bold text-white text-xl">GO-KOOL CHASMAGHAR</span>
           </div>
 
           <div className="rounded-2xl p-8" style={{ background: 'rgba(255,255,255,0.06)', backdropFilter: 'blur(20px)', border: '1px solid rgba(255,255,255,0.1)' }}>
@@ -158,7 +158,7 @@ export default function Auth() {
             {mode === 'signin' && (
               <>
                 <h2 className="text-2xl font-bold text-white mb-1">Sign in</h2>
-                <p className="text-slate-400 text-sm mb-8">Welcome back to OptiVision</p>
+                <p className="text-slate-400 text-sm mb-8">Welcome back to GO-KOOL CHASMAGHAR</p>
 
                 <form onSubmit={handleSignIn} className="space-y-5">
                   <div>
@@ -217,7 +217,7 @@ export default function Auth() {
             {mode === 'signup' && (
               <>
                 <h2 className="text-2xl font-bold text-white mb-1">Create account</h2>
-                <p className="text-slate-400 text-sm mb-8">Join OptiVision and manage your optical store</p>
+                <p className="text-slate-400 text-sm mb-8">Join GO-KOOL CHASMAGHAR and manage your optical store</p>
 
                 <form onSubmit={handleSignUp} className="space-y-4">
                   <div>

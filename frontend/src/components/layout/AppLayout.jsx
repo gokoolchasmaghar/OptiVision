@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { Outlet, NavLink, useLocation, useNavigate } from 'react-router-dom';
 import {
   LayoutDashboard, Users, Glasses, Eye, ClipboardList,
-  Receipt, Package, BarChart3, Settings, LogOut,
+  IndianRupee, Package, BarChart3, Settings, LogOut,
   ChevronLeft, ChevronRight, Bell, Plus, Menu, X
 } from 'lucide-react';
 import { useAuthStore } from '../../stores/authStore';
@@ -14,7 +14,7 @@ const NAV = [
   { to:'/frames',     icon:Glasses,        label:'Frames' },
   { to:'/lenses',     icon:Eye,            label:'Lenses' },
   { to:'/orders',     icon:ClipboardList,  label:'Orders' },
-  { to:'/billing',    icon:Receipt,        label:'Billing' },
+  { to:'/billing',    icon:IndianRupee,    label:'Billing' },
   { to:'/inventory',  icon:Package,        label:'Inventory' },
   { to:'/reports',    icon:BarChart3,      label:'Reports' },
   { to:'/settings',   icon:Settings,       label:'Settings' },
@@ -64,7 +64,7 @@ export default function AppLayout() {
           </div>
           {!compact && (
             <div className="flex-1 min-w-0">
-              <div className="font-bold text-white text-sm leading-none">OptiVision</div>
+              <div className="font-bold text-white text-sm leading-none">GO-KOOL CHASMAGHAR</div>
               <div className="text-xs text-slate-500 mt-0.5">Management Suite</div>
             </div>
           )}

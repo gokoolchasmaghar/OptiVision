@@ -4,7 +4,7 @@ export default function PrescriptionView({ customer, rx }) {
       
       {/* Header */}
       <h2 style={{ textAlign: 'center', marginBottom: 4 }}>
-        OptiVision
+        GO-KOOL CHASMAGHAR
       </h2>
       <p style={{ textAlign: 'center', color: '#666', marginTop: 0 }}>
         Eye Prescription

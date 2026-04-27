@@ -97,7 +97,7 @@ export default function Settings() {
                 </label>
               </div>
               {[
-                ['Store Name *', 'name', 'OptiVision'],
+                ['Store Name *', 'name', 'GO-KOOL CHASMAGHAR'],
                 ['Phone', 'phone', '+91-9876543210'],
                 ['Email', 'email', 'info@store.in'],
                 ['GST Number', 'gstNumber', '27AABCU9603R1ZX'],

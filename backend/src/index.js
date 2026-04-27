@@ -94,6 +94,8 @@ app.use('/api/reports', require('./routes/reports'));
 app.use('/api/dashboard', require('./routes/dashboard'));
 app.use('/api/upload', require('./routes/upload'));
 app.use('/api/barcode', require('./routes/barcode'));
+app.use('/api/import', require('./routes/import'));
+app.use('/api/products', require('./routes/product'));
 
 // 404 handler
 app.use((req, res) => {
@@ -132,7 +134,7 @@ app.use((err, req, res, next) => {
 
 // Start server
 const server = app.listen(PORT, () => {
-  logger.info(`🚀 OptiVision API on port ${PORT}`);
+  logger.info(`🚀 GO-KOOL CHASMAGHAR API on port ${PORT}`);
 });
 
 // Graceful shutdown
