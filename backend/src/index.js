@@ -96,6 +96,7 @@ app.use('/api/upload', require('./routes/upload'));
 app.use('/api/barcode', require('./routes/barcode'));
 app.use('/api/import', require('./routes/import'));
 app.use('/api/products', require('./routes/product'));
+app.use('/api/notifications', require('./routes/notification'));
 
 // 404 handler
 app.use((req, res) => {

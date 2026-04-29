@@ -4,6 +4,7 @@ import { AreaChart, Area, BarChart, Bar, PieChart, Pie, Cell, XAxis, YAxis, Cart
 import { TrendingUp, TrendingDown, AlertTriangle, Package, ExternalLink } from 'lucide-react';
 import api from '../services/api';
 import { PageHeader, StatusBadge, Spinner } from '../components/ui';
+import NotificationBell from '../components/NotificationBell';
 import { format } from 'date-fns';
 
 const fmt = n => `₹${Number(n||0).toLocaleString('en-IN')}`;
@@ -33,10 +34,17 @@ export default function Dashboard() {
 
   return (
     <div>
-      <PageHeader
-        title="Dashboard"
-        subtitle={`Today · ${format(new Date(), 'EEEE, MMM d yyyy')}`}
-      />
+      {/* PageHeader with NotificationBell injected via action slot */}
+      <div className="flex items-start justify-between mb-6">
+        <div>
+          <h1 className="text-xl font-bold text-slate-800">Dashboard</h1>
+          <p className="text-sm text-slate-500 mt-0.5">Today · {format(new Date(), 'EEEE, MMM d yyyy')}</p>
+        </div>
+        {/* Notification Bell — visible to all roles */}
+        <div className="flex items-center gap-2 pt-1">
+          <NotificationBell />
+        </div>
+      </div>
 
       {/* Stats row */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
