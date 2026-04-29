@@ -91,9 +91,18 @@ const buildInvoiceHtml = (order, barcodeImg = '') => {
 
       <div class="section" style="display:flex; justify-content:space-between;">
         <div><b>Invoice No:</b> ${order.orderNumber}</div>
-        <div><b>Date:</b> ${new Date(order.createdAt).toLocaleDateString()}</div>
+
+        <div style="text-align:right">
+          <div><b>Date:</b> ${new Date(order.createdAt).toLocaleDateString()}</div>
+          <div><b>Delivery Date:</b> ${
+            order.deliveryDate
+              ? new Date(order.deliveryDate).toLocaleDateString()
+              : 'Pending'
+          }</div>
+        </div>
       </div>
 
+      <!-- CUSTOMER -->
       <div class="section">
         <b>Customer Name:</b> ${order.customer?.name || '-'}<br/>
         <b>Mobile:</b> ${order.customer?.phone || '-'}
@@ -115,8 +124,8 @@ const buildInvoiceHtml = (order, barcodeImg = '') => {
             </tr>
             <tr>
               <td>AXIS</td>
-              <td>${rx.rightAxis ?? '-'}</td>
-              <td>${rx.leftAxis ?? '-'}</td>
+              <td>${rx.rightAxis ?? '0.00'}</td>
+              <td>${rx.leftAxis ?? '0.00'}</td>
             </tr>
             <tr>
               <td>ADD</td>
@@ -128,8 +137,17 @@ const buildInvoiceHtml = (order, barcodeImg = '') => {
           <div style="margin-top:10px;">
             <b>PD (mm):</b> ${formatPD(rx.pd)}
           </div>
+
+          <div style="margin-top:4px;">
+            <b>Lens Type:</b> ${
+              rx.lensType
+                ? rx.lensType.replace('_', ' ')
+                : 'NULL'
+            }
+          </div>
         </div>
       ` : ''}
+      
 
       <div class="section">
         <h3>Product Details</h3>

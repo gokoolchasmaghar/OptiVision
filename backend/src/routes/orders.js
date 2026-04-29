@@ -1,8 +1,8 @@
 const router = require('express').Router();
 const prisma = require('../utils/prisma');
 const { authenticate, requireAdmin } = require('../middleware/auth');
-const { generateInvoice } = require('../controllers/invoice');
-const { generatePublicInvoice } = require('../controllers/invoice');
+const { generateInvoice } = require('../controllers/invoiceController');
+const { generatePublicInvoice } = require('../controllers/invoiceController');
 
 const roundMoney = value => Math.round((Number(value) || 0) * 100) / 100;
 
@@ -48,6 +48,14 @@ router.get('/:id', async (req, res, next) => {
 });
 
 router.get('/:id/invoice', authenticate, generateInvoice);
+
+const getFinancialYear = () => {
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = now.getMonth(); // Jan = 0
+
+  return month >= 2 ? year : year - 1;
+};
 
 router.post('/', async (req, res, next) => {
   try {
@@ -102,7 +110,17 @@ router.post('/', async (req, res, next) => {
       taxableAmount + calculatedTax - safeRedeemPoints
     );
 
-    const orderNumber = `${store.invoicePrefix}-${String(store.invoiceCounter + 1).padStart(4, '0')}`;
+    const fy = getFinancialYear();
+    const shortYear = String(fy).slice(-2);
+
+    // Reset counter if new financial year
+    let counter = store.invoiceCounter;
+    if (store.invoiceYear !== fy) {
+      counter = 1;
+    }
+
+    // Generate invoice number
+    const orderNumber = `${store.invoicePrefix}-${shortYear}${String(counter).padStart(3, '0')}`;
 
     const order = await prisma.$transaction(async tx => {
       for (const item of items) {
@@ -186,12 +204,14 @@ router.post('/', async (req, res, next) => {
         }
       });
       if (!customerUpdate.count) throw Object.assign(new Error('Customer not found'), { status: 404 });
-
       // 🔥 LOYALTY LOGIC END
 
       await tx.store.update({
         where: { id: req.storeId },
-        data: { invoiceCounter: { increment: 1 } }
+        data: {
+          invoiceCounter: counter + 1,
+          invoiceYear: fy,
+        }
       });
 
       return newOrder;

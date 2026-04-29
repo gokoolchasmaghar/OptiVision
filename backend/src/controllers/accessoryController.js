@@ -43,7 +43,6 @@ exports.createAccessory = async (req, res) => {
       sellingPrice,
       stockQty,
       barcode,
-      sku,
       modelCode,
     } = req.body;
 
@@ -51,6 +50,11 @@ exports.createAccessory = async (req, res) => {
     if (!name || !sellingPrice) {
       return res.status(400).json({ message: 'Name and selling price required' });
     }
+
+    // 🔥 Auto-generate SKU
+    const generatedSKU = barcode
+      ? `ACC-${barcode}`
+      : `ACC-${Date.now()}`;
 
     const item = await prisma.accessory.create({
       data: {
@@ -61,7 +65,7 @@ exports.createAccessory = async (req, res) => {
         sellingPrice: Number(sellingPrice),
         stockQty: Number(stockQty) || 0,
         barcode,
-        sku,
+        sku: generatedSKU,
         modelCode,
       },
     });
@@ -101,7 +105,6 @@ exports.updateAccessory = async (req, res) => {
 
         // ✅ IMPORTANT FIX
         ...(barcode ? { barcode } : {}),
-        ...(sku ? { sku } : {}),
 
         modelCode,
       },

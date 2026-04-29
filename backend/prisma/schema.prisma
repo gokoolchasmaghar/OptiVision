@@ -88,8 +88,9 @@ model Store {
   gstEnabled      Boolean  @default(false)
   logoUrl         String?
   taxRate         Float    @default(18)
-  invoicePrefix   String   @default("INV")
-  invoiceCounter  Int      @default(1000)
+  invoicePrefix   String   @default("INVGC")
+  invoiceCounter  Int      @default(1)
+  invoiceYear     Int?
   isActive        Boolean  @default(true)
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
@@ -171,6 +172,7 @@ model Prescription {
 
   pd       Float?
   imageUrl String?
+  lensType LensType?
   notes    String?
 
   createdAt DateTime @default(now())

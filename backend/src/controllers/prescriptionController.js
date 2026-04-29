@@ -265,7 +265,12 @@ const buildPrescriptionHtml = rx => {
         <section class="section-card">
           <h2 class="section-title">Eye Power</h2>
           ${buildOldStyleTable(rx)}
-          ${rx.doctorName ? `<div class="doctor-pill">Doctor: Dr. ${escapeHtml(rx.doctorName)}</div>` : ''}
+          ${rx.lensType ? `
+            <div style="margin-top:10px; font-size:14px;">
+              <b>Lens Type:</b> ${escapeHtml(rx.lensType.replace('_', ' '))}
+            </div>
+          ` : ''}
+          ${rx.doctorName ? `<div class="doctor-pill">Doctor: ${escapeHtml(rx.doctorName)}</div>` : ''}
         </section>
 
         <div class="foot">Note: This is a system-generated prescription.</div>

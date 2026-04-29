@@ -34,7 +34,7 @@ router.get('/:id', async (req, res, next) => {
 
 router.post('/', async (req, res, next) => {
   try {
-    const { customerId, doctorName, date, rightSph, rightCyl, rightAxis, rightAdd, rightPd, leftSph, leftCyl, leftAxis, leftAdd, leftPd, pd, imageUrl, notes } = req.body;
+    const { customerId, doctorName, date, rightSph, rightCyl, rightAxis, rightAdd, rightPd, leftSph, leftCyl, leftAxis, leftAdd, leftPd, pd, imageUrl, lensType, notes } = req.body;
     const customer = await prisma.customer.findFirst({
       where: { id: customerId, storeId: req.storeId },
       select: { id: true },
@@ -59,6 +59,7 @@ router.post('/', async (req, res, next) => {
         leftPd: n(leftPd),
         pd: n(pd),
         imageUrl,
+        lensType,
         notes
       }
     });
