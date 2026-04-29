@@ -274,7 +274,7 @@ export default function OrderCreate() {
               </div>
             ) : (
               <div>
-                <div className="mb-3"><label className="field-label">Doctor Name</label><input className="field-input" value={newRx.doctorName} onChange={e => setNewRx(f => ({ ...f, doctorName: e.target.value }))} placeholder="Dr. Smith" /></div>
+                <div className="mb-3"><label className="field-label">Doctor Name</label><input className="field-input" value={newRx.doctorName} onChange={e => setNewRx(f => ({ ...f, doctorName: e.target.value }))} /></div>
                 <div className="overflow-x-auto">
                   <table className="w-full text-sm border border-slate-100 rounded-xl overflow-hidden mb-3">
                     <thead><tr className="bg-slate-50"><th className="px-3 py-2 text-left text-xs text-slate-500">Field</th><th className="px-3 py-2 text-center text-xs text-blue-700">Right (OD)</th><th className="px-3 py-2 text-center text-xs text-emerald-700 border-l border-slate-100">Left (OS)</th></tr></thead>

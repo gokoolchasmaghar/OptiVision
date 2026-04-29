@@ -99,15 +99,15 @@ export default function Customers() {
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div className="sm:col-span-2">
             <label className="field-label">Full Name *</label>
-            <input className="field-input" value={form.name} onChange={e => setForm(f => ({...f, name: e.target.value}))} placeholder="Rajesh Kumar"/>
+            <input className="field-input" value={form.name} onChange={e => setForm(f => ({...f, name: e.target.value}))}/>
           </div>
           <div>
             <label className="field-label">Phone *</label>
-            <input className="field-input" value={form.phone} onChange={e => setForm(f => ({...f, phone: e.target.value}))} placeholder="+91-9876543210"/>
+            <input className="field-input" value={form.phone} onChange={e => setForm(f => ({...f, phone: e.target.value}))}/>
           </div>
           <div>
             <label className="field-label">Email</label>
-            <input className="field-input" type="email" value={form.email} onChange={e => setForm(f => ({...f, email: e.target.value}))} placeholder="email@example.com"/>
+            <input className="field-input" type="email" value={form.email} onChange={e => setForm(f => ({...f, email: e.target.value}))}/>
           </div>
           <div>
             <label className="field-label">Gender</label>
@@ -120,11 +120,11 @@ export default function Customers() {
           </div>
           <div>
             <label className="field-label">Age</label>
-            <input className="field-input" type="number" value={form.age} onChange={e => setForm(f => ({...f, age: e.target.value}))} placeholder="30" min="1" max="120"/>
+            <input className="field-input" type="number" value={form.age} onChange={e => setForm(f => ({...f, age: e.target.value}))} min="1" max="120"/>
           </div>
           <div className="sm:col-span-2">
             <label className="field-label">Address</label>
-            <input className="field-input" value={form.address} onChange={e => setForm(f => ({...f, address: e.target.value}))} placeholder="City, State"/>
+            <input className="field-input" value={form.address} onChange={e => setForm(f => ({...f, address: e.target.value}))} />
           </div>
         </div>
       </Modal>

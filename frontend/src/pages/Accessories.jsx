@@ -125,7 +125,7 @@ export default function Accessories() {
                     <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
                     <input
                         className="field-input pl-8"
-                        placeholder="Search name, barcode..."
+                        placeholder="Search name, brand..."
                         value={search}
                         onChange={e => setSearch(e.target.value)}
                     />
@@ -290,7 +290,6 @@ export default function Accessories() {
                                         className="field-input"
                                         value={form.name}
                                         onChange={e => setForm(f => ({ ...f, name: e.target.value }))}
-                                        placeholder="RayBan Aviator"
                                     />
                                 </div>
 
@@ -315,7 +314,6 @@ export default function Accessories() {
                                         className="field-input"
                                         value={form.modelCode || ''}
                                         onChange={e => setForm(f => ({ ...f, modelCode: e.target.value }))}
-                                        placeholder="RB-AVI-001"
                                     />
                                 </div>
 
@@ -326,7 +324,6 @@ export default function Accessories() {
                                         className="field-input"
                                         value={form.sku}
                                         onChange={e => setForm(f => ({ ...f, sku: e.target.value }))}
-                                        placeholder="SKU-001"
                                     />
                                 </div>
 
@@ -363,7 +360,6 @@ export default function Accessories() {
                                         type="number"
                                         value={form.purchasePrice}
                                         onChange={e => setForm(f => ({ ...f, purchasePrice: e.target.value }))}
-                                        placeholder="800"
                                     />
                                 </div>
 
@@ -375,7 +371,6 @@ export default function Accessories() {
                                         type="number"
                                         value={form.sellingPrice}
                                         onChange={e => setForm(f => ({ ...f, sellingPrice: e.target.value }))}
-                                        placeholder="1999"
                                     />
                                 </div>
 
@@ -387,7 +382,6 @@ export default function Accessories() {
                                         type="number"
                                         value={form.stockQty}
                                         onChange={e => setForm(f => ({ ...f, stockQty: e.target.value }))}
-                                        placeholder="10"
                                     />
                                 </div>
 
@@ -402,7 +396,6 @@ export default function Accessories() {
                                         type="number"
                                         value={form.lowStockAlert}
                                         onChange={e => setForm(f => ({ ...f, lowStockAlert: e.target.value }))}
-                                        placeholder="5"
                                     />
                                 </div>
 

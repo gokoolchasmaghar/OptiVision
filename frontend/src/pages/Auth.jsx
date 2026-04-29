@@ -229,7 +229,6 @@ export default function Auth() {
                       onChange={e => setSignupForm(f => ({...f, name: e.target.value}))}
                       className="w-full px-4 py-3 rounded-xl text-sm text-white placeholder:text-slate-600 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all"
                       style={{ background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.12)' }}
-                      placeholder="John Doe"
                       disabled={loading}
                     />
                   </div>

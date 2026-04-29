@@ -13,9 +13,9 @@ const COATINGS = ['Anti-Glare', 'Blue Cut', 'Anti-Scratch', 'UV400', 'Photochrom
 const TYPE_COLORS = { SINGLE_VISION: 'blue', BIFOCAL: 'purple', PROGRESSIVE: 'green', READING: 'orange' };
 
 const EMPTY_FORM = {
-  name: '', lensType: 'SINGLE_VISION', lensIndex: '1.56',
+  name: '', lensType: 'SINGLE_VISION', lensIndex: '',
   coating: [], brand: '', purchasePrice: '', sellingPrice: '',
-  stockQty: '100', barcode: ''
+  stockQty: '', barcode: ''
 };
 
 export default function Lenses() {
@@ -209,7 +209,7 @@ export default function Lenses() {
         <div className="space-y-4">
           <div>
             <label className="field-label">Lens Name *</label>
-            <input className="field-input" value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} placeholder="Standard Blue Cut SV 1.56" />
+            <input className="field-input" value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} />
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -227,7 +227,7 @@ export default function Lenses() {
             </div>
             <div>
               <label className="field-label">Brand</label>
-              <input className="field-input" value={form.brand} onChange={e => setForm(f => ({ ...f, brand: e.target.value }))} placeholder="Essilor, Zeiss…" />
+              <input className="field-input" value={form.brand} onChange={e => setForm(f => ({ ...f, brand: e.target.value }))} />
             </div>
             <div>
               <label className="field-label">Stock Qty</label>

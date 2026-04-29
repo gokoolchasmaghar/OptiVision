@@ -238,7 +238,7 @@ export default function CustomerDetail() {
         </>}>
         <div className="mb-4">
           <label className="field-label">Doctor Name</label>
-          <input className="field-input" value={rxForm.doctorName} onChange={e => setRxForm(f => ({ ...f, doctorName: e.target.value }))} placeholder="Dr. Smith" />
+          <input className="field-input" value={rxForm.doctorName} onChange={e => setRxForm(f => ({ ...f, doctorName: e.target.value }))} />
         </div>
         <div className="overflow-x-auto">
           <table className="w-full text-sm border border-slate-100 rounded-xl overflow-hidden mb-4">
@@ -270,7 +270,7 @@ export default function CustomerDetail() {
         </div>
         <div>
           <label className="field-label">PD (mm)</label>
-          <input className="field-input w-full sm:max-w-xs" type="number" step="0.5" value={rxForm.pd} onChange={e => setRxForm(f => ({ ...f, pd: e.target.value }))} placeholder="63" />
+          <input className="field-input w-full sm:max-w-xs" type="number" step="0.5" value={rxForm.pd} onChange={e => setRxForm(f => ({ ...f, pd: e.target.value }))} placeholder="" />
         </div>
       </Modal>
     </div>

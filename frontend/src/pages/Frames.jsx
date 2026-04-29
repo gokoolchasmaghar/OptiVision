@@ -256,12 +256,12 @@ export default function Frames() {
           <button className="btn-primary btn-md" onClick={save} disabled={saving}>{saving ? 'Saving…' : editFrame ? 'Update' : 'Add Frame'}</button>
         </>}>
         <div className="grid grid-cols-2 gap-4">
-          <div><label className="field-label">Brand *</label><input className="field-input" value={form.brand} onChange={e => setForm(f => ({ ...f, brand: e.target.value }))} placeholder="Titan, Ray-Ban…" /></div>
-          <div><label className="field-label">Model</label><input className="field-input" value={form.model} onChange={e => setForm(f => ({ ...f, model: e.target.value }))} placeholder="Octane" /></div>
+          <div><label className="field-label">Brand *</label><input className="field-input" value={form.brand} onChange={e => setForm(f => ({ ...f, brand: e.target.value }))} /></div>
+          <div><label className="field-label">Model</label><input className="field-input" value={form.model} onChange={e => setForm(f => ({ ...f, model: e.target.value }))} /></div>
           <div><label className="field-label">Shape</label><select className="field-select" value={form.shape} onChange={e => setForm(f => ({ ...f, shape: e.target.value }))}>{SHAPES.map(s => <option key={s} value={s}>{s.replace('_', ' ')}</option>)}</select></div>
-          <div><label className="field-label">Size</label><input className="field-input" value={form.size} onChange={e => setForm(f => ({ ...f, size: e.target.value }))} placeholder="Small / Medium / Large" /></div>
-          <div><label className="field-label">Color</label><input className="field-input" value={form.color} onChange={e => setForm(f => ({ ...f, color: e.target.value }))} placeholder="Black, Gold…" /></div>
-          <div><label className="field-label">Material</label><input className="field-input" value={form.material} onChange={e => setForm(f => ({ ...f, material: e.target.value }))} placeholder="Metal, Acetate…" /></div>
+          <div><label className="field-label">Size</label><input className="field-input" value={form.size} onChange={e => setForm(f => ({ ...f, size: e.target.value }))} /></div>
+          <div><label className="field-label">Color</label><input className="field-input" value={form.color} onChange={e => setForm(f => ({ ...f, color: e.target.value }))} /></div>
+          <div><label className="field-label">Material</label><input className="field-input" value={form.material} onChange={e => setForm(f => ({ ...f, material: e.target.value }))} /></div>
           <div><label className="field-label">Gender</label><select className="field-select" value={form.gender} onChange={e => setForm(f => ({ ...f, gender: e.target.value }))}><option value="">Unisex</option><option value="Male">Male</option><option value="Female">Female</option></select></div>
           <div>
             <label className="field-label">Barcode</label>
@@ -314,11 +314,11 @@ export default function Frames() {
               }}
             ></div>
           </div>
-          <div><label className="field-label">Model Code</label><input className="field-input" value={form.modelCode || ''} onChange={e => setForm(f => ({ ...f, modelCode: e.target.value }))} placeholder="VO5645I" /></div>
-          <div><label className="field-label">Purchase Price ₹</label><input className="field-input" type="number" value={form.purchasePrice} onChange={e => setForm(f => ({ ...f, purchasePrice: e.target.value }))} placeholder="800" /></div>
-          <div><label className="field-label">Selling Price ₹ *</label><input className="field-input" type="number" value={form.sellingPrice} onChange={e => setForm(f => ({ ...f, sellingPrice: e.target.value }))} placeholder="1999" /></div>
-          <div><label className="field-label">Stock Qty</label><input className="field-input" type="number" value={form.stockQty} onChange={e => setForm(f => ({ ...f, stockQty: e.target.value }))} placeholder="10" /></div>
-          <div><label className="field-label">Low Stock Alert</label><input className="field-input" type="number" value={form.lowStockAlert} onChange={e => setForm(f => ({ ...f, lowStockAlert: e.target.value }))} placeholder="5" /></div>
+          <div><label className="field-label">Model Code</label><input className="field-input" value={form.modelCode || ''} onChange={e => setForm(f => ({ ...f, modelCode: e.target.value }))}/></div>
+          <div><label className="field-label">Purchase Price ₹</label><input className="field-input" type="number" value={form.purchasePrice} onChange={e => setForm(f => ({ ...f, purchasePrice: e.target.value }))} /></div>
+          <div><label className="field-label">Selling Price ₹ *</label><input className="field-input" type="number" value={form.sellingPrice} onChange={e => setForm(f => ({ ...f, sellingPrice: e.target.value }))} /></div>
+          <div><label className="field-label">Stock Qty</label><input className="field-input" type="number" value={form.stockQty} onChange={e => setForm(f => ({ ...f, stockQty: e.target.value }))} /></div>
+          <div><label className="field-label">Low Stock Alert</label><input className="field-input" type="number" value={form.lowStockAlert} onChange={e => setForm(f => ({ ...f, lowStockAlert: e.target.value }))} /></div>
           {form.purchasePrice && form.sellingPrice && (
             <div className="col-span-2 bg-emerald-50 border border-emerald-100 rounded-xl p-3 text-sm">
               <span className="text-emerald-700 font-semibold">Margin: {Math.round((form.sellingPrice - form.purchasePrice) / form.sellingPrice * 100)}%</span>
