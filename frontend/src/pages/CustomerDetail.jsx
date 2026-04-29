@@ -16,6 +16,15 @@ function RxTable({ rx }) {
       <td className="rx-cell px-4 py-2.5 border-l border-slate-100">{left ?? '—'}</td>
     </tr>
   );
+
+  {
+    rx.lensType && (
+      <div className="mt-2 text-xs text-slate-600 font-medium">
+        Lens Type: {rx.lensType.replace('_', ' ')}
+      </div>
+    )
+  }
+
   return (
     <div className="overflow-x-auto">
       <table className="w-full text-sm border border-slate-100 rounded-xl overflow-hidden">
@@ -46,7 +55,7 @@ export default function CustomerDetail() {
   const [loading, setLoading] = useState(true);
   const [tab, setTab] = useState('rx');
   const [rxModal, setRxModal] = useState(false);
-  const [rxForm, setRxForm] = useState({ doctorName: '', rightSph: '', rightCyl: '', rightAxis: '', rightAdd: '', leftSph: '', leftCyl: '', leftAxis: '', leftAdd: '', pd: '' });
+  const [rxForm, setRxForm] = useState({ doctorName: '', rightSph: '', rightCyl: '', rightAxis: '', rightAdd: '', leftSph: '', leftCyl: '', leftAxis: '', leftAdd: '', pd: '', lensType: '', notes: '' });
   const [savingRx, setSavingRx] = useState(false);
 
   const load = () => api.get(`/customers/${id}`).then(r => setCust(r.data.data)).catch(() => toast.error('Failed to load')).finally(() => setLoading(false));
@@ -160,6 +169,12 @@ export default function CustomerDetail() {
                         {i === 0 && <span className="badge-green badge">Latest</span>}
                       </div>
 
+                      {rx.lensType && (
+                        <div className="m-2 text-xs text-slate-600 font-medium">
+                          <h1>Lens Type: {rx.lensType.replace('_', ' ')}</h1>
+                        </div>
+                      )}
+
                       {/* ✅ Prescription Table */}
                       <RxTable rx={rx} />
 
@@ -268,10 +283,37 @@ export default function CustomerDetail() {
             </tbody>
           </table>
         </div>
-        <div>
-          <label className="field-label">PD (mm)</label>
-          <input className="field-input w-full sm:max-w-xs" type="number" step="0.5" value={rxForm.pd} onChange={e => setRxForm(f => ({ ...f, pd: e.target.value }))} placeholder="" />
+
+        <div className="flex flex-col sm:flex-row gap-4 mt-3">
+          {/* PD */}
+          <div className="flex-1">
+            <label className="field-label">PD (mm)</label>
+            <input
+              className="field-input w-full"
+              type="number"
+              step="0.5"
+              value={rxForm.pd}
+              onChange={e => setRxForm(f => ({ ...f, pd: e.target.value }))}
+            />
+          </div>
+
+          {/* Lens Type */}
+          <div className="flex-1">
+            <label className="field-label">Lens Type</label>
+            <select
+              className="field-select w-full"
+              value={rxForm.lensType}
+              onChange={e => setRxForm(f => ({ ...f, lensType: e.target.value }))}
+            >
+              <option value="">Select</option>
+              <option value="SINGLE_VISION">Single Vision</option>
+              <option value="BIFOCAL">Bifocal</option>
+              <option value="PROGRESSIVE">Progressive</option>
+              <option value="READING">Reading</option>
+            </select>
+          </div>
         </div>
+
       </Modal>
     </div>
   );

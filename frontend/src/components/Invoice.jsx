@@ -253,9 +253,17 @@ const generateInvoiceHTML = (order) => {
 
     <!-- INFO -->
     <div class="section" style="display:flex; justify-content:space-between;">
-      <div><b>Invoice No:</b> ${order.orderNumber}</div>
+    <div><b>Invoice No:</b> ${order.orderNumber}</div>
+
+    <div style="text-align:right">
       <div><b>Date:</b> ${format(new Date(order.createdAt), 'dd-MMM-yyyy')}</div>
+      <div><b>Delivery Date:</b> ${
+        order.deliveryDate
+          ? format(new Date(order.deliveryDate), 'dd-MMM-yyyy')
+          : 'Pending'
+      }</div>
     </div>
+  </div>
 
     <!-- CUSTOMER -->
     <div class="section">
@@ -281,8 +289,8 @@ const generateInvoiceHTML = (order) => {
 
         <tr>
           <td>AXIS</td>
-          <td>${rx.rightAxis ?? '-'}</td>
-          <td>${rx.leftAxis ?? '-'}</td>
+          <td>${rx.rightAxis ?? '0.00'}</td>
+          <td>${rx.leftAxis ?? '0.00'}</td>
         </tr>
 
         <tr>
@@ -295,6 +303,14 @@ const generateInvoiceHTML = (order) => {
       <!-- PD -->
       <div style="margin-top:10px;">
         <b>PD (mm):</b> ${formatPD(rx.pd)}
+      </div>
+
+      <div style="margin-top:4px;">
+        <b>Lens Type:</b> ${
+          rx.lensType
+            ? rx.lensType.replace('_', ' ')
+            : 'NULL'
+        }
       </div>
     </div>
 

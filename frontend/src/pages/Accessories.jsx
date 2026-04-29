@@ -25,7 +25,6 @@ export default function Accessories() {
         stockQty: '',
         lowStockAlert: '5',
         barcode: '',
-        sku: '',
         modelCode: '',
     });
 
@@ -52,7 +51,6 @@ export default function Accessories() {
         const cleanData = {
             ...form,
             barcode: form.barcode || undefined,
-            sku: form.sku || undefined,
             purchasePrice: Number(form.purchasePrice) || 0,
             sellingPrice: Number(form.sellingPrice),
             stockQty: Number(form.stockQty) || 0,
@@ -80,7 +78,6 @@ export default function Accessories() {
                 purchasePrice: '',
                 stockQty: '',
                 barcode: '',
-                sku: '',
             });
 
             fetchData();
@@ -235,7 +232,6 @@ export default function Accessories() {
                                                 purchasePrice: i.purchasePrice || '',
                                                 stockQty: i.stockQty || '',
                                                 barcode: i.barcode || '',
-                                                sku: i.sku || '',
                                             });
                                             setShowModal(true);
                                         }}
@@ -314,16 +310,6 @@ export default function Accessories() {
                                         className="field-input"
                                         value={form.modelCode || ''}
                                         onChange={e => setForm(f => ({ ...f, modelCode: e.target.value }))}
-                                    />
-                                </div>
-
-                                {/* SKU */}
-                                <div>
-                                    <label className="field-label">SKU</label>
-                                    <input
-                                        className="field-input"
-                                        value={form.sku}
-                                        onChange={e => setForm(f => ({ ...f, sku: e.target.value }))}
                                     />
                                 </div>
 
