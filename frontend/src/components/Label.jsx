@@ -18,19 +18,26 @@ export function printLabels(labelHtml) {
       <meta charset="utf-8" />
       <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
-        body { font-family: sans-serif; background: #fff; }
+        body { 
+          font-family: sans-serif; 
+          background: #fff; 
+          transform: rotate(0deg);
+        }
 
         .container {
-          width: 80mm; 
+          width: 100%; 
           margin: 5mm auto;
         }
 
         .label {
-          width: 70mm; /* Narrower for optical frame tags */
-          height: 22mm;
+          width: 60mm; /* Narrower for optical frame tags */
+          height: 30mm;
           border: 0.5pt solid #000;
           border-radius: 6px;
-          display: flex;
+          display: table;
+          table-layout: fixed;
+          width: 100%;
+          border-collapse: collapse;
           margin-bottom: 4mm;
           overflow: hidden;
           page-break-inside: avoid;
@@ -38,21 +45,20 @@ export function printLabels(labelHtml) {
 
         /* Left: Barcode Area */
         .barcode-section {
-          flex: 1.1;
-          display: flex;
-          align-items: center;
-          justify-content: center;
+          display: table-cell;
+          width: 55%;
+          vertical-align: middle;
+          text-align: center;
           padding: 1mm;
           border-right: 1px dashed #666; /* Perforation line */
         }
 
         /* Right: Info Area */
         .details-section {
-          flex: 1;
-          display: flex;
-          flex-direction: column;
-          justify-content: center;
-          padding-left: 3mm;
+          display: table-cell;
+          width: 45%;
+          vertical-align: middle;
+          padding-left: 2mm;
           line-height: 1.2;
         }
 
@@ -61,7 +67,10 @@ export function printLabels(labelHtml) {
         .price { font-weight: bold; font-size: 11px; margin-top: 1mm; }
 
         @media print {
-          @page { size: auto; margin: 0; }
+          @page {
+            size: 60mm 30mm; /* adjust based on your roll */
+            margin: 0;
+          }
           body { margin: 0; }
           .label { border: 0.5pt solid #000; }
         }
@@ -71,7 +80,12 @@ export function printLabels(labelHtml) {
       <div class="container">${labelHtml}</div>
       <script>
         window.onload = function () {
-          setTimeout(() => { window.print(); window.close(); }, 400);
+          window.onload = () => {
+            setTimeout(() => {
+              window.print();
+              window.close();
+            }, 800);
+          };
         };
       </script>
     </body>
@@ -89,8 +103,8 @@ function buildBarcodeSvg(barcode) {
     const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
     JsBarcode(svg, barcode, {
       format: "CODE128",
-      width: 1.0,
-      height: 30,
+      width: 2,
+      height: 40,
       displayValue: true,
       fontSize: 9,
       margin: 0,
