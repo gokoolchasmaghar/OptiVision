@@ -5,6 +5,8 @@ import { Modal, PageHeader, Spinner, Empty } from '../components/ui';
 import toast from 'react-hot-toast';
 import { Html5Qrcode } from 'html5-qrcode';
 import Label, { PrintLabelButton } from '../components/Label';
+import { useAuthStore } from '../stores/authStore';
+import { isAdmin } from '../utils/roles';
 
 const fmt = n => `₹${Number(n || 0).toLocaleString('en-IN')}`;
 const LENS_TYPES = ['SINGLE_VISION', 'BIFOCAL', 'PROGRESSIVE', 'READING'];
@@ -30,6 +32,8 @@ export default function Lenses() {
   const [printQty, setPrintQty] = useState(1);
   const scannerRef = useRef(null);
   const scannerReadyRef = useRef(false);
+  const { user } = useAuthStore();
+  const canManageLenses = isAdmin(user);
 
   const load = () =>
     api.get('/lenses')
@@ -152,7 +156,7 @@ export default function Lenses() {
       <PageHeader
         title="Lens Catalog"
         subtitle={`${lenses.length} lens packages`}
-        action={<button className="btn-primary btn-md" onClick={openAdd}><Plus size={15} /> Add Lens</button>}
+        action={canManageLenses && <button className="btn-primary btn-md" onClick={openAdd}><Plus size={15} /> Add Lens</button>}
       />
 
       {loading ? (
@@ -183,8 +187,12 @@ export default function Lenses() {
                 </div>
                 <div className="flex gap-2">
                   <button onClick={() => { setSelectedLens(l); setPrintQty(1); }} className="btn-secondary btn-xs">Label</button>
-                  <button onClick={() => openEdit(l)} className="btn-ghost btn-xs">Edit</button>
-                  <button onClick={async () => { if (confirm('Delete?')) { await api.delete(`/lenses/${l.id}`); load(); } }} className="btn-danger btn-xs">Del</button>
+                  {canManageLenses && (
+                    <>
+                      <button onClick={() => openEdit(l)} className="btn-ghost btn-xs">Edit</button>
+                      <button onClick={async () => { if (confirm('Delete?')) { await api.delete(`/lenses/${l.id}`); load(); } }} className="btn-danger btn-xs">Del</button>
+                    </>
+                  )}
                 </div>
               </div>
             </div>

@@ -1,25 +1,11 @@
 const router = require('express').Router();
 const prisma = require('../utils/prisma');
 const { authenticate, requireAdmin } = require('../middleware/auth');
+const { resolveBarcode } = require('../utils/barcode');
+const { resolveSku } = require('../utils/sku');
+const { FRAME_SHAPES, enumValue, numberOrDefault } = require('../utils/normalize');
 
 router.use(authenticate);
-
-const generateEAN13 = () => {
-  const base = Math.floor(100000000000 + Math.random() * 900000000000).toString();
-  const digits = base.split('').map(Number);
-  let sum = 0;
-
-  digits.forEach((num, i) => {
-    sum += i % 2 === 0 ? num : num * 3;
-  });
-
-  const checkDigit = (10 - (sum % 10)) % 10;
-  return base + checkDigit;
-};
-
-const generateSKU = () => {
-  return `SKU-${Date.now()}`;
-};
 
 router.get('/', async (req, res, next) => {
   try {
@@ -67,9 +53,9 @@ router.get('/:id', async (req, res, next) => {
   } catch (e) { next(e); }
 });
 
-router.post('/', async (req, res, next) => {
+router.post('/', requireAdmin, async (req, res, next) => {
   try {
-    const { brand, model, shape, size, color, material, gender, purchasePrice, sellingPrice, stockQty, lowStockAlert, barcode, imageUrl, supplierId, frameCode, modelCode } = req.body;
+    const { brand, model, shape, size, color, material, gender, purchasePrice, sellingPrice, stockQty, lowStockAlert, barcode, sku, imageUrl, supplierId, frameCode, modelCode } = req.body;
     if (!brand || !sellingPrice) return res.status(400).json({ success: false, message: 'brand and sellingPrice required' });
     let resolvedSupplierId = null;
     if (supplierId) {
@@ -81,8 +67,12 @@ router.post('/', async (req, res, next) => {
       resolvedSupplierId = supplier.id;
     }
 
+    const finalBarcode = await resolveBarcode(prisma, barcode);
+    const finalSku = await resolveSku(prisma, 'frame', 'FRM', sku);
+    const finalShape = enumValue(shape, FRAME_SHAPES, 'RECTANGLE');
+
     const frame = await prisma.frame.create({
-      data: { storeId: req.storeId, frameCode: frameCode || `FRM-${Date.now()}`, modelCode: modelCode || `MDL-${Date.now()}`, brand, model, shape: shape || 'RECTANGLE', size, color, material, gender, purchasePrice: Number(purchasePrice) || 0, sellingPrice: Number(sellingPrice), stockQty: Number(stockQty) || 0, lowStockAlert: Number(lowStockAlert) || 5,  barcode: barcode || generateEAN13(), sku: generateSKU(), imageUrl, supplierId: resolvedSupplierId }
+      data: { storeId: req.storeId, frameCode: frameCode || `FRM-${Date.now()}`, modelCode: modelCode || `MDL-${Date.now()}`, brand, model, shape: finalShape, size, color, material, gender, purchasePrice: numberOrDefault(purchasePrice, 0), sellingPrice: numberOrDefault(sellingPrice, 0), stockQty: numberOrDefault(stockQty, 0), lowStockAlert: numberOrDefault(lowStockAlert, 5),  barcode: finalBarcode, sku: finalSku, imageUrl, supplierId: resolvedSupplierId }
     });
     if (Number(stockQty) > 0) {
       await prisma.stockMovement.create({ data: { storeId: req.storeId, frameId: frame.id, type: 'IN', quantity: Number(stockQty), beforeQty: 0, afterQty: Number(stockQty), reason: 'Initial stock' } });
@@ -91,11 +81,48 @@ router.post('/', async (req, res, next) => {
   } catch (e) { next(e); }
 });
 
-router.put('/:id', async (req, res, next) => {
+router.put('/:id', requireAdmin, async (req, res, next) => {
   try {
-    const { id, storeId, createdAt, updatedAt, ...safeData } = req.body;
+    const { id, storeId, createdAt, updatedAt, barcode, sku, shape, supplierId, purchasePrice, sellingPrice, stockQty, lowStockAlert, ...safeData } = req.body;
+    if (barcode !== undefined) {
+      safeData.barcode = await resolveBarcode(prisma, barcode, new Set(), { model: 'frame', id: req.params.id });
+    }
+    if (sku !== undefined) {
+      safeData.sku = await resolveSku(prisma, 'frame', 'FRM', sku, req.params.id);
+    }
+    if (shape !== undefined) {
+      safeData.shape = enumValue(shape, FRAME_SHAPES, 'RECTANGLE');
+    }
+    if (supplierId !== undefined) {
+      if (supplierId) {
+        const supplier = await prisma.supplier.findFirst({ where: { id: supplierId, storeId: req.storeId, isActive: true }, select: { id: true } });
+        if (!supplier) return res.status(400).json({ success: false, message: 'Invalid supplier for this store' });
+      }
+      safeData.supplierId = supplierId || null;
+    }
+    if (purchasePrice !== undefined) safeData.purchasePrice = numberOrDefault(purchasePrice, 0);
+    if (sellingPrice !== undefined) safeData.sellingPrice = numberOrDefault(sellingPrice, 0);
+    const existing = stockQty !== undefined
+      ? await prisma.frame.findFirst({ where: { id: req.params.id, storeId: req.storeId }, select: { id: true, stockQty: true } })
+      : null;
+    if (stockQty !== undefined) safeData.stockQty = numberOrDefault(stockQty, 0);
+    if (lowStockAlert !== undefined) safeData.lowStockAlert = numberOrDefault(lowStockAlert, 5);
+
     const r = await prisma.frame.updateMany({ where: { id: req.params.id, storeId: req.storeId }, data: safeData });
     if (!r.count) return res.status(404).json({ success: false, message: 'Not found' });
+    if (stockQty !== undefined && existing && existing.stockQty !== safeData.stockQty) {
+      await prisma.stockMovement.create({
+        data: {
+          storeId: req.storeId,
+          frameId: req.params.id,
+          type: 'ADJUSTMENT',
+          quantity: Math.abs(safeData.stockQty - existing.stockQty),
+          beforeQty: existing.stockQty,
+          afterQty: safeData.stockQty,
+          reason: 'Frame updated',
+        }
+      });
+    }
     res.json({ success: true, data: await prisma.frame.findFirst({ where: { id: req.params.id, storeId: req.storeId } }) });
   } catch (e) { next(e); }
 });

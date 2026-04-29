@@ -1,10 +1,12 @@
 import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Plus, Phone, Mail, MapPin, User } from 'lucide-react';
+import { ArrowLeft, Plus, Phone, Mail, MapPin, Trash2 } from 'lucide-react';
 import api from '../services/api';
 import { Tabs, StatusBadge, Spinner, Empty, Modal } from '../components/ui';
 import toast from 'react-hot-toast';
 import { format } from 'date-fns';
+import { useAuthStore } from '../stores/authStore';
+import { isAdmin } from '../utils/roles';
 
 const fmt = n => `₹${Number(n || 0).toLocaleString('en-IN')}`;
 
@@ -57,6 +59,9 @@ export default function CustomerDetail() {
   const [rxModal, setRxModal] = useState(false);
   const [rxForm, setRxForm] = useState({ doctorName: '', rightSph: '', rightCyl: '', rightAxis: '', rightAdd: '', leftSph: '', leftCyl: '', leftAxis: '', leftAdd: '', pd: '', lensType: '', notes: '' });
   const [savingRx, setSavingRx] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const { user } = useAuthStore();
+  const canManageCustomer = isAdmin(user);
 
   const load = () => api.get(`/customers/${id}`).then(r => setCust(r.data.data)).catch(() => toast.error('Failed to load')).finally(() => setLoading(false));
   useEffect(() => { load(); }, [id]);
@@ -70,6 +75,20 @@ export default function CustomerDetail() {
       load();
     } catch (e) { toast.error('Error saving'); }
     setSavingRx(false);
+  };
+
+  const deleteCustomer = async () => {
+    if (!confirm(`Delete ${cust.name}? This cannot be undone.`)) return;
+
+    setDeleting(true);
+    try {
+      await api.delete(`/customers/${id}`);
+      toast.success('Customer deleted');
+      navigate('/customers');
+    } catch (e) {
+      toast.error(e.response?.data?.message || 'Delete failed');
+      setDeleting(false);
+    }
   };
 
   const downloadPdfBlob = (data, filename) => {
@@ -138,6 +157,11 @@ export default function CustomerDetail() {
           <button onClick={() => navigate(`/orders/new?customerId=${id}`)} className="btn-primary btn-sm w-full mt-4 justify-center">
             <Plus size={13} /> New Order
           </button>
+          {canManageCustomer && (
+            <button onClick={deleteCustomer} className="btn-danger btn-sm w-full mt-3 justify-center" disabled={deleting}>
+              <Trash2 size={13} /> {deleting ? 'Deleting…' : 'Delete Customer'}
+            </button>
+          )}
         </div>
 
         {/* Tabs */}

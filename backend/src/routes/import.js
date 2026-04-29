@@ -1,7 +1,7 @@
 // backend/src/routes/import.js
 const router = require('express').Router();
 const multer = require('multer');
-const { authenticate } = require('../middleware/auth');
+const { authenticate, requireAdmin } = require('../middleware/auth');
 const { importInventory, previewImport } = require('../controllers/importController');
 
 // FIX: memory storage (no disk write needed — we process buffer directly)
@@ -17,7 +17,7 @@ const upload = multer({
 });
 
 // FIX: authenticate middleware added — storeId needed for all imports
-router.post('/preview', authenticate, upload.single('file'), previewImport);
-router.post('/', authenticate, upload.single('file'), importInventory);
+router.post('/preview', authenticate, requireAdmin, upload.single('file'), previewImport);
+router.post('/', authenticate, requireAdmin, upload.single('file'), importInventory);
 
 module.exports = router;

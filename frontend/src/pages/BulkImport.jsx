@@ -13,17 +13,29 @@ const TYPES = [
 
 // ── Sample CSV download ───────────────────────────────────────────────────────
 const SAMPLES = {
-    frame: `brand,model,barcode,sellingPrice,purchasePrice,stockQty,color,size,shape,material,gender
-Ray-Ban,RB3025,8801234567890,3500,1800,10,Gold,Medium,AVIATOR,Metal,Unisex
-Titan,EyePlus,8801234567891,1299,600,15,Black,Large,RECTANGLE,Acetate,Male`,
+    frame: `storeId,frameCode,brand,model,shape,size,color,material,gender,purchasePrice,sellingPrice,stockQty,lowStockAlert,barcode,sku,modelCode
+store-GO-KOOL CHASMAGHAR-001,FR001,RayBan,RB2140,RECTANGLE,52-18-140,Black,Acetate,Unisex,1800,3200,12,5,,SKU-FR-001,RB2140-BLK
+store-GO-KOOL CHASMAGHAR-001,FR002,Titan Eye+,TE1023,ROUND,50-20-145,Brown,Metal,Unisex,950,1800,8,3,8901234500012,SKU-FR-002,TE1023-BRN
+store-GO-KOOL CHASMAGHAR-001,FR003,Fastrack,FT4455,SQUARE,54-18-140,Blue,Plastic,Men,700,1500,20,6,8901234500013,SKU-FR-003,FT4455-BLU
+store-GO-KOOL CHASMAGHAR-001,FR004,Oakley,OX8046,RECTANGLE,55-18-138,Grey,Metal,Men,2500,4500,6,2,8901234500014,SKU-FR-004,OX8046-GRY
+store-GO-KOOL CHASMAGHAR-001,FR005,Vogue,VO2606,CAT_EYE,51-19-140,Black,Acetate,Women,1200,2500,15,5,8901234500015,SKU-FR-005,VO2606-BLK
+store-GO-KOOL CHASMAGHAR-001,FR006,Carrera,CA8821,AVIATOR,57-16-140,Silver,Metal,Men,2000,3800,9,3,8901234500016,SKU-FR-006,CA8821-SLV`,
 
-    lens: `name,brand,lensType,lensIndex,sellingPrice,purchasePrice,stockQty,coating
-Standard SV 1.56,Essilor,SINGLE_VISION,1.56,800,400,100,Anti-Glare
-Blue Cut 1.56,Zeiss,SINGLE_VISION,1.56,1200,600,50,Blue Cut`,
+    lens: `storeId,name,lensType,lensIndex,coating,brand,barcode,sku,modelCode,purchasePrice,sellingPrice,stockQty,lowStockAlert
+store-GO-KOOL CHASMAGHAR-001,Essilor Basic SV,SINGLE_VISION,1.50,Anti-Glare|UV400,Essilor,,SKU-LENS-001,ESS-1.50,300,800,30,10
+store-GO-KOOL CHASMAGHAR-001,Essilor Blue Cut,SINGLE_VISION,1.56,Blue Cut|Anti-Scratch,Essilor,8902234500012,SKU-LENS-002,ESS-1.56,500,1300,25,10
+store-GO-KOOL CHASMAGHAR-001,Crizal Sapphire HR,SINGLE_VISION,1.67,Anti-Glare|Scratch Resistant,Crizal,8902234500013,SKU-LENS-003,CRZ-1.67,1500,3500,10,10
+store-GO-KOOL CHASMAGHAR-001,Zeiss Digital Lens,SINGLE_VISION,1.61,Blue Cut|UV400,Zeiss,8902234500014,SKU-LENS-004,ZSS-1.61,1800,4200,8,10
+store-GO-KOOL CHASMAGHAR-001,Hoya Blue Control,SINGLE_VISION,1.56,Blue Cut|Anti-Glare,Hoya,8902234500015,SKU-LENS-005,HOY-1.56,700,1800,18,10
+store-GO-KOOL CHASMAGHAR-001,Kodak UV Lens,SINGLE_VISION,1.50,UV400,Kodak,8902234500016,SKU-LENS-006,KDK-1.50,350,900,22,10`,
 
-    accessory: `name,brand,barcode,sellingPrice,purchasePrice,stockQty
-Microfiber Cloth,OptiCare,8809876543210,99,40,50
-Lens Cleaning Spray,ClearVision,8809876543211,199,80,30`,
+    accessory: `storeId,name,category,modelCode,barcode,sku,purchasePrice,sellingPrice,stockQty,lowStockAlert
+store-GO-KOOL CHASMAGHAR-001,RayBan Aviator Sunglasses,SUNGLASSES,RB-SG-101,8903234500011,SKU-ACC-001,2000,4000,8,3
+store-GO-KOOL CHASMAGHAR-001,Hard Case Black,CASE,HC-BLK-01,8903234500012,SKU-ACC-002,150,400,25,10
+store-GO-KOOL CHASMAGHAR-001,Lens Cleaning Solution,SOLUTION,LCS-100,8903234500013,SKU-ACC-003,80,200,30,10
+store-GO-KOOL CHASMAGHAR-001,Microfiber Cloth,CLOTH,MC-01,8903234500014,SKU-ACC-004,20,100,50,15
+store-GO-KOOL CHASMAGHAR-001,Fastrack Sunglasses,SUNGLASSES,FT-SG-202,8903234500015,SKU-ACC-005,800,1700,20,6
+store-GO-KOOL CHASMAGHAR-001,Generic Accessories,OTHER,GEN-001,8903234500016,SKU-ACC-006,100,300,15,5`,
 };
 
 function downloadSample(type) {

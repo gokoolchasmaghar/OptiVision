@@ -1,46 +1,23 @@
 // routes/lenses.js
 const router = require('express').Router();
 const prisma = require('../utils/prisma');
-const { authenticate } = require('../middleware/auth');
+const { authenticate, requireAdmin } = require('../middleware/auth');
+const { resolveBarcode } = require('../utils/barcode');
+const { resolveSku } = require('../utils/sku');
+const { LENS_TYPES, enumValue, numberOrDefault } = require('../utils/normalize');
+
 router.use(authenticate);
-
-const generateEAN13 = () => {
-  const digits = Array.from({ length: 12 }, () => Math.floor(Math.random() * 10));
-  const checksum = digits.reduce((sum, d, i) => sum + d * (i % 2 === 0 ? 1 : 3), 0);
-  const checkDigit = (10 - (checksum % 10)) % 10;
-  return [...digits, checkDigit].join('');
-};
-
-const generateUniqueBarcode = async () => {
-  let barcode;
-  let exists = true;
-
-  while (exists) {
-    barcode = generateEAN13();
-
-    const found = await prisma.lens.findUnique({
-      where: { barcode }
-    });
-
-    exists = !!found;
-  }
-
-  return barcode;
-};
-
-const generateSKU = () => {
-  return 'LENS-' + Math.floor(100000 + Math.random() * 900000);
-};
 
 router.get('/', async (req, res, next) => {
   try {
     const { lensType, search } = req.query;
-    const lenses = await prisma.lens.findMany({ where: { storeId: req.storeId, isActive: true, ...(lensType && { lensType }), ...(search && { name: { contains: search, mode: 'insensitive' } }) }, orderBy: { name: 'asc' } });
+    const finalLensType = enumValue(lensType, LENS_TYPES);
+    const lenses = await prisma.lens.findMany({ where: { storeId: req.storeId, isActive: true, ...(finalLensType && { lensType: finalLensType }), ...(search && { name: { contains: search, mode: 'insensitive' } }) }, orderBy: { name: 'asc' } });
     res.json({ success: true, data: lenses });
   } catch (e) { next(e); }
 });
 
-router.post('/', async (req, res, next) => {
+router.post('/', requireAdmin, async (req, res, next) => {
   try {
     const {
       name,
@@ -53,7 +30,8 @@ router.post('/', async (req, res, next) => {
       stockQty,
       lowStockAlert,
       supplierId,
-      barcode
+      barcode,
+      sku
     } = req.body;
 
     let resolvedSupplierId = null;
@@ -68,56 +46,100 @@ router.post('/', async (req, res, next) => {
       resolvedSupplierId = supplier.id;
     }
 
-    // Barcode logic
-    const finalBarcode =
-      barcode && String(barcode).trim() !== ''
-        ? String(barcode)
-        : await generateUniqueBarcode();
+    const finalBarcode = await resolveBarcode(prisma, barcode);
+    const finalSku = await resolveSku(prisma, 'lens', 'LENS', sku);
+    const finalLensType = enumValue(lensType, LENS_TYPES, 'SINGLE_VISION');
 
-    // SKU logic
-    const finalSKU = generateSKU();
-
-    // Create lens
     const lens = await prisma.lens.create({
       data: {
         storeId: req.storeId,
         name,
-        lensType: lensType || 'SINGLE_VISION',
+        lensType: finalLensType,
         lensIndex: lensIndex || '1.56',
-        coating: coating || [],
+        coating: Array.isArray(coating) ? coating : [],
         brand,
-        purchasePrice: Number(purchasePrice) || 0,
-        sellingPrice: Number(sellingPrice),
-        stockQty: Number(stockQty) || 100,
-        lowStockAlert: Number(lowStockAlert) || 10,
+        purchasePrice: numberOrDefault(purchasePrice, 0),
+        sellingPrice: numberOrDefault(sellingPrice, 0),
+        stockQty: numberOrDefault(stockQty, 100),
+        lowStockAlert: numberOrDefault(lowStockAlert, 10),
         supplierId: resolvedSupplierId,
         barcode: finalBarcode,
-        sku: finalSKU
+        sku: finalSku
       }
     });
+    if (numberOrDefault(stockQty, 100) > 0) {
+      await prisma.stockMovement.create({
+        data: {
+          storeId: req.storeId,
+          lensId: lens.id,
+          type: 'IN',
+          quantity: numberOrDefault(stockQty, 100),
+          beforeQty: 0,
+          afterQty: numberOrDefault(stockQty, 100),
+          reason: 'Initial stock',
+        }
+      });
+    }
 
     // Send response
     res.status(201).json({ success: true, data: lens });
 
-  } catch (e) {
-    console.error("LENS CREATE ERROR:", e);
-    next(e);
-  }
+  } catch (e) { next(e); }
 });
 
-router.put('/:id', async (req, res, next) => {
+router.put('/:id', requireAdmin, async (req, res, next) => {
   try {
-    const { storeId, id, createdAt, updatedAt, ...safeData } = req.body;
+    const { storeId, id, createdAt, updatedAt, barcode, sku, lensType, coating, supplierId, purchasePrice, sellingPrice, stockQty, lowStockAlert, ...safeData } = req.body;
+    if (barcode !== undefined) {
+      safeData.barcode = await resolveBarcode(prisma, barcode, new Set(), { model: 'lens', id: req.params.id });
+    }
+    if (sku !== undefined) {
+      safeData.sku = await resolveSku(prisma, 'lens', 'LENS', sku, req.params.id);
+    }
+    if (lensType !== undefined) {
+      safeData.lensType = enumValue(lensType, LENS_TYPES, 'SINGLE_VISION');
+    }
+    if (coating !== undefined) {
+      safeData.coating = Array.isArray(coating) ? coating : [];
+    }
+    if (supplierId !== undefined) {
+      if (supplierId) {
+        const supplier = await prisma.supplier.findFirst({ where: { id: supplierId, storeId: req.storeId, isActive: true }, select: { id: true } });
+        if (!supplier) return res.status(400).json({ success: false, message: 'Invalid supplier for this store' });
+      }
+      safeData.supplierId = supplierId || null;
+    }
+    if (purchasePrice !== undefined) safeData.purchasePrice = numberOrDefault(purchasePrice, 0);
+    if (sellingPrice !== undefined) safeData.sellingPrice = numberOrDefault(sellingPrice, 0);
+    const existing = stockQty !== undefined
+      ? await prisma.lens.findFirst({ where: { id: req.params.id, storeId: req.storeId }, select: { id: true, stockQty: true } })
+      : null;
+    if (stockQty !== undefined) safeData.stockQty = numberOrDefault(stockQty, 0);
+    if (lowStockAlert !== undefined) safeData.lowStockAlert = numberOrDefault(lowStockAlert, 10);
+
     const result = await prisma.lens.updateMany({
       where: { id: req.params.id, storeId: req.storeId },
       data: safeData
     });
     if (!result.count) return res.status(404).json({ success: false, message: 'Not found' });
+    if (stockQty !== undefined && existing && existing.stockQty !== safeData.stockQty) {
+      await prisma.stockMovement.create({
+        data: {
+          storeId: req.storeId,
+          lensId: req.params.id,
+          type: 'ADJUSTMENT',
+          quantity: Math.abs(safeData.stockQty - existing.stockQty),
+          beforeQty: existing.stockQty,
+          afterQty: safeData.stockQty,
+          reason: 'Lens updated',
+        }
+      });
+    }
     const lens = await prisma.lens.findFirst({ where: { id: req.params.id, storeId: req.storeId } });
     res.json({ success: true, data: lens });
   } catch (e) { next(e); }
 });
-router.delete('/:id', async (req, res, next) => {
+router.delete('/:id', requireAdmin, async (req, res, next) => {
   try {
     const result = await prisma.lens.updateMany({
       where: { id: req.params.id, storeId: req.storeId },

@@ -1,7 +1,7 @@
 // inventory.js
 const router = require('express').Router();
 const prisma = require('../utils/prisma');
-const { authenticate } = require('../middleware/auth');
+const { authenticate, requireAdmin } = require('../middleware/auth');
 router.use(authenticate);
 
 router.get('/', async (req, res, next) => {
@@ -21,21 +21,21 @@ router.get('/movements', async (req, res, next) => {
     const skip = (Number(page) - 1) * Number(limit);
     const movements = await prisma.stockMovement.findMany({
       where: { storeId: req.storeId }, orderBy: { createdAt: 'desc' }, skip, take: Number(limit),
-      include: { frame: { select: { brand: true, model: true, frameCode: true } }, lens: { select: { name: true } } }
+      include: { frame: { select: { brand: true, model: true, frameCode: true } }, lens: { select: { name: true } }, accessory: { select: { name: true } } }
     });
     res.json({ success: true, data: movements });
   } catch (e) { next(e); }
 });
 
-router.post('/adjust', async (req, res, next) => {
+router.post('/adjust', requireAdmin, async (req, res, next) => {
   try {
     const { frameId, lensId, accessoryId, type, quantity, reason } = req.body;
     if (!['IN', 'OUT', 'ADJUSTMENT'].includes(type)) {
       return res.status(400).json({ success: false, message: 'Invalid movement type' });
     }
     const qty = Number(quantity);
-    if (!Number.isInteger(qty) || qty <= 0) {
-      return res.status(400).json({ success: false, message: 'Quantity must be a positive integer' });
+    if (!Number.isInteger(qty) || qty < 0 || (type !== 'ADJUSTMENT' && qty === 0)) {
+      return res.status(400).json({ success: false, message: 'Quantity must be a valid integer' });
     }
     const selectedCount = [frameId, lensId, accessoryId].filter(Boolean).length;
     if (selectedCount !== 1) {
@@ -56,7 +56,10 @@ router.post('/adjust', async (req, res, next) => {
 
     if (!item) return res.status(404).json({ success: false, message: 'Item not found' });
     const bef = item.stockQty;
-    const aft = type === 'IN' ? bef + qty : type === 'OUT' ? Math.max(0, bef - qty) : qty;
+    if (type === 'OUT' && qty > bef) {
+      return res.status(400).json({ success: false, message: 'Insufficient stock' });
+    }
+    const aft = type === 'IN' ? bef + qty : type === 'OUT' ? bef - qty : qty;
     const updateResult = idKey === 'frameId'
       ? await prisma.frame.updateMany({ where: { id: item.id, storeId: req.storeId }, data: { stockQty: aft } })
       : idKey === 'lensId'
@@ -64,7 +67,7 @@ router.post('/adjust', async (req, res, next) => {
         : await prisma.accessory.updateMany({ where: { id: item.id, storeId: req.storeId }, data: { stockQty: aft } });
 
     if (!updateResult.count) return res.status(404).json({ success: false, message: 'Item not found' });
-    await prisma.stockMovement.create({ data: { storeId: req.storeId, [idKey]: item.id, type, quantity: qty, beforeQty: bef, afterQty: aft, reason } });
+    await prisma.stockMovement.create({ data: { storeId: req.storeId, [idKey]: item.id, type, quantity: Math.abs(aft - bef), beforeQty: bef, afterQty: aft, reason } });
     res.json({ success: true, data: { beforeQty: bef, afterQty: aft } });
   } catch (e) { next(e); }
 });

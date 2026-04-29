@@ -5,6 +5,8 @@ import { Modal, PageHeader, SearchInput, StatusBadge, Spinner, Empty, Badge } fr
 import toast from 'react-hot-toast';
 import Label, { PrintLabelButton } from '../components/Label';
 import { Html5Qrcode } from "html5-qrcode";
+import { useAuthStore } from '../stores/authStore';
+import { isAdmin } from '../utils/roles';
 
 const SHAPES = ['ROUND', 'OVAL', 'RECTANGLE', 'SQUARE', 'CAT_EYE', 'AVIATOR', 'WAYFARER', 'GEOMETRIC', 'RIMLESS', 'SEMI_RIMLESS'];
 const fmt = n => `₹${Number(n || 0).toLocaleString('en-IN')}`;
@@ -30,6 +32,8 @@ export default function Frames() {
   const [scanning, setScanning] = useState(false);
   const [printQty, setPrintQty] = useState(1);
   const scannerRef = useRef(null);
+  const { user } = useAuthStore();
+  const canManageFrames = isAdmin(user);
 
   const generateEAN13 = () => {
     const digits = Array.from({ length: 12 }, () => Math.floor(Math.random() * 10));
@@ -154,7 +158,7 @@ export default function Frames() {
   return (
     <div>
       <PageHeader title="Frames" subtitle={`${frames.length} items`}
-        action={<button className="btn-primary btn-md" onClick={openAdd}><Plus size={15} /> Add Frame</button>} />
+        action={canManageFrames && <button className="btn-primary btn-md" onClick={openAdd}><Plus size={15} /> Add Frame</button>} />
 
       {/* Filters */}
       <div className="flex gap-3 mb-5 flex-wrap items-center">
@@ -183,10 +187,12 @@ export default function Frames() {
             <div key={fr.id} className="card card-hover overflow-hidden group">
               <div className="h-36 bg-gradient-to-br from-slate-50 to-slate-100 flex items-center justify-center relative">
                 <span className="text-6xl opacity-60">🕶️</span>
-                <div className="absolute top-2.5 right-2.5 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                  <button onClick={() => openEdit(fr)} className="btn-secondary btn-xs shadow-sm">Edit</button>
-                  <button onClick={() => del(fr.id)} className="btn-danger btn-xs shadow-sm">Del</button>
-                </div>
+                {canManageFrames && (
+                  <div className="absolute top-2.5 right-2.5 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <button onClick={() => openEdit(fr)} className="btn-secondary btn-xs shadow-sm">Edit</button>
+                    <button onClick={() => del(fr.id)} className="btn-danger btn-xs shadow-sm">Del</button>
+                  </div>
+                )}
                 {fr.stockQty === 0 && (
                   <div className="absolute inset-0 bg-slate-900/40 flex items-center justify-center">
                     <span className="text-white font-bold text-sm bg-red-500 rounded-lg px-2.5 py-1">Out of Stock</span>
@@ -238,10 +244,12 @@ export default function Frames() {
                   <td className="font-semibold">{fmt(fr.sellingPrice)}</td>
                   <td><StockBadge qty={fr.stockQty} alert={fr.lowStockAlert} /></td>
                   <td>
-                    <div className="flex gap-2">
-                      <button onClick={() => openEdit(fr)} className="btn-ghost btn-xs">Edit</button>
-                      <button onClick={() => del(fr.id)} className="btn-danger btn-xs">Del</button>
-                    </div>
+                    {canManageFrames && (
+                      <div className="flex gap-2">
+                        <button onClick={() => openEdit(fr)} className="btn-ghost btn-xs">Edit</button>
+                        <button onClick={() => del(fr.id)} className="btn-danger btn-xs">Del</button>
+                      </div>
+                    )}
                   </td>
                 </tr>
               ))}

@@ -17,6 +17,7 @@ import Settings from './pages/Settings';
 import BulkImport from "./pages/BulkImport";
 import { ScannerProvider } from "./context/ScannerContext";
 import Accessories from './pages/Accessories';
+import { isAdmin } from './utils/roles';
 // import Auth from './pages/Auth';
 
 const Guard = ({ children }) => {
@@ -26,6 +27,10 @@ const Guard = ({ children }) => {
 const Public = ({ children }) => {
   const { token } = useAuthStore();
   return token ? <Navigate to="/dashboard" replace /> : children;
+};
+const AdminRoute = ({ children }) => {
+  const { user } = useAuthStore();
+  return isAdmin(user) ? children : <Navigate to="/dashboard" replace />;
 };
 
 export default function App() {
@@ -46,9 +51,9 @@ export default function App() {
           <Route path="orders/:id" element={<OrderDetail />} />
           <Route path="billing" element={<Billing />} />
           <Route path="inventory" element={<Inventory />} />
-          <Route path="reports" element={<Reports />} />
+          <Route path="reports" element={<AdminRoute><Reports /></AdminRoute>} />
           <Route path="settings" element={<Settings />} />
-          <Route path="bulk-import" element={<BulkImport />} />
+          <Route path="bulk-import" element={<AdminRoute><BulkImport /></AdminRoute>} />
           <Route path="/accessories" element={<Accessories />} />
         </Route>
         <Route path="*" element={<Navigate to="/dashboard" replace />} />

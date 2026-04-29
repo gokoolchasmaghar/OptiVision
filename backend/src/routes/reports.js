@@ -1,9 +1,10 @@
 const router = require('express').Router();
 const prisma = require('../utils/prisma');
-const { authenticate } = require('../middleware/auth');
+const { authenticate, requireAdmin } = require('../middleware/auth');
 const { launchPdfBrowser } = require('../utils/pdfBrowser');
 
 router.use(authenticate);
+router.use(requireAdmin);
 
 const parseDateRange = (from, to) => {
   const dateFrom = from

@@ -3,6 +3,8 @@ import { useNavigate } from 'react-router-dom';
 import api from '../services/api';
 import { PageHeader, Tabs, Modal, Spinner, Empty } from '../components/ui';
 import toast from 'react-hot-toast';
+import { useAuthStore } from '../stores/authStore';
+import { isAdmin } from '../utils/roles';
 
 const fmt = n => `₹${Number(n || 0).toLocaleString('en-IN')}`;
 
@@ -22,6 +24,8 @@ export default function Inventory() {
   const [adjForm, setAdjForm] = useState({ frameId: '', lensId: '', accessoryId: '', type: 'IN', quantity: '', reason: '' });
   const [saving, setSaving] = useState(false);
   const navigate = useNavigate();
+  const { user } = useAuthStore();
+  const canManageInventory = isAdmin(user);
 
   const load = () => Promise.all([
     api.get('/inventory').then(r => setData(r.data.data)),
@@ -53,7 +57,7 @@ export default function Inventory() {
       <PageHeader
         title="Inventory"
         subtitle="Stock levels and movements"
-        action={
+        action={canManageInventory && (
           <div className="flex flex-wrap gap-2">
             <button className="btn-primary btn-md" onClick={() => setAdjModal(true)}>
               Adjust Stock
@@ -63,7 +67,7 @@ export default function Inventory() {
               Bulk Import
             </button>
           </div>
-        }
+        )}
       />
 
       <Tabs

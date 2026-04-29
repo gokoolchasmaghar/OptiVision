@@ -21,13 +21,16 @@ const authenticate = async (req, res, next) => {
       return res.status(401).json({ success: false, message: 'Unauthorized' });
     }
 
-    req.user = user;
-    // FIX: removed console.log("USER:", user) — was logging sensitive data in production
+    const { passwordHash, ...safeUser } = user;
+    req.user = safeUser;
 
     req.storeId = user.storeId || user.store?.id;
 
-    if (!req.storeId) {
-      return res.status(401).json({ success: false, message: 'User has no store assigned' });
+    if (!req.storeId && user.role !== 'SUPER_ADMIN') {
+      return res.status(401).json({
+        success: false,
+        message: 'User has no store assigned'
+      });
     }
 
     next();
@@ -47,6 +50,7 @@ const requireRole = (...roles) => (req, res, next) => {
   next();
 };
 
-const requireAdmin = requireRole('SUPER_ADMIN', 'SHOP_ADMIN', 'Admin');
+const requireAdmin = requireRole('SUPER_ADMIN', 'SHOP_ADMIN');
+const requireStaff = requireRole('STAFF', 'SHOP_ADMIN', 'SUPER_ADMIN');
 
-module.exports = { authenticate, requireRole, requireAdmin };
+module.exports = { authenticate, requireRole, requireAdmin, requireStaff };

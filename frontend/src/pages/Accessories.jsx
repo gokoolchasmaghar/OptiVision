@@ -3,12 +3,16 @@ import api from '../services/api';
 import { Plus, Search, Trash2 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import Label, { PrintLabelButton } from '../components/Label';
+import { useAuthStore } from '../stores/authStore';
+import { isAdmin } from '../utils/roles';
 
 const fmt = n => `₹${Number(n || 0).toLocaleString('en-IN')}`;
 
 const categories = ['ALL', 'SUNGLASSES', 'CASE', 'SOLUTION', 'CLOTH', 'OTHER'];
 
 export default function Accessories() {
+    const { user } = useAuthStore();
+    const canManageAccessories = isAdmin(user);
     const [items, setItems] = useState([]);
     const [search, setSearch] = useState('');
     const [category, setCategory] = useState('ALL');
@@ -36,7 +40,6 @@ export default function Accessories() {
             });
             setItems(res.data.data);
         } catch (e) {
-            console.log(e.response?.data);  // For debugging
             toast.error('Failed to load accessories');
         }
     };
@@ -108,12 +111,14 @@ export default function Accessories() {
                     <p className="text-sm text-slate-500">{items.length} items</p>
                 </div>
 
-                <button
-                    onClick={() => setShowModal(true)}
-                    className="btn-primary btn-sm px-4 py-2 rounded-xl flex items-center gap-2"
-                >
-                    <Plus size={16} /> Add Accessory
-                </button>
+                {canManageAccessories && (
+                    <button
+                        onClick={() => setShowModal(true)}
+                        className="btn-primary btn-sm px-4 py-2 rounded-xl flex items-center gap-2"
+                    >
+                        <Plus size={16} /> Add Accessory
+                    </button>
+                )}
             </div>
 
             {/* 🔍 Filters */}
@@ -221,31 +226,33 @@ export default function Accessories() {
                                     Label
                                 </button>
 
-                                <div className="flex gap-3 text-xs">
-                                    <button
-                                        onClick={() => {
-                                            setEditingItem(i);
-                                            setForm({
-                                                name: i.name || '',
-                                                category: i.category || 'SUNGLASSES',
-                                                sellingPrice: i.sellingPrice || '',
-                                                purchasePrice: i.purchasePrice || '',
-                                                stockQty: i.stockQty || '',
-                                                barcode: i.barcode || '',
-                                            });
-                                            setShowModal(true);
-                                        }}
-                                        className="btn-ghost btn-xs"
-                                    >
-                                        Edit
-                                    </button>
-                                    <button
-                                        onClick={() => handleDelete(i.id)}
-                                        className="btn-danger btn-xs"
-                                    >
-                                        Del
-                                    </button>
-                                </div>
+                                {canManageAccessories && (
+                                    <div className="flex gap-3 text-xs">
+                                        <button
+                                            onClick={() => {
+                                                setEditingItem(i);
+                                                setForm({
+                                                    name: i.name || '',
+                                                    category: i.category || 'SUNGLASSES',
+                                                    sellingPrice: i.sellingPrice || '',
+                                                    purchasePrice: i.purchasePrice || '',
+                                                    stockQty: i.stockQty || '',
+                                                    barcode: i.barcode || '',
+                                                });
+                                                setShowModal(true);
+                                            }}
+                                            className="btn-ghost btn-xs"
+                                        >
+                                            Edit
+                                        </button>
+                                        <button
+                                            onClick={() => handleDelete(i.id)}
+                                            className="btn-danger btn-xs"
+                                        >
+                                            Del
+                                        </button>
+                                    </div>
+                                )}
                             </div>
                         </div>
                     </div>

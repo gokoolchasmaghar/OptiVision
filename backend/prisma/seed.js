@@ -11,9 +11,11 @@ async function main() {
   const adminPassword = process.env.SEED_ADMIN_PASSWORD;
   const staffEmail = process.env.SEED_STAFF_EMAIL || 'staff@gmail.com';
   const staffPassword = process.env.SEED_STAFF_PASSWORD;
+  const superEmail = process.env.SEED_SUPER_EMAIL || 'superadmin@gmail.com';
+  const superPassword = process.env.SEED_SUPER_PASSWORD;
 
-  if (!adminPassword || !staffPassword) {
-    throw new Error('❌ SEED_ADMIN_PASSWORD and SEED_STAFF_PASSWORD must be set in env');
+  if (!adminPassword || !staffPassword || !superPassword) {
+    throw new Error('❌ SEED_ADMIN_PASSWORD, SEED_STAFF_PASSWORD and SEED_SUPER_PASSWORD must be set in env');
   }
 
   // Create store
@@ -23,16 +25,39 @@ async function main() {
     create: {
       id: 'store-GO-KOOL CHASMAGHAR-001',
       name: 'GO-KOOL CHASMAGHAR',
-      address: 'Main Branch, India',
-      phone: '9999999999',
-      email: adminEmail,
+      address: '235, Parbirata G.T. Road, Sripally Near State Bank of India Burdwan, Purba Bardhaman West Bengal - 713103',
+      phone: '9832906048',
+      email: 'gokoolchasmaghar.eyewear@gmail.com',
       gstEnabled: false,
-      invoicePrefix: 'OV',
-      invoiceCounter: 1000,
+      invoicePrefix: 'INVGC',
+      invoiceCounter: 1,
       isActive: true,
     }
   });
   console.log('✅ Store:', store.name);
+
+  // 🔥 SUPER ADMIN
+  const superHash = await bcrypt.hash(superPassword, 12);
+
+  await prisma.user.upsert({
+    where: { email: superEmail },
+    update: {
+      passwordHash: superHash,
+      isActive: true,
+      role: 'SUPER_ADMIN',
+      storeId: store.id // optional but safe
+    },
+    create: {
+      storeId: store.id,
+      name: 'Super Admin',
+      email: superEmail,
+      phone: '7777777777',
+      passwordHash: superHash,
+      role: 'SUPER_ADMIN',
+      isActive: true,
+    }
+  });
+  console.log('✅ Super Admin:', superEmail);
 
   // Admin
   const adminHash = await bcrypt.hash(adminPassword, 12);

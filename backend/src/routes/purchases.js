@@ -1,7 +1,9 @@
 const router = require('express').Router();
 const prisma = require('../utils/prisma');
-const { authenticate } = require('../middleware/auth');
+const { authenticate, requireAdmin } = require('../middleware/auth');
+const { positiveInt, numberOrDefault } = require('../utils/normalize');
 router.use(authenticate);
+router.use(requireAdmin);
 
 router.get('/', async (req, res, next) => {
   try {
@@ -23,7 +25,16 @@ router.post('/', async (req, res, next) => {
     });
     if (!supplier) return res.status(400).json({ success: false, message: 'Invalid supplier for this store' });
 
-    const totalAmount = items.reduce((s, i) => s + i.quantity * i.unitCost, 0);
+    const normalizedItems = items.map(i => ({
+      ...i,
+      quantity: positiveInt(i.quantity),
+      unitCost: numberOrDefault(i.unitCost, 0),
+    }));
+    if (normalizedItems.some(i => !i.quantity || i.unitCost < 0 || !['frame', 'lens', 'accessory'].includes(i.itemType) || !i.itemId || !i.itemName)) {
+      return res.status(400).json({ success: false, message: 'Invalid purchase items' });
+    }
+
+    const totalAmount = normalizedItems.reduce((s, i) => s + i.quantity * i.unitCost, 0);
     const purchase = await prisma.$transaction(async tx => {
       const p = await tx.purchase.create({
         data: {
@@ -33,8 +44,8 @@ router.post('/', async (req, res, next) => {
           totalAmount,
           notes,
           purchasedAt: purchasedAt ? new Date(purchasedAt) : new Date(),
-          items: {
-            create: items.map(i => ({
+              items: {
+            create: normalizedItems.map(i => ({
               itemType: i.itemType,
               itemId: i.itemId,
               itemName: i.itemName,
@@ -46,7 +57,7 @@ router.post('/', async (req, res, next) => {
         },
         include: { items: true }
       });
-      for (const item of items) {
+      for (const item of normalizedItems) {
         if (item.itemType === 'frame' && item.itemId) {
           const f = await tx.frame.findFirst({ where: { id: item.itemId, storeId: req.storeId } });
           if (f) {
@@ -55,6 +66,8 @@ router.post('/', async (req, res, next) => {
               data: { stockQty: { increment: item.quantity }, purchasePrice: item.unitCost }
             });
             await tx.stockMovement.create({ data: { storeId: req.storeId, frameId: item.itemId, type: 'IN', quantity: item.quantity, beforeQty: f.stockQty, afterQty: f.stockQty + item.quantity, reason: 'Purchase', reference: invoiceNumber || p.id } });
+          } else {
+            throw Object.assign(new Error(`Frame not found: ${item.itemName}`), { status: 400 });
           }
         } else if (item.itemType === 'lens' && item.itemId) {
           const l = await tx.lens.findFirst({ where: { id: item.itemId, storeId: req.storeId } });
@@ -64,6 +77,8 @@ router.post('/', async (req, res, next) => {
               data: { stockQty: { increment: item.quantity } }
             });
             await tx.stockMovement.create({ data: { storeId: req.storeId, lensId: item.itemId, type: 'IN', quantity: item.quantity, beforeQty: l.stockQty, afterQty: l.stockQty + item.quantity, reason: 'Purchase', reference: invoiceNumber || p.id } });
+          } else {
+            throw Object.assign(new Error(`Lens not found: ${item.itemName}`), { status: 400 });
           }
         } else if (item.itemType === 'accessory' && item.itemId) {
           const a = await tx.accessory.findFirst({ where: { id: item.itemId, storeId: req.storeId } });
@@ -84,6 +99,8 @@ router.post('/', async (req, res, next) => {
                 reference: invoiceNumber || p.id
               }
             });
+          } else {
+            throw Object.assign(new Error(`Accessory not found: ${item.itemName}`), { status: 400 });
           }
         }
       }

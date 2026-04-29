@@ -7,6 +7,7 @@ import {
 } from 'lucide-react';
 import { useAuthStore } from '../../stores/authStore';
 import toast from 'react-hot-toast';
+import { isAdmin } from '../../utils/roles';
 
 const NAV = [
   { to: '/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
@@ -17,7 +18,7 @@ const NAV = [
   { to: '/orders', icon: ClipboardList, label: 'Orders' },
   { to: '/billing', icon: IndianRupee, label: 'Billing' },
   { to: '/inventory', icon: Package, label: 'Inventory' },
-  { to: '/reports', icon: BarChart3, label: 'Reports' },
+  { to: '/reports', icon: BarChart3, label: 'Reports', adminOnly: true },
   { to: '/settings', icon: Settings, label: 'Settings' },
 ];
 
@@ -28,6 +29,7 @@ export default function AppLayout() {
   const [mini, setMini] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [isDesktop, setIsDesktop] = useState(() => window.innerWidth >= 768);
+  const navItems = NAV.filter(item => !item.adminOnly || isAdmin(user));
 
   useEffect(() => {
     const onResize = () => setIsDesktop(window.innerWidth >= 768);
@@ -84,7 +86,7 @@ export default function AppLayout() {
 
         {/* Nav */}
         <nav className="flex-1 px-2 py-3 space-y-0.5 overflow-y-auto scrollbar-hide">
-          {NAV.map(({ to, icon: Icon, label }) => (
+          {navItems.map(({ to, icon: Icon, label }) => (
             <NavLink key={to} to={to}
               className={({ isActive }) =>
                 `nav-item ${isActive ? 'nav-active' : 'nav-inactive'} ${compact ? 'justify-center px-2' : ''}`

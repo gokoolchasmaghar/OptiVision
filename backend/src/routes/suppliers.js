@@ -1,6 +1,6 @@
 const router = require('express').Router();
 const prisma = require('../utils/prisma');
-const { authenticate } = require('../middleware/auth');
+const { authenticate, requireAdmin } = require('../middleware/auth');
 
 router.use(authenticate);
 
@@ -16,7 +16,7 @@ router.get('/', async (req, res, next) => {
   }
 });
 
-router.post('/', async (req, res, next) => {
+router.post('/', requireAdmin, async (req, res, next) => {
   try {
     const { name, phone, email, address, gstNumber } = req.body;
     const supplier = await prisma.supplier.create({
@@ -28,7 +28,7 @@ router.post('/', async (req, res, next) => {
   }
 });
 
-router.put('/:id', async (req, res, next) => {
+router.put('/:id', requireAdmin, async (req, res, next) => {
   try {
     const { storeId, id, createdAt, updatedAt, ...safeData } = req.body;
     const result = await prisma.supplier.updateMany({
@@ -46,7 +46,7 @@ router.put('/:id', async (req, res, next) => {
   }
 });
 
-router.delete('/:id', async (req, res, next) => {
+router.delete('/:id', requireAdmin, async (req, res, next) => {
   try {
     const result = await prisma.supplier.updateMany({
       where: { id: req.params.id, storeId: req.storeId },

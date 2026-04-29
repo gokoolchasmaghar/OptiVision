@@ -7,6 +7,7 @@ import toast from 'react-hot-toast';
 
 const fmt = n => `₹${Number(n || 0).toLocaleString('en-IN')}`;
 const STEPS = ['Customer', 'Frame', 'Prescription', 'Lens Package', 'Checkout'];
+const LENS_TYPES = ['SINGLE_VISION', 'BIFOCAL', 'PROGRESSIVE', 'READING'];
 
 const DEFAULT_STORE_PRICING = { gstEnabled: true, taxRate: 18 };
 
@@ -29,7 +30,7 @@ export default function OrderCreate() {
   // Step 3: Prescription
   const [prescriptions, setPrescriptions] = useState([]);
   const [selRx, setSelRx] = useState(null);
-  const [newRx, setNewRx] = useState({ doctorName: '', rightSph: '', rightCyl: '', rightAxis: '', rightAdd: '', leftSph: '', leftCyl: '', leftAxis: '', leftAdd: '', pd: '' });
+  const [newRx, setNewRx] = useState({ doctorName: '', rightSph: '', rightCyl: '', rightAxis: '', rightAdd: '', leftSph: '', leftCyl: '', leftAxis: '', leftAdd: '', pd: '', lensType: '' });
   const [useExistingRx, setUseExistingRx] = useState(true);
 
   // Step 4: Lens
@@ -100,7 +101,8 @@ export default function OrderCreate() {
     newRx.leftCyl !== '' ||
     newRx.leftAxis !== '' ||
     newRx.leftAdd !== '' ||
-    newRx.pd !== '';
+    newRx.pd !== '' ||
+    newRx.lensType !== '';
 
   const formattedRx = {
     ...newRx,
@@ -268,6 +270,11 @@ export default function OrderCreate() {
                       <div className="text-slate-500">OS: {rx.leftSph || '—'} / {rx.leftCyl || '—'} × {rx.leftAxis || '—'}</div>
                       <div className="text-slate-500">PD: {rx.pd || '—'}</div>
                     </div>
+                    {rx.lensType && (
+                      <div className="mt-2 text-xs font-medium text-slate-600">
+                        Lens Type: {rx.lensType.replace('_', ' ')}
+                      </div>
+                    )}
                   </div>
                 ))}
                 <button onClick={() => { setUseExistingRx(false); setSelRx(null); }} className="btn-ghost btn-sm">+ Enter New Prescription</button>
@@ -289,7 +296,21 @@ export default function OrderCreate() {
                     </tbody>
                   </table>
                 </div>
-                <div className="w-full sm:max-w-xs"><label className="field-label">PD (mm)</label><input className="field-input" type="number" step="0.5" value={newRx.pd} onChange={e => setNewRx(f => ({ ...f, pd: e.target.value }))} placeholder="63" /></div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-3">
+                  <div>
+                    <label className="field-label">PD (mm)</label>
+                    <input className="field-input" type="number" step="0.5" value={newRx.pd} onChange={e => setNewRx(f => ({ ...f, pd: e.target.value }))} placeholder="63" />
+                  </div>
+                  <div>
+                    <label className="field-label">Lens Type</label>
+                    <select className="field-select" value={newRx.lensType} onChange={e => setNewRx(f => ({ ...f, lensType: e.target.value }))}>
+                      <option value="">Select</option>
+                      {LENS_TYPES.map(type => (
+                        <option key={type} value={type}>{type.replace('_', ' ')}</option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
               </div>
             )}
           </div>

@@ -5,6 +5,8 @@ import api from '../services/api';
 import { StatusBadge, Modal, Spinner } from '../components/ui';
 import { format } from 'date-fns';
 import toast from 'react-hot-toast';
+import { useAuthStore } from '../stores/authStore';
+import { isAdmin } from '../utils/roles';
 
 import {
   downloadInvoice,
@@ -26,6 +28,8 @@ export default function OrderDetail() {
   const [saving, setSaving] = useState(false);
   const [invoiceMenu, setInvoiceMenu] = useState(false);
   const invoiceMenuRef = useRef(null);
+  const { user } = useAuthStore();
+  const canAdminOrder = isAdmin(user);
 
   const load = () => api.get(`/orders/${id}`).then(r => setOrder(r.data.data)).finally(() => setLoading(false));
   useEffect(() => { load(); }, [id]);
@@ -202,7 +206,7 @@ Thank you for trusting us 🙏`
         </div>
         <div className="flex gap-2 flex-wrap no-print">
           {/* <button onClick={() => window.print()} className="btn-secondary btn-md"><Printer size={15} /> Print</button> */}
-          {order.balanceAmount > 0 && (
+          {canAdminOrder && order.balanceAmount > 0 && (
             <button onClick={() => { setPayForm({ amount: String(order.balanceAmount), method: 'CASH', note: '' }); setPayModal(true); }}
               className="btn-success btn-md"><CreditCard size={15} /> Collect {fmt(order.balanceAmount)}</button>
           )}
@@ -291,7 +295,7 @@ Thank you for trusting us 🙏`
             )}
           </div>
 
-          {typeof handleCancelOrder === 'function' && (
+          {canAdminOrder && typeof handleCancelOrder === 'function' && (
             <button onClick={handleCancelOrder} className="btn-danger btn-md">
               Cancel Order
             </button>
@@ -399,7 +403,7 @@ Thank you for trusting us 🙏`
                   <span>Advance Paid</span><span>{fmt(order.advanceAmount)}</span>
                 </div>
               )}
-              {order.balanceAmount > 0 && (
+              {canAdminOrder && order.balanceAmount > 0 && (
                 <div className="flex justify-between text-sm text-red-600 font-bold">
                   <span>Balance Due</span><span>{fmt(order.balanceAmount)}</span>
                 </div>
@@ -445,7 +449,7 @@ Thank you for trusting us 🙏`
                   {order.payments.map(p => (
                     <tr key={p.id}>
                       <td>
-                        {p.paidAt ? format(new Date(p.paidAt), 'MMM d, yyyy � h:mm a') : '-'}
+                        {p.paidAt ? format(new Date(p.paidAt), 'MMM d, yyyy � h:mm a') : '-'}
                       </td>
 
                       <td>

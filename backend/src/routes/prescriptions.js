@@ -1,9 +1,11 @@
 const router = require('express').Router();
 const prisma = require('../utils/prisma');
-const { authenticate } = require('../middleware/auth');
+const { authenticate, requireStaff } = require('../middleware/auth');
 const { downloadPrescription } = require('../controllers/prescriptionController');
+const { LENS_TYPES, enumValue } = require('../utils/normalize');
 
 router.use(authenticate);
+router.use(requireStaff);
 
 router.get('/customer/:customerId', async (req, res, next) => {
   try {
@@ -41,7 +43,13 @@ router.post('/', async (req, res, next) => {
     });
     if (!customer) return res.status(400).json({ success: false, message: 'Invalid customer for this store' });
 
-    const n = v => v !== undefined && v !== '' ? Number(v) : null;
+    const finalLensType = lensType ? enumValue(lensType, LENS_TYPES) : null;
+    if (lensType && !finalLensType) return res.status(400).json({ success: false, message: 'Invalid lens type' });
+    const n = v => {
+      if (v === undefined || v === '') return null;
+      const num = Number(v);
+      return Number.isFinite(num) ? num : null;
+    };
     const rx = await prisma.prescription.create({
       data: {
         customerId,
@@ -59,7 +67,7 @@ router.post('/', async (req, res, next) => {
         leftPd: n(leftPd),
         pd: n(pd),
         imageUrl,
-        lensType,
+        lensType: finalLensType,
         notes
       }
     });
@@ -69,7 +77,12 @@ router.post('/', async (req, res, next) => {
 
 router.put('/:id', async (req, res, next) => {
   try {
-    const { id, customerId, createdAt, updatedAt, ...safeData } = req.body;
+    const { id, customerId, createdAt, updatedAt, lensType, ...safeData } = req.body;
+    if (lensType !== undefined) {
+      const finalLensType = lensType ? enumValue(lensType, LENS_TYPES) : null;
+      if (lensType && !finalLensType) return res.status(400).json({ success: false, message: 'Invalid lens type' });
+      safeData.lensType = finalLensType;
+    }
     const result = await prisma.prescription.updateMany({
       where: { id: req.params.id, customer: { storeId: req.storeId } },
       data: safeData,

@@ -51,7 +51,7 @@ router.get('/users', authenticate, requireAdmin, async (req, res, next) => {
   try {
     const users = await prisma.user.findMany({
       where: { storeId: req.storeId },
-      select: { id:true, name:true, email:true, phone:true, role:true, isActive:true, lastLogin:true, createdAt:true },
+      select: { id: true, name: true, email: true, phone: true, role: true, isActive: true, lastLogin: true, createdAt: true },
       orderBy: { createdAt: 'desc' }
     });
     res.json({ success: true, data: users });
@@ -70,7 +70,7 @@ router.post('/users', authenticate, requireAdmin,
       const { name, email, password, role, phone } = req.body;
       const user = await prisma.user.create({
         data: { storeId: req.storeId, name, email, phone, passwordHash: await bcrypt.hash(password, 12), role },
-        select: { id:true, name:true, email:true, phone:true, role:true, isActive:true, createdAt:true }
+        select: { id: true, name: true, email: true, phone: true, role: true, isActive: true, createdAt: true }
       });
       res.status(201).json({ success: true, data: user });
     } catch (e) { next(e); }
@@ -82,6 +82,30 @@ router.patch('/users/:id', authenticate, requireAdmin, async (req, res, next) =>
     const { name, phone, role, isActive } = req.body;
     if (role && !['SHOP_ADMIN', 'STAFF'].includes(role)) {
       return res.status(400).json({ success: false, message: 'Invalid role' });
+    }
+
+    // 🔒 Prevent admin modifying another admin
+    const targetUser = await prisma.user.findFirst({
+      where: { id: req.params.id, storeId: req.storeId }
+    });
+
+    if (!targetUser) {
+      return res.status(404).json({ success: false, message: 'User not found' });
+    }
+
+    // Admin cannot modify another admin
+    if (req.user.role === 'SHOP_ADMIN' && targetUser.role === 'SHOP_ADMIN') {
+      return res.status(403).json({
+        success: false,
+        message: 'Cannot modify another admin'
+      });
+    }
+
+    if (req.user.id === req.params.id && isActive === false) {
+      return res.status(400).json({
+        success: false,
+        message: 'You cannot deactivate yourself'
+      });
     }
 
     const result = await prisma.user.updateMany({
@@ -97,7 +121,7 @@ router.patch('/users/:id', authenticate, requireAdmin, async (req, res, next) =>
 
     const user = await prisma.user.findFirst({
       where: { id: req.params.id, storeId: req.storeId },
-      select: { id:true, name:true, email:true, phone:true, role:true, isActive:true }
+      select: { id: true, name: true, email: true, phone: true, role: true, isActive: true }
     });
     res.json({ success: true, data: user });
   } catch (e) { next(e); }

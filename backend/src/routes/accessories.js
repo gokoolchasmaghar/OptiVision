@@ -7,15 +7,15 @@ const {
   deleteAccessory,
 } = require('../controllers/accessoryController');
 
-const { authenticate } = require('../middleware/auth');
+const { authenticate, requireAdmin } = require('../middleware/auth');
 
 // 🔐 Protect all routes
 router.use(authenticate);
 
 // 📦 Routes
-router.get('/', getAccessories);
-router.post('/', createAccessory);
-router.put('/:id', updateAccessory);
-router.delete('/:id', deleteAccessory);
+router.get('/', getAccessories); // staff allowed
+router.post('/', requireAdmin, createAccessory);
+router.put('/:id', requireAdmin, updateAccessory);
+router.delete('/:id', requireAdmin, deleteAccessory);
 
 module.exports = router;

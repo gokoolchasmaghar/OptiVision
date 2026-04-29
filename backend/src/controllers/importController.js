@@ -2,12 +2,15 @@ const prisma = require('../utils/prisma');
 const csv = require('csv-parser');
 const XLSX = require('xlsx');
 const { Readable } = require('stream');
+const { isValidBarcode, resolveBarcode } = require('../utils/barcode');
+const { resolveSku } = require('../utils/sku');
+const { ACCESSORY_CATEGORIES, FRAME_SHAPES, LENS_TYPES, enumValue, numberOrDefault } = require('../utils/normalize');
 
 // ── Parse CSV ─────────────────────────────────────────────────────────────────
 function parseCSV(buffer) {
     return new Promise((resolve, reject) => {
         const results = [];
-        Readable.from(buffer.toString())
+        Readable.from([buffer.toString()])
             .pipe(csv())
             .on('data', d => results.push(d))
             .on('end', () => resolve(results))
@@ -42,51 +45,62 @@ function validateRow(type, row) {
     if (!price || isNaN(Number(price))) return 'Valid selling price is required';
 
     if (type === 'frame') {
-        if (!row.barcode) return 'Barcode is required for frames';
         if (!row.model) return 'Model is required';
         if (!row.stockqty) return 'Stock quantity is required';
     }
 
     if (type === 'lens') {
+        if ((row.lenstype || row.type) && !enumValue(row.lenstype || row.type, LENS_TYPES)) {
+            return 'Invalid lens type';
+        }
         if (!row.lenstype && !row.type) {
             return 'Lens type is required';
         }
+    }
+
+    if (type === 'accessory' && row.category && !enumValue(row.category, ACCESSORY_CATEGORIES)) {
+        return 'Invalid accessory category';
     }
 
     return null;
 }
 
 // ── Build Prisma data objects ─────────────────────────────────────────────────
-function buildFrameData(row, storeId) {
+function cleanBarcode(value) {
+    const barcode = value?.toString().trim();
+    return isValidBarcode(barcode) ? barcode : null;
+}
+
+function buildFrameData(row, storeId, barcode, sku) {
     const price = Number(row.sellingprice || row.price || 0);
     const cost = Number(row.purchaseprice || row.cost || 0);
     return {
         storeId,
         frameCode: row.framecode || `FC-${Date.now()}`,
-        sku: row.sku || `SKU-${Date.now()}`,
+        sku,
         brand: row.brand || row.name || '',
         model: row.model || '',
-        barcode: row.barcode?.toString().trim(),
-        shape: row.shape?.toUpperCase() || 'RECTANGLE',
+        barcode,
+        shape: enumValue(row.shape, FRAME_SHAPES, 'RECTANGLE'),
         color: row.color || null,
         size: row.size || null,
         material: row.material || null,
         gender: row.gender || null,
         purchasePrice: cost,
         sellingPrice: price,
-        stockQty: Number(row.stockqty || row.stock || 0),
-        lowStockAlert: Number(row.lowstockalert || row.alert || 5),
+        stockQty: numberOrDefault(row.stockqty || row.stock, 0),
+        lowStockAlert: numberOrDefault(row.lowstockalert || row.alert, 5),
     };
 }
 
-function buildLensData(row, storeId) {
+function buildLensData(row, storeId, barcode, sku) {
     const price = Number(row.sellingprice || row.price || 0);
     const cost = Number(row.purchaseprice || row.cost || 0);
 
-    const lensType = (row.lenstype || row.type || 'SINGLE_VISION').toUpperCase();
+    const lensType = enumValue(row.lenstype || row.type, LENS_TYPES, 'SINGLE_VISION');
 
     const coating = row.coating
-        ? row.coating.split(',').map(c => c.trim()).filter(Boolean)
+        ? String(row.coating).split(/[|,]/).map(c => c.trim()).filter(Boolean)
         : [];
 
     return {
@@ -95,7 +109,7 @@ function buildLensData(row, storeId) {
             connect: { id: storeId }
         },
 
-        sku: row.sku || `SKU-LENS-${Date.now()}`,
+        sku,
 
         name: row.name || '',
         brand: row.brand || null,
@@ -104,33 +118,33 @@ function buildLensData(row, storeId) {
         lensIndex: row.lensindex || row.index || '1.56',
         coating,
 
-        barcode: row.barcode?.toString().trim() || `LENS-${row.name?.replace(/\s+/g, '').toUpperCase()}-${Date.now()}`,
+        barcode,
 
         purchasePrice: cost,
         sellingPrice: price,
-        stockQty: Number(row.stockqty || row.stock || 100),
-        lowStockAlert: Number(row.lowstockalert || 10),
+        stockQty: numberOrDefault(row.stockqty || row.stock, 100),
+        lowStockAlert: numberOrDefault(row.lowstockalert, 10),
     };
 }
 
-function buildAccessoryData(row, storeId) {
+function buildAccessoryData(row, storeId, barcode, sku) {
     const price = Number(row.sellingprice || row.price || 0);
     const cost = Number(row.purchaseprice || row.cost || 0);
 
     return {
         storeId, // ✅ THIS IS CORRECT
 
-        sku: row.sku || `SKU-ACC-${Date.now()}`,
+        sku,
 
         name: row.name || '',
-        category: row.category || 'GENERAL',
+        category: enumValue(row.category, ACCESSORY_CATEGORIES, 'OTHER'),
 
-        barcode: row.barcode?.toString().trim() || `ACC-${Date.now()}`,
+        barcode,
 
         purchasePrice: cost,
         sellingPrice: price,
-        stockQty: Number(row.stockqty || row.stock || 0),
-        lowStockAlert: Number(row.lowstockalert || row.alert || 5),
+        stockQty: numberOrDefault(row.stockqty || row.stock, 0),
+        lowStockAlert: numberOrDefault(row.lowstockalert || row.alert, 5),
     };
 }
 
@@ -197,6 +211,8 @@ exports.importInventory = async (req, res) => {
 
         const errors = [];
         let successCount = 0;
+        const reservedBarcodes = new Set();
+        const reservedSkus = new Set();
 
         // FIX: process outside transaction to avoid timeout on large files
         // Each row is individually committed so partial imports work
@@ -211,16 +227,19 @@ exports.importInventory = async (req, res) => {
 
             try {
                 if (type === 'frame') {
+                    const normalizedBarcode = cleanBarcode(row.barcode);
                     // FIX: correct model name is prisma.frame (not prisma.frames)
-                    const exists = await prisma.frame.findFirst({
-                        where: { barcode: row.barcode, storeId }
-                    });
+                    const exists = normalizedBarcode
+                        ? await prisma.frame.findFirst({
+                            where: { barcode: normalizedBarcode, storeId }
+                        })
+                        : null;
 
                     if (exists) {
 
                         // ❌ SKIP
                         if (duplicateMode === "skip") {
-                            errors.push({ row: i + 1, error: `Skipped duplicate: ${row.barcode}` });
+                            errors.push({ row: i + 1, error: `Skipped duplicate: ${normalizedBarcode}` });
                             continue;
                         }
 
@@ -254,26 +273,120 @@ exports.importInventory = async (req, res) => {
 
                         // 🔁 REPLACE FULL DATA
                         if (duplicateMode === "replace") {
+                            const sku = row.sku
+                                ? await resolveSku(prisma, 'frame', 'FRM', row.sku, exists.id)
+                                : exists.sku;
                             await prisma.frame.update({
                                 where: { id: exists.id },
-                                data: buildFrameData(row, storeId)
+                                data: buildFrameData(row, storeId, normalizedBarcode, sku)
                             });
 
                             successCount++;
                             continue;
                         }
                     }
-                    await prisma.frame.create({ data: buildFrameData(row, storeId) });
+                    const barcode = await resolveBarcode(prisma, row.barcode, reservedBarcodes);
+                    const sku = await resolveSku(prisma, 'frame', 'FRM', row.sku || undefined, undefined, reservedSkus);
+                    const created = await prisma.frame.create({ data: buildFrameData(row, storeId, barcode, sku) });
+                    if (created.stockQty > 0) {
+                        await prisma.stockMovement.create({
+                            data: { storeId, frameId: created.id, type: 'IN', quantity: created.stockQty, beforeQty: 0, afterQty: created.stockQty, reason: 'BULK_IMPORT' }
+                        });
+                    }
                 }
 
                 if (type === 'lens') {
                     // FIX: correct model name is prisma.lens (not prisma.lenses)
-                    await prisma.lens.create({ data: buildLensData(row, storeId) });
+                    const normalizedBarcode = cleanBarcode(row.barcode);
+                    const exists = normalizedBarcode
+                        ? await prisma.lens.findFirst({ where: { barcode: normalizedBarcode, storeId } })
+                        : null;
+                    if (exists) {
+                        if (duplicateMode === 'skip') {
+                            errors.push({ row: i + 1, error: `Skipped duplicate: ${normalizedBarcode}` });
+                            continue;
+                        }
+                        if (duplicateMode === 'update') {
+                            const addedQty = numberOrDefault(row.stockqty || row.stock, 0);
+                            const updated = await prisma.lens.update({
+                                where: { id: exists.id },
+                                data: { stockQty: exists.stockQty + addedQty }
+                            });
+                            if (addedQty > 0) {
+                                await prisma.stockMovement.create({
+                                    data: { storeId, lensId: exists.id, type: 'IN', quantity: addedQty, beforeQty: exists.stockQty, afterQty: updated.stockQty, reason: 'BULK_IMPORT' }
+                                });
+                            }
+                            successCount++;
+                            continue;
+                        }
+                        if (duplicateMode === 'replace') {
+                            const sku = row.sku
+                                ? await resolveSku(prisma, 'lens', 'LENS', row.sku, exists.id)
+                                : exists.sku;
+                            await prisma.lens.update({
+                                where: { id: exists.id },
+                                data: buildLensData(row, storeId, normalizedBarcode, sku)
+                            });
+                            successCount++;
+                            continue;
+                        }
+                    }
+                    const barcode = await resolveBarcode(prisma, row.barcode, reservedBarcodes);
+                    const sku = await resolveSku(prisma, 'lens', 'LENS', row.sku || undefined, undefined, reservedSkus);
+                    const created = await prisma.lens.create({ data: buildLensData(row, storeId, barcode, sku) });
+                    if (created.stockQty > 0) {
+                        await prisma.stockMovement.create({
+                            data: { storeId, lensId: created.id, type: 'IN', quantity: created.stockQty, beforeQty: 0, afterQty: created.stockQty, reason: 'BULK_IMPORT' }
+                        });
+                    }
                 }
 
                 if (type === 'accessory') {
                     // FIX: correct model name is prisma.accessory (not prisma.accessories)
-                    await prisma.accessory.create({ data: buildAccessoryData(row, storeId) });
+                    const normalizedBarcode = cleanBarcode(row.barcode);
+                    const exists = normalizedBarcode
+                        ? await prisma.accessory.findFirst({ where: { barcode: normalizedBarcode, storeId } })
+                        : null;
+                    if (exists) {
+                        if (duplicateMode === 'skip') {
+                            errors.push({ row: i + 1, error: `Skipped duplicate: ${normalizedBarcode}` });
+                            continue;
+                        }
+                        if (duplicateMode === 'update') {
+                            const addedQty = numberOrDefault(row.stockqty || row.stock, 0);
+                            const updated = await prisma.accessory.update({
+                                where: { id: exists.id },
+                                data: { stockQty: exists.stockQty + addedQty }
+                            });
+                            if (addedQty > 0) {
+                                await prisma.stockMovement.create({
+                                    data: { storeId, accessoryId: exists.id, type: 'IN', quantity: addedQty, beforeQty: exists.stockQty, afterQty: updated.stockQty, reason: 'BULK_IMPORT' }
+                                });
+                            }
+                            successCount++;
+                            continue;
+                        }
+                        if (duplicateMode === 'replace') {
+                            const sku = row.sku
+                                ? await resolveSku(prisma, 'accessory', 'ACC', row.sku, exists.id)
+                                : exists.sku;
+                            await prisma.accessory.update({
+                                where: { id: exists.id },
+                                data: buildAccessoryData(row, storeId, normalizedBarcode, sku)
+                            });
+                            successCount++;
+                            continue;
+                        }
+                    }
+                    const barcode = await resolveBarcode(prisma, row.barcode, reservedBarcodes);
+                    const sku = await resolveSku(prisma, 'accessory', 'ACC', row.sku || undefined, undefined, reservedSkus);
+                    const created = await prisma.accessory.create({ data: buildAccessoryData(row, storeId, barcode, sku) });
+                    if (created.stockQty > 0) {
+                        await prisma.stockMovement.create({
+                            data: { storeId, accessoryId: created.id, type: 'IN', quantity: created.stockQty, beforeQty: 0, afterQty: created.stockQty, reason: 'BULK_IMPORT' }
+                        });
+                    }
                 }
 
                 successCount++;

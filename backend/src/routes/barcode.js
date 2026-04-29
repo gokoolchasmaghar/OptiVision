@@ -1,8 +1,9 @@
 const router = require('express').Router();
 const prisma = require('../utils/prisma');
-const { authenticate } = require('../middleware/auth');
+const { authenticate, requireStaff } = require('../middleware/auth');
 
 router.use(authenticate);
+router.use(requireStaff);
 
 router.get('/:code', async (req, res, next) => {
   try {
@@ -80,10 +81,7 @@ router.get('/:code', async (req, res, next) => {
       message: "Product not found"
     });
 
-  } catch (e) {
-    console.error("BARCODE ERROR:", e);
-    next(e);
-  }
+  } catch (e) { next(e); }
 });
 
 module.exports = router;

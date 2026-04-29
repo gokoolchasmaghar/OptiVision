@@ -21,9 +21,6 @@ export const ScannerProvider = ({ children }) => {
       const tag = document.activeElement.tagName;
       if (tag === "INPUT" || tag === "TEXTAREA") return;
 
-      console.log("Key:", e.key);
-      console.log("Buffer:", buffer);
-
       // 2. Ignore special/control keys
       if (
         e.key === "Shift" ||
@@ -50,14 +47,12 @@ export const ScannerProvider = ({ children }) => {
           setProduct(res.data);
 
           // SUCCESS SOUND
-          toast.success(`Scanned: ${res.data.name || res.data.model}`);
+          toast.success(`Scanned: ${res.data.data?.name || res.data.data?.brand || res.data.data?.model || 'Item'}`);
           // new Audio("/success.mp3").play();
         } catch {
           toast.error(`No product found for barcode: ${buffer}`);
           // new Audio("/error.mp3").play();
         }
-
-        console.log("SCANNED:", buffer);
 
         setBuffer("");
         return;
