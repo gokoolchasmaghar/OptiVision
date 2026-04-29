@@ -1,6 +1,7 @@
 import { createContext, useContext, useEffect, useState } from "react";
 import api from "../services/api";
 import { useRef } from "react";
+import toast from "react-hot-toast";
 
 const ScannerContext = createContext();
 
@@ -31,24 +32,29 @@ export const ScannerProvider = ({ children }) => {
         e.key === "Meta"
       ) return;
 
-      // 3. Handle Enter (scanner end signal)
       if (e.key === "Enter") {
-        if (buffer === lastScanRef.current) return;
-        lastScanRef.current = buffer;
+        if (!buffer.trim()) return;
+
+        const now = Date.now();
+
+        // Prevent ultra-fast duplicate scans
+        if (now - lastScanRef.current < 300) return;
+        lastScanRef.current = now;
+
+        document.activeElement.blur();
 
         try {
           const res = await api.get(`/products/scan/${buffer}`);
+
+          // Replace popup instantly
           setProduct(res.data);
 
-          setTimeout(() => {
-            setProduct(null);
-          }, 4000);
-
           // SUCCESS SOUND
-          new Audio("/success.mp3").play();
+          toast.success(`Scanned: ${res.data.name || res.data.model}`);
+          // new Audio("/success.mp3").play();
         } catch {
-          // ERROR SOUND
-          new Audio("/error.mp3").play();
+          toast.error(`No product found for barcode: ${buffer}`);
+          // new Audio("/error.mp3").play();
         }
 
         console.log("SCANNED:", buffer);
@@ -81,65 +87,78 @@ export const ScannerProvider = ({ children }) => {
       {/* GLOBAL POPUP */}
       {product && (
         <div
-          className="fixed inset-0 bg-black/50 flex items-center justify-center z-[9999]"
+          className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-[9999]"
           onClick={() => setProduct(null)}
         >
           <div
-            className="bg-white rounded-2xl shadow-2xl w-[420px] p-6 relative animate-scaleIn"
+            className="bg-white rounded-3xl shadow-2xl w-[420px] p-6 relative animate-scaleIn border border-gray-100"
             onClick={(e) => e.stopPropagation()}
           >
-            {/* Close button */}
+            {/* Close */}
             <button
               onClick={() => setProduct(null)}
-              className="absolute top-3 right-3 text-gray-400 hover:text-gray-600"
+              className="absolute top-3 right-3 text-gray-400 hover:text-gray-700 text-lg"
             >
               ✕
             </button>
 
-            {/* Type */}
-            <h2 className="text-xl font-bold text-center mb-4 capitalize">
-              {product.type}
-            </h2>
-
-            {/* Product Info */}
-            <div className="space-y-2 text-sm">
-              <p><b>Name:</b> {product.data.name || product.data.model}</p>
-              <p><b>Brand:</b> {product.data.brand || "-"}</p>
-              <p><b>Barcode:</b> {product.data.barcode}</p>
-
-              <p>
-                <b>Selling Price:</b>{" "}
-                <span className="text-green-600 font-semibold">
-                  ₹{product.data.sellingPrice}
-                </span>
-              </p>
-
-              <p>
-                <b>Purchase Price:</b>{" "}
-                ₹{product.data.purchasePrice}
-              </p>
-
-              <p>
-                <b>Stock:</b>{" "}
-                <span
-                  className={
-                    product.data.stockQty <= product.data.lowStockAlert
-                      ? "text-red-500 font-bold"
-                      : ""
-                  }
-                >
-                  {product.data.stockQty}
-                </span>
+            {/* Header */}
+            <div className="text-center mb-5">
+              <div className="text-xs uppercase tracking-wide text-gray-400">
+                {product.type}
+              </div>
+              <h2 className="text-xl font-bold text-gray-800 mt-1">
+                {product.data.name || product.data.model}
+              </h2>
+              <p className="text-sm text-gray-500">
+                {product.data.brand || "No Brand"}
               </p>
             </div>
 
-            {/* Optional action */}
-            <button
-              onClick={() => setProduct(null)}
-              className="mt-5 w-full bg-gray-100 hover:bg-gray-200 rounded-lg py-2 text-sm"
-            >
-              Close
-            </button>
+            {/* Info Grid */}
+            <div className="grid grid-cols-2 gap-3 text-sm">
+              <div className="bg-gray-50 rounded-lg p-3">
+                <div className="text-gray-400 text-xs">Barcode</div>
+                <div className="font-medium">{product.data.barcode}</div>
+              </div>
+
+              <div className="bg-gray-50 rounded-lg p-3">
+                <div className="text-gray-400 text-xs">Stock</div>
+                <div
+                  className={`font-semibold ${product.data.stockQty <= product.data.lowStockAlert
+                    ? "text-red-500"
+                    : "text-gray-800"
+                    }`}
+                >
+                  {product.data.stockQty}
+                </div>
+              </div>
+
+              <div className="bg-green-50 rounded-lg p-3">
+                <div className="text-green-600 text-xs">Selling</div>
+                <div className="font-bold text-green-700">
+                  ₹{product.data.sellingPrice}
+                </div>
+              </div>
+
+              <div className="bg-gray-50 rounded-lg p-3">
+                <div className="text-gray-400 text-xs">Purchase</div>
+                <div className="font-medium">
+                  ₹{product.data.purchasePrice}
+                </div>
+              </div>
+            </div>
+
+            {/* Footer */}
+            <div className="mt-5 flex gap-3">
+              <button
+                onClick={() => setProduct(null)}
+                className="flex-1 bg-gray-100 hover:bg-gray-200 rounded-lg py-2 text-sm"
+              >
+                Close
+              </button>
+
+            </div>
           </div>
         </div>
       )}
