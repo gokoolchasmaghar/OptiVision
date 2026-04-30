@@ -296,6 +296,17 @@ export default function Label({ product }) {
 }
 
 // ─────────────────────────────────────────────────────────────
+// 🛡️ HTML SANITIZER
+// ─────────────────────────────────────────────────────────────
+function escapeHtml(str) {
+  return String(str ?? "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+}
+
+// ─────────────────────────────────────────────────────────────
 // 🖨️ PRINT BUTTON
 // ─────────────────────────────────────────────────────────────
 export function PrintLabelButton({ product, quantity = 1, className = "" }) {
@@ -323,9 +334,9 @@ export function PrintLabelButton({ product, quantity = 1, className = "" }) {
         <div class="label">
           <div class="barcode-section">${barcodeSvg}</div>
           <div class="details-section">
-            <div class="heading">${heading}</div>
-            <div class="subheading">${subHeading}</div>
-            <div class="price">${price}</div>
+            <div class="heading">${escapeHtml(heading)}</div>
+            <div class="subheading">${escapeHtml(subHeading)}</div>
+            <div class="price">${escapeHtml(price)}</div>
           </div>
         </div>
       `;
