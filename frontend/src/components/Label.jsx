@@ -73,15 +73,16 @@ export function printLabels(labelHtml) {
           /* Critical: each label on its own page on the thermal roll */
           break-after: page;
           page-break-after: always;
+          break-inside: avoid;
         }
 
         /* Left: Barcode Area */
         .barcode-section {
-          width: 58%;
+          width: 60%;
           display: flex;
           align-items: center;
           justify-content: center;
-          padding: 0.3mm 1mm 0.3mm 0;
+          padding: 1mm 2mm;   /* equal spacing both sides */
           border-right: 1px dashed #666;
           overflow: hidden;
         }
@@ -97,8 +98,8 @@ export function printLabels(labelHtml) {
 
         /* Right: Info Area */
         .details-section {
-          width: 42%;
-          padding-left: 2mm;
+          width: 40%;
+          padding-left: 1.5mm;
           display: flex;
           flex-direction: column;
           justify-content: center;
