@@ -18,51 +18,64 @@ export function printLabels(labelHtml) {
     <head>
       <meta charset="utf-8" />
       <style>
-        * { margin: 0; padding: 0; box-sizing: border-box; }
+        * { 
+          margin: 0; 
+          padding: 0; 
+          box-sizing: border-box;
+          -webkit-print-color-adjust: exact;
+          print-color-adjust: exact;
+        }
+        body { 
+          font-family: sans-serif; 
+          background: #fff; 
+          transform: rotate(0deg);
+        }
 
-        body {
-          font-family: sans-serif;
-          background: #fff;
-          margin: 0;
-          padding: 0;
+        svg {
+          width: 95%;
+          height: auto;
         }
 
         .container {
           width: 100%;
           display: flex;
           flex-direction: column;
+          align-items: center;
         }
 
         .label {
           width: 70mm;
           height: 20mm;
-          margin: 0 auto;
+          margin: 0;
 
           display: flex;
           align-items: center;
+          justify-content: space-between;
 
-          border-bottom: 0.5pt solid #000;
+          box-sizing: border-box;
+          padding: 0.8mm 0;
+
           overflow: hidden;
         }
 
         /* Left: Barcode Area */
         .barcode-section {
-          width: 55%;
+          width: 58%;
           display: flex;
           align-items: center;
           justify-content: center;
-          padding: 1mm;
+          padding: 0.5mm 1mm 0.5mm 0;
           border-right: 1px dashed #666;
         }
 
         /* Right: Info Area */
         .details-section {
-          width: 45%;
+          width: 42%;
           padding-left: 2mm;
           display: flex;
           flex-direction: column;
           justify-content: center;
-          line-height: 1.2;
+          line-height: 1.1;
         }
 
         .heading { font-weight: bold; font-size: 11px; }
@@ -71,27 +84,15 @@ export function printLabels(labelHtml) {
 
         @media print {
           @page {
-            size: 100mm auto;   /* 🔥 roll printing */
+            size: 100mm 20mm;
             margin: 0;
           }
-
-          body {
-            margin: 0;
-            padding: 0;
-          }
-
-          .container {
-            width: 100%;
-          }
+          body { margin: 0; }
         }
       </style>
-
-      <script src="https://cdn.jsdelivr.net/npm/jsbarcode"></script>
     </head>
-
     <body>
       <div class="container">${labelHtml}</div>
-
       <script>
         window.onload = () => {
           setTimeout(() => {
@@ -104,7 +105,6 @@ export function printLabels(labelHtml) {
     </body>
     </html>
   `);
-
   win.document.close();
 }
 
@@ -117,12 +117,18 @@ function buildBarcodeSvg(barcode) {
     const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
     JsBarcode(svg, barcode, {
       format: "CODE128",
-      width: 2,
-      height: 40,
+      width: 1.5,
+      height: 34,
+      textMargin: 2,
       displayValue: true,
-      fontSize: 9,
+      fontSize: 8,
       margin: 0,
     });
+
+    // force inline size for print consistency
+    svg.setAttribute("width", "100%");
+    svg.setAttribute("height", "100%");
+
     return svg.outerHTML;
   } catch (e) {
     return "";
@@ -138,16 +144,17 @@ export default function Label({ product }) {
   useEffect(() => {
     if (!ref.current) return;
 
-    ref.current.innerHTML = "";
+    ref.current.innerHTML = ""; //CLEAR OLD SVG
 
     if (!product?.barcode) return;
 
     JsBarcode(ref.current, product.barcode, {
       format: "CODE128",
-      width: 1.3,
-      height: 42,
+      width: 1.5,
+      height: 34,
+      textMargin: 2,
       displayValue: true,
-      fontSize: 10,
+      fontSize: 8,
       margin: 0,
     });
   }, [product]);
@@ -156,18 +163,14 @@ export default function Label({ product }) {
 
   return (
     <div style={{ padding: "10px" }}>
-      <div
-        style={{
-          width: "100%",
-          maxWidth: "360px",
-          aspectRatio: "3.5 / 1",
-          height: "80px",
-          border: "1px solid #000",
-          borderRadius: "8px",
-          display: "flex",
-          background: "#fff",
-        }}
-      >
+      <div style={{
+        width: "100%",
+        maxWidth: "360px",
+        aspectRatio: "3.5 / 1",
+        height: "80px",
+        display: "flex",
+        background: "#fff"
+      }}>
         <div
           style={{
             flex: "0 0 55%",
@@ -188,7 +191,6 @@ export default function Label({ product }) {
             }}
           />
         </div>
-
         <div
           style={{
             flex: "0 0 45%",
@@ -200,26 +202,22 @@ export default function Label({ product }) {
             overflow: "hidden",
           }}
         >
-          <div
-            style={{
-              fontWeight: "bold",
-              fontSize: "12px",
-              whiteSpace: "nowrap",
-              overflow: "hidden",
-              textOverflow: "ellipsis",
-            }}
-          >
+          <div style={{
+            fontWeight: "bold",
+            fontSize: "12px",
+            whiteSpace: "nowrap",
+            overflow: "hidden",
+            textOverflow: "ellipsis"
+          }}>
             {product.brand}
           </div>
 
-          <div
-            style={{
-              fontSize: "11px",
-              whiteSpace: "nowrap",
-              overflow: "hidden",
-              textOverflow: "ellipsis",
-            }}
-          >
+          <div style={{
+            fontSize: "11px",
+            whiteSpace: "nowrap",
+            overflow: "hidden",
+            textOverflow: "ellipsis"
+          }}>
             {product.model || product.name || ""}
           </div>
 
@@ -227,13 +225,11 @@ export default function Label({ product }) {
             {[product.color, product.size].filter(Boolean).join(" | ")}
           </div>
 
-          <div
-            style={{
-              fontWeight: "bold",
-              fontSize: "clamp(10px, 2.5vw, 12px)",
-              marginTop: "2px",
-            }}
-          >
+          <div style={{
+            fontWeight: "bold",
+            fontSize: "clamp(10px, 2.5vw, 12px)",
+            marginTop: "2px"
+          }}>
             ₹{product.sellingPrice}
           </div>
         </div>
@@ -251,9 +247,7 @@ export function PrintLabelButton({ product, quantity = 1, className = "" }) {
 
     const barcodeSvg = buildBarcodeSvg(product.barcode);
     const heading = `${product.brand || ""} ${product.model || ""}`;
-    const subHeading = `${product.color || ""} ${
-      product.size ? `Size: ${product.size}` : ""
-    }`;
+    const subHeading = `${product.color || ""} ${product.size ? `Size: ${product.size}` : ""}`;
     const price = `₹${Number(product.sellingPrice || 0).toLocaleString("en-IN")}`;
 
     let labelsHtml = "";
@@ -269,7 +263,6 @@ export function PrintLabelButton({ product, quantity = 1, className = "" }) {
         </div>
       `;
     }
-
     printLabels(labelsHtml);
   };
 
