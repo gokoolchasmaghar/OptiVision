@@ -1,5 +1,6 @@
 import { useEffect, useRef } from "react";
 import JsBarcode from "jsbarcode";
+import toast from "react-hot-toast";
 
 // ─────────────────────────────────────────────────────────────
 // 🖨️ PRINT HELPER (FRAME TAG LAYOUT)
@@ -18,47 +19,49 @@ export function printLabels(labelHtml) {
       <meta charset="utf-8" />
       <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
-        body { 
-          font-family: sans-serif; 
-          background: #fff; 
-          transform: rotate(0deg);
+
+        body {
+          font-family: sans-serif;
+          background: #fff;
+          margin: 0;
+          padding: 0;
         }
 
         .container {
-          width: 100%; 
-          margin: 5mm auto;
+          width: 100%;
+          display: flex;
+          flex-direction: column;
         }
 
         .label {
-          width: 60mm; /* Narrower for optical frame tags */
-          height: 30mm;
-          border: 0.5pt solid #000;
-          border-radius: 6px;
-          display: table;
-          table-layout: fixed;
-          width: 100%;
-          border-collapse: collapse;
-          margin-bottom: 4mm;
+          width: 70mm;
+          height: 20mm;
+          margin: 0 auto;
+
+          display: flex;
+          align-items: center;
+
+          border-bottom: 0.5pt solid #000;
           overflow: hidden;
-          page-break-inside: avoid;
         }
 
         /* Left: Barcode Area */
         .barcode-section {
-          display: table-cell;
           width: 55%;
-          vertical-align: middle;
-          text-align: center;
+          display: flex;
+          align-items: center;
+          justify-content: center;
           padding: 1mm;
-          border-right: 1px dashed #666; /* Perforation line */
+          border-right: 1px dashed #666;
         }
 
         /* Right: Info Area */
         .details-section {
-          display: table-cell;
           width: 45%;
-          vertical-align: middle;
           padding-left: 2mm;
+          display: flex;
+          flex-direction: column;
+          justify-content: center;
           line-height: 1.2;
         }
 
@@ -68,29 +71,40 @@ export function printLabels(labelHtml) {
 
         @media print {
           @page {
-            size: 60mm 30mm; /* adjust based on your roll */
+            size: 100mm auto;   /* 🔥 roll printing */
             margin: 0;
           }
-          body { margin: 0; }
-          .label { border: 0.5pt solid #000; }
+
+          body {
+            margin: 0;
+            padding: 0;
+          }
+
+          .container {
+            width: 100%;
+          }
         }
       </style>
+
+      <script src="https://cdn.jsdelivr.net/npm/jsbarcode"></script>
     </head>
+
     <body>
       <div class="container">${labelHtml}</div>
+
       <script>
-        window.onload = function () {
-          window.onload = () => {
-            setTimeout(() => {
-              window.print();
-              window.close();
-            }, 800);
-          };
+        window.onload = () => {
+          setTimeout(() => {
+            window.focus();
+            window.print();
+            window.close();
+          }, 300);
         };
       </script>
     </body>
     </html>
   `);
+
   win.document.close();
 }
 
@@ -124,7 +138,7 @@ export default function Label({ product }) {
   useEffect(() => {
     if (!ref.current) return;
 
-    ref.current.innerHTML = ""; //CLEAR OLD SVG
+    ref.current.innerHTML = "";
 
     if (!product?.barcode) return;
 
@@ -142,16 +156,18 @@ export default function Label({ product }) {
 
   return (
     <div style={{ padding: "10px" }}>
-      <div style={{
-        width: "100%",
-        maxWidth: "360px",
-        aspectRatio: "3.5 / 1",
-        height: "80px",
-        border: "1px solid #000",
-        borderRadius: "8px",
-        display: "flex",
-        background: "#fff"
-      }}>
+      <div
+        style={{
+          width: "100%",
+          maxWidth: "360px",
+          aspectRatio: "3.5 / 1",
+          height: "80px",
+          border: "1px solid #000",
+          borderRadius: "8px",
+          display: "flex",
+          background: "#fff",
+        }}
+      >
         <div
           style={{
             flex: "0 0 55%",
@@ -172,6 +188,7 @@ export default function Label({ product }) {
             }}
           />
         </div>
+
         <div
           style={{
             flex: "0 0 45%",
@@ -183,22 +200,26 @@ export default function Label({ product }) {
             overflow: "hidden",
           }}
         >
-          <div style={{
-            fontWeight: "bold",
-            fontSize: "12px",
-            whiteSpace: "nowrap",
-            overflow: "hidden",
-            textOverflow: "ellipsis"
-          }}>
+          <div
+            style={{
+              fontWeight: "bold",
+              fontSize: "12px",
+              whiteSpace: "nowrap",
+              overflow: "hidden",
+              textOverflow: "ellipsis",
+            }}
+          >
             {product.brand}
           </div>
 
-          <div style={{
-            fontSize: "11px",
-            whiteSpace: "nowrap",
-            overflow: "hidden",
-            textOverflow: "ellipsis"
-          }}>
+          <div
+            style={{
+              fontSize: "11px",
+              whiteSpace: "nowrap",
+              overflow: "hidden",
+              textOverflow: "ellipsis",
+            }}
+          >
             {product.model || product.name || ""}
           </div>
 
@@ -206,11 +227,13 @@ export default function Label({ product }) {
             {[product.color, product.size].filter(Boolean).join(" | ")}
           </div>
 
-          <div style={{
-            fontWeight: "bold",
-            fontSize: "clamp(10px, 2.5vw, 12px)",
-            marginTop: "2px"
-          }}>
+          <div
+            style={{
+              fontWeight: "bold",
+              fontSize: "clamp(10px, 2.5vw, 12px)",
+              marginTop: "2px",
+            }}
+          >
             ₹{product.sellingPrice}
           </div>
         </div>
@@ -228,7 +251,9 @@ export function PrintLabelButton({ product, quantity = 1, className = "" }) {
 
     const barcodeSvg = buildBarcodeSvg(product.barcode);
     const heading = `${product.brand || ""} ${product.model || ""}`;
-    const subHeading = `${product.color || ""} ${product.size ? `Size: ${product.size}` : ""}`;
+    const subHeading = `${product.color || ""} ${
+      product.size ? `Size: ${product.size}` : ""
+    }`;
     const price = `₹${Number(product.sellingPrice || 0).toLocaleString("en-IN")}`;
 
     let labelsHtml = "";
@@ -244,6 +269,7 @@ export function PrintLabelButton({ product, quantity = 1, className = "" }) {
         </div>
       `;
     }
+
     printLabels(labelsHtml);
   };
 

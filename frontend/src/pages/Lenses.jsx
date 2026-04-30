@@ -165,38 +165,92 @@ export default function Lenses() {
         <div className="card"><Empty icon="🔬" title="No lenses found" /></div>
       ) : (
         <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          {lenses.map(l => (
-            <div key={l.id} className="card p-5 card-hover">
-              <div className="flex items-start justify-between mb-3">
-                <span className={`badge badge-${TYPE_COLORS[l.lensType] || 'gray'}`}>{l.lensType.replace('_', ' ')}</span>
-                <span className="badge-gray badge">{l.lensIndex}</span>
-              </div>
-              <h3 className="font-bold text-slate-900 text-sm mb-1">{l.name}</h3>
-              {l.brand && <div className="text-xs text-slate-500 mb-3">{l.brand}</div>}
-              <div className="flex flex-wrap gap-1.5 mb-3">
-                {(l.coating || []).map(c => (
-                  <span key={c} className="inline-flex items-center gap-1 text-xs bg-teal-50 text-teal-700 rounded-full px-2.5 py-0.5 font-medium">
-                    <Check size={9} /> {c}
+          {lenses.map(l => {
+            const isOutOfStock = l.stockQty === 0;
+            const isLowStock = l.stockQty > 0 && l.stockQty <= 5;
+
+            return (
+              <div key={l.id} className="card p-5 card-hover relative">
+
+                {/* 🔴 OUT OF STOCK OVERLAY */}
+                {isOutOfStock && (
+                  <div className="absolute inset-0 bg-gray-200/70 flex items-center justify-center rounded-xl z-10">
+                    <span className="bg-red-500 text-white px-4 py-1.5 rounded-full text-sm font-semibold shadow">
+                      Out of Stock
+                    </span>
+                  </div>
+                )}
+
+                <div className="flex items-start justify-between mb-3">
+                  <span className={`badge badge-${TYPE_COLORS[l.lensType] || 'gray'}`}>
+                    {l.lensType.replace('_', ' ')}
                   </span>
-                ))}
-              </div>
-              <div className="flex items-center justify-between mt-auto pt-3 border-t border-slate-100">
-                <div>
-                  <div className="font-bold text-slate-900">{fmt(l.sellingPrice)}</div>
-                  <div className="text-xs text-slate-400">Stock: {l.stockQty}</div>
+                  <span className="badge-gray badge">{l.lensIndex}</span>
                 </div>
-                <div className="flex gap-2">
-                  <button onClick={() => { setSelectedLens(l); setPrintQty(1); }} className="btn-secondary btn-xs">Label</button>
-                  {canManageLenses && (
-                    <>
-                      <button onClick={() => openEdit(l)} className="btn-ghost btn-xs">Edit</button>
-                      <button onClick={async () => { if (confirm('Delete?')) { await api.delete(`/lenses/${l.id}`); load(); } }} className="btn-danger btn-xs">Del</button>
-                    </>
-                  )}
+
+                <h3 className="font-bold text-slate-900 text-sm mb-1">{l.name}</h3>
+                {l.brand && <div className="text-xs text-slate-500 mb-3">{l.brand}</div>}
+
+                <div className="flex flex-wrap gap-1.5 mb-3">
+                  {(l.coating || []).map(c => (
+                    <span key={c} className="inline-flex items-center gap-1 text-xs bg-teal-50 text-teal-700 rounded-full px-2.5 py-0.5 font-medium">
+                      <Check size={9} /> {c}
+                    </span>
+                  ))}
+                </div>
+
+                <div className="flex items-center justify-between mt-auto pt-3 border-t border-slate-100">
+                  <div>
+                    <div className="font-bold text-slate-900">{fmt(l.sellingPrice)}</div>
+
+                    {/* 🟡 STOCK BADGE */}
+                    <div className="text-xs mt-1">
+                      {isOutOfStock ? (
+                        <span className="text-white font-bold text-sm bg-red-500 rounded-lg px-2.5 py-1">
+                          Out of Stock
+                        </span>
+                      ) : isLowStock ? (
+                        <span className="px-2 py-0.5 rounded-full bg-orange-100 text-orange-600 font-semibold">
+                          Low • {l.stockQty}
+                        </span>
+                      ) : (
+                        <span className="text-slate-400">Stock: {l.stockQty}</span>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="flex gap-2 relative z-20">
+                    <button
+                      onClick={() => { setSelectedLens(l); setPrintQty(1); }}
+                      className="btn-secondary btn-xs"
+                    >
+                      Label
+                    </button>
+
+                    {/* ❌ Disable Edit/Delete if Out of Stock */}
+                    {canManageLenses && !isOutOfStock && (
+                      <>
+                        <button onClick={() => openEdit(l)} className="btn-ghost btn-xs">
+                          Edit
+                        </button>
+                        <button
+                          onClick={async () => {
+                            if (confirm('Delete?')) {
+                              await api.delete(`/lenses/${l.id}`);
+                              load();
+                            }
+                          }}
+                          className="btn-danger btn-xs"
+                        >
+                          Del
+                        </button>
+                      </>
+                    )}
+                  </div>
                 </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
 
