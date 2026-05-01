@@ -108,9 +108,10 @@ export function printLabels(labelHtml) {
           display: flex;
           flex-direction: column;
           justify-content: center;
+          align-items: center;
 
-          padding-left: 2.5mm;  
-          padding-right: 1mm;
+          padding: 0 2mm;          
+          text-align: center;
 
           box-sizing: border-box;
           line-height: 1.1;
@@ -135,6 +136,12 @@ export function printLabels(labelHtml) {
           -webkit-line-clamp: 2;
           -webkit-box-orient: vertical;
           overflow: hidden;
+        }
+
+        .heading,
+        .subheading,
+        .price {
+          width: 100%;
         }
 
         .price {
