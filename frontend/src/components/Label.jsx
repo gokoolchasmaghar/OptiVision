@@ -214,6 +214,7 @@ export default function Label({ product }) {
           display: "flex",
           background: "#fff",
           border: "1px solid #ccc",
+          borderRadius: "8px",
           overflow: "hidden",
         }}
       >
@@ -274,7 +275,7 @@ export default function Label({ product }) {
               textOverflow: "ellipsis",
             }}
           >
-            {product.model || product.name || ""}
+            {product.name || product.model || ""}
           </div>
 
           <div style={{ fontSize: "10px" }}>

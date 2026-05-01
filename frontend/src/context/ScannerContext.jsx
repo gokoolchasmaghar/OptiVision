@@ -1,6 +1,5 @@
-import { createContext, useContext, useEffect, useState } from "react";
+import { createContext, useContext, useEffect, useState, useRef } from "react";
 import api from "../services/api";
-import { useRef } from "react";
 import toast from "react-hot-toast";
 
 const ScannerContext = createContext();
@@ -11,30 +10,22 @@ export const ScannerProvider = ({ children }) => {
   const [buffer, setBuffer] = useState("");
   const [product, setProduct] = useState(null);
   const timeoutRef = useRef(null);
-  const lastScanRef = useRef("");
+  const lastScanRef = useRef(0);
 
+  // ─────────────────────────────────────────────
+  // 🔍 SCANNER LISTENER
+  // ─────────────────────────────────────────────
   useEffect(() => {
-    let timeout;
-
     const handleKeyDown = async (e) => {
-      // 1. Ignore typing inside inputs / textareas
       const tag = document.activeElement.tagName;
       if (tag === "INPUT" || tag === "TEXTAREA") return;
 
-      // 2. Ignore special/control keys
-      if (
-        e.key === "Shift" ||
-        e.key === "Control" ||
-        e.key === "Alt" ||
-        e.key === "Meta"
-      ) return;
+      if (["Shift", "Control", "Alt", "Meta"].includes(e.key)) return;
 
       if (e.key === "Enter") {
         if (!buffer.trim()) return;
 
         const now = Date.now();
-
-        // Prevent ultra-fast duplicate scans
         if (now - lastScanRef.current < 300) return;
         lastScanRef.current = now;
 
@@ -42,29 +33,28 @@ export const ScannerProvider = ({ children }) => {
 
         try {
           const res = await api.get(`/products/scan/${buffer}`);
-
-          // Replace popup instantly
           setProduct(res.data);
 
-          // SUCCESS SOUND
-          toast.success(`Scanned: ${res.data.data?.name || res.data.data?.brand || res.data.data?.model || 'Item'}`);
-          // new Audio("/success.mp3").play();
+          toast.success(
+            `Scanned: ${
+              res.data?.data?.name ||
+              res.data?.data?.brand ||
+              res.data?.data?.model ||
+              "Item"
+            }`
+          );
         } catch {
           toast.error(`No product found for barcode: ${buffer}`);
-          // new Audio("/error.mp3").play();
         }
 
         setBuffer("");
         return;
       }
 
-      // 4. Only allow valid characters (avoid junk)
       if (e.key.length > 1) return;
 
-      // 5. Append to buffer
       setBuffer((prev) => prev + e.key);
 
-      // 6. Reset buffer if typing is slow (not a scanner)
       clearTimeout(timeoutRef.current);
       timeoutRef.current = setTimeout(() => {
         setBuffer("");
@@ -74,6 +64,53 @@ export const ScannerProvider = ({ children }) => {
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [buffer]);
+
+  // ─────────────────────────────────────────────
+  // 🔥 AUTO CLOSE POPUP (Retail UX)
+  // ─────────────────────────────────────────────
+  useEffect(() => {
+    if (!product) return;
+
+    const timer = setTimeout(() => {
+      setProduct(null);
+    }, 5000);
+
+    return () => clearTimeout(timer);
+  }, [product]);
+
+  // ─────────────────────────────────────────────
+  // 🧩 FIELD COMPONENT (SAFE)
+  // ─────────────────────────────────────────────
+  const Field = ({ label, value, highlight }) => (
+    <div
+      className={`rounded-lg p-3 ${
+        highlight ? "bg-green-50" : "bg-gray-50"
+      }`}
+    >
+      <div
+        className={`text-xs ${
+          highlight ? "text-green-600" : "text-gray-400"
+        }`}
+      >
+        {label}
+      </div>
+      <div
+        className={`font-medium ${
+          highlight ? "text-green-700 font-bold" : ""
+        }`}
+      >
+        {value !== undefined && value !== null && value !== ""
+          ? value
+          : "-"}
+      </div>
+    </div>
+  );
+
+  // ─────────────────────────────────────────────
+  // 🛡️ SAFE DATA EXTRACTION
+  // ─────────────────────────────────────────────
+  const data = product?.data || {};
+  const type = (product?.type || "").toLowerCase();
 
   return (
     <ScannerContext.Provider value={{ product, setProduct }}>
@@ -98,50 +135,72 @@ export const ScannerProvider = ({ children }) => {
             </button>
 
             {/* Header */}
-            <div className="text-center mb-5">
-              <div className="text-xs uppercase tracking-wide text-gray-400">
-                {product.type}
+            <div className="text-center mb-4">
+              <div className="text-xs text-gray-400 font-mono">
+                {data.barcode}
               </div>
-              <h2 className="text-xl font-bold text-gray-800 mt-1">
-                {product.data.name || product.data.model}
+
+              <h2 className="text-lg font-bold text-gray-800 mt-1">
+                {data.name || data.model}
               </h2>
+
               <p className="text-sm text-gray-500">
-                {product.data.brand || "No Brand"}
+                {data.brand || "No Brand"}
               </p>
             </div>
 
-            {/* Info Grid */}
+            {/* Details */}
             <div className="grid grid-cols-2 gap-3 text-sm">
-              <div className="bg-gray-50 rounded-lg p-3">
-                <div className="text-gray-400 text-xs">Barcode</div>
-                <div className="font-medium">{product.data.barcode}</div>
-              </div>
+              {/* FRAME */}
+              {type === "frame" && (
+                <>
+                  <Field label="Model" value={data.model} />
+                  <Field label="Shape" value={data.shape} />
+                  <Field label="Size" value={data.size} />
+                  <Field label="Color" value={data.color} />
+                  <Field label="Material" value={data.material} />
+                  <Field label="Gender" value={data.gender} />
+                </>
+              )}
 
-              <div className="bg-gray-50 rounded-lg p-3">
-                <div className="text-gray-400 text-xs">Stock</div>
-                <div
-                  className={`font-semibold ${product.data.stockQty <= product.data.lowStockAlert
-                    ? "text-red-500"
-                    : "text-gray-800"
-                    }`}
-                >
-                  {product.data.stockQty}
-                </div>
-              </div>
+              {/* LENS */}
+              {type === "lens" && (
+                <>
+                  <Field label="Lens Type" value={data.lensType} />
+                  <Field label="Index" value={data.lensIndex} />
+                </>
+              )}
 
-              <div className="bg-green-50 rounded-lg p-3">
-                <div className="text-green-600 text-xs">Selling</div>
-                <div className="font-bold text-green-700">
-                  ₹{product.data.sellingPrice}
-                </div>
-              </div>
+              {/* ACCESSORY */}
+              {type === "accessory" && (
+                <>
+                  <Field label="Category" value={data.category} />
+                </>
+              )}
 
-              <div className="bg-gray-50 rounded-lg p-3">
-                <div className="text-gray-400 text-xs">Purchase</div>
-                <div className="font-medium">
-                  ₹{product.data.purchasePrice}
-                </div>
-              </div>
+              {/* COMMON */}
+              <Field
+                label="Stock"
+                value={
+                  <span
+                    className={
+                      data.stockQty <= data.lowStockAlert
+                        ? "text-red-500 font-semibold"
+                        : ""
+                    }
+                  >
+                    {data.stockQty}
+                  </span>
+                }
+              />
+
+              <Field label="Low Alert" value={data.lowStockAlert} />
+
+              <Field
+                label="Selling"
+                value={`₹${data.sellingPrice}`}
+                highlight
+              />
             </div>
 
             {/* Footer */}
@@ -152,7 +211,6 @@ export const ScannerProvider = ({ children }) => {
               >
                 Close
               </button>
-
             </div>
           </div>
         </div>
