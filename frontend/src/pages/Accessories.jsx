@@ -19,6 +19,7 @@ export default function Accessories() {
     const [editingItem, setEditingItem] = useState(null);
     const [selectedItem, setSelectedItem] = useState(null);
     const [printQty, setPrintQty] = useState(1);
+    const [scanInput, setScanInput] = useState('');
 
     const [showModal, setShowModal] = useState(false);
     const [form, setForm] = useState({
@@ -102,6 +103,42 @@ export default function Accessories() {
         }
     };
 
+    const handleScan = async (e) => {
+        if (e.key !== 'Enter') return;
+
+        const raw = scanInput;
+
+        const barcode = String(raw)
+            .replace(/[\r\n]+/g, '')
+            .trim();
+
+        console.log("RAW:", raw);
+        console.log("CLEAN:", barcode);
+
+        if (!barcode) return;
+
+        try {
+            const res = await api.get(`/accessories/barcode/${barcode}`);
+            const product = res.data?.data;
+
+            if (!product) {
+                toast.error("Product not found");
+                return;
+            }
+
+            // 👉 Open label modal directly
+            setSelectedItem(product);
+            setPrintQty(1);
+
+            toast.success("Product found");
+
+        } catch {
+            toast.error("Product not found");
+        }
+
+        setScanInput('');
+    };
+
     return (
         <div>
             {/* 🔷 Header */}
@@ -126,10 +163,39 @@ export default function Accessories() {
                 <div className="relative flex-1">
                     <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
                     <input
+                        autoFocus
                         className="field-input pl-8"
-                        placeholder="Search name, brand..."
+                        placeholder="Search or scan barcode..."
                         value={search}
                         onChange={e => setSearch(e.target.value)}
+                        onKeyDown={async (e) => {
+                            if (e.key !== "Enter") return;
+
+                            const barcode = String(search)
+                                .replace(/[\r\n]+/g, "")
+                                .trim();
+
+                            if (!barcode) return;
+
+                            try {
+                                const res = await api.get(`/accessories/barcode/${barcode}`);
+                                const product = res.data?.data;
+
+                                if (!product) {
+                                    toast.error("Product not found");
+                                    return;
+                                }
+
+                                // 👉 open label modal (same flow you already use)
+                                setSelectedItem(product);
+                                setPrintQty(1);
+
+                            } catch {
+                                toast.error("Product not found");
+                            }
+
+                            setSearch(""); // clear after scan
+                        }}
                     />
                 </div>
 
