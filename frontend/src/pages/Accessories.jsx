@@ -236,8 +236,10 @@ export default function Accessories() {
                                                     category: i.category || 'SUNGLASSES',
                                                     sellingPrice: i.sellingPrice || '',
                                                     purchasePrice: i.purchasePrice || '',
+                                                    modelCode: i.modelCode || '',
                                                     stockQty: i.stockQty || '',
                                                     barcode: i.barcode || '',
+                                                    lowStockAlert: i.lowStockAlert || '2',
                                                 });
                                                 setShowModal(true);
                                             }}

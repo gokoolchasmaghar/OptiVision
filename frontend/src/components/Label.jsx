@@ -190,7 +190,7 @@ function buildBarcodeSvg(barcode) {
       margin: 0,         // ✅ removes vertical shift
       textMargin: 0,
       displayValue: true,
-      fontSize: 8,
+      fontSize: 9,
     });
 
     return svg.outerHTML;
@@ -216,7 +216,7 @@ export default function Label({ product }) {
       margin: 0,
       textMargin: 0,
       displayValue: true,
-      fontSize: 8,
+      fontSize: 9,
     });
   }, [product]);
 
