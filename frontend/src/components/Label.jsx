@@ -60,9 +60,12 @@ export function printLabels(labelHtml) {
           position: relative;
           overflow: hidden;
 
+          page-break-inside: avoid;
+        }
+         
+        .label:not(:last-child) {
           page-break-after: always;
           break-after: page;
-          page-break-inside: avoid;
         }
 
         /* 🔹 FOLD GUIDE (center) */
