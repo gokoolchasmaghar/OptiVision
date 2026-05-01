@@ -4,6 +4,9 @@ const { launchPdfBrowser } = require('../utils/pdfBrowser');
 const BRAND_NAME = 'GO-KOOL CHASMAGHAR';
 const BRAND_ADDRESS = '235, Parbirata G.T. Road, Sripally near SBI, Burdwan, Purba Bardhaman, West Bengal - 713103';
 
+// ─────────────────────────────────────────
+// Helpers
+// ─────────────────────────────────────────
 const escapeHtml = value =>
   String(value ?? '')
     .replace(/&/g, '&amp;')
@@ -15,22 +18,19 @@ const escapeHtml = value =>
 const formatSigned = value => {
   if (value === null || value === undefined || value === '') return '--';
   const n = Number(value);
-  if (!Number.isFinite(n)) return '--';
-  return n.toFixed(2);
+  return Number.isFinite(n) ? n.toFixed(2) : '--';
 };
 
 const formatAxis = value => {
   if (value === null || value === undefined || value === '') return '--';
   const n = Number(value);
-  if (!Number.isFinite(n)) return '--';
-  return String(Math.trunc(n));
+  return Number.isFinite(n) ? String(Math.trunc(n)) : '--';
 };
 
 const formatPd = value => {
   if (value === null || value === undefined || value === '') return '--';
   const n = Number(value);
-  if (!Number.isFinite(n)) return '--';
-  return n.toFixed(0);
+  return Number.isFinite(n) ? n.toFixed(0) : '--';
 };
 
 const formatEyeTestDate = date => {
@@ -41,52 +41,23 @@ const formatEyeTestDate = date => {
   return `${weekday}, ${day} ${month} ${year}`;
 };
 
-const buildOldStyleTable = rx => `
-  <table class="rx-table">
-    <thead>
-      <tr>
-        <th></th>
-        <th>Right Eye (OD)</th>
-        <th>Left Eye (OS)</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td>SPH</td>
-        <td>${escapeHtml(formatSigned(rx.rightSph))}</td>
-        <td>${escapeHtml(formatSigned(rx.leftSph))}</td>
-      </tr>
-      <tr>
-        <td>CYL</td>
-        <td>${escapeHtml(formatSigned(rx.rightCyl))}</td>
-        <td>${escapeHtml(formatSigned(rx.leftCyl))}</td>
-      </tr>
-      <tr>
-        <td>AXIS</td>
-        <td>${escapeHtml(formatAxis(rx.rightAxis))}</td>
-        <td>${escapeHtml(formatAxis(rx.leftAxis))}</td>
-      </tr>
-      <tr>
-        <td>ADD</td>
-        <td>${escapeHtml(formatSigned(rx.rightAdd))}</td>
-        <td>${escapeHtml(formatSigned(rx.leftAdd))}</td>
-      </tr>
-      <tr>
-        <td>PD</td>
-        <td>${escapeHtml(formatPd(rx.rightPd ?? rx.pd))}</td>
-        <td>${escapeHtml(formatPd(rx.leftPd ?? rx.pd))}</td>
-      </tr>
-    </tbody>
-  </table>
-`;
-
+// ─────────────────────────────────────────
+// HTML Builder
+// ─────────────────────────────────────────
 const buildPrescriptionHtml = rx => {
   const testDate = rx.date ? new Date(rx.date) : new Date();
+
+  const storeName = escapeHtml(rx.customer?.store?.name || BRAND_NAME);
+  const storeAddress = escapeHtml(rx.customer?.store?.address || BRAND_ADDRESS);
+
   const customerName = escapeHtml(rx.customer?.name || 'Customer');
   const customerPhone = escapeHtml(rx.customer?.phone || '--');
-  const customerAge = rx.customer?.age !== null && rx.customer?.age !== undefined
-    ? `${escapeHtml(rx.customer.age)} yrs`
-    : '--';
+
+  const customerAge =
+    rx.customer?.age !== null && rx.customer?.age !== undefined
+      ? `${escapeHtml(rx.customer.age)} yrs`
+      : '--';
+
   const eyeTestDate = escapeHtml(formatEyeTestDate(testDate));
 
   return `
@@ -95,191 +66,235 @@ const buildPrescriptionHtml = rx => {
     <head>
       <meta charset="utf-8" />
       <style>
-        * { box-sizing: border-box; }
+        * { 
+          box-sizing: border-box; 
+          page-break-inside: avoid;
+        }
+
         body {
-          margin: 0;
-          padding: 28px 22px;
-          background: #f3f4f6;
-          font-family: Arial, sans-serif;
-          color: #111827;
+           margin: 0;
+            padding: 16px 20px;
+            background: #ffffff;
+            font-family: Arial, sans-serif;
+            color: #111827;
+
+            height: 148mm;          /* 🔥 match PDF height */
+            overflow: hidden;
         }
+
         .sheet {
-          width: 100%;
-          max-width: 760px;
-          margin: 0 auto;
+          max-width: 700px;
+          margin: auto;
         }
+
         .header {
           text-align: center;
-          margin-bottom: 14px;
-        }
-        .brand-mark {
-          font-size: 24px;
-          font-weight: 700;
-          letter-spacing: 0.4px;
-          color: #111827;
-          margin-bottom: 8px;
-        }
-        .title {
-          margin: 0;
-          font-size: 38px;
-          font-weight: 700;
-          color: #111827;
-          line-height: 1.05;
-        }
-        .divider {
-          border: none;
-          border-top: 1px solid #e5e7eb;
-          margin: 18px 0 20px;
-        }
-        .top-row {
-          display: flex;
-          gap: 18px;
-          align-items: stretch;
-          margin-bottom: 18px;
-        }
-        .customer-col {
-          flex: 1;
-          min-width: 210px;
-          padding-top: 4px;
-        }
-        .label {
-          color: #6b7280;
-          font-size: 14px;
-          margin-bottom: 6px;
-        }
-        .value-strong {
-          font-size: 34px;
-          font-weight: 700;
-          color: #111827;
-          line-height: 1.15;
-          margin-bottom: 8px;
-        }
-        .customer-meta {
-          color: #4b5563;
-          font-size: 13px;
-          line-height: 1.5;
-        }
-        .meta-card {
-          flex: 1.3;
-          background: #ffffff;
-          border: 1px solid #e5e7eb;
-          border-radius: 14px;
-          padding: 14px 16px;
-        }
-        .meta-row {
-          display: flex;
-          justify-content: space-between;
-          gap: 10px;
-          margin: 2px 0;
-          font-size: 14px;
-        }
-        .meta-row .k {
-          color: #6b7280;
-        }
-        .meta-row .v {
-          color: #111827;
-          font-weight: 600;
-          text-align: right;
-        }
-        .section-card {
-          background: #ffffff;
-          border: 1px solid #e5e7eb;
-          border-radius: 14px;
-          padding: 16px;
           margin-bottom: 16px;
         }
-        .section-title {
-          margin: 0 0 12px;
-          font-size: 30px;
-          font-weight: 700;
-          color: #111827;
+
+        .header,
+        .top {
+          flex-shrink: 0;
         }
-        .rx-table {
+
+        .top > div:first-child {
+          width: 220px;   /* left block fixed */
+        }
+
+        .title {
+          font-size: 24px;
+          font-weight: 600;
+          margin-top: 6px;
+        }
+
+        .divider {
+          border-top: 1px solid #e5e7eb;
+          margin: 18px 0;
+        }
+
+        .top {
+          display: flex;
+          justify-content: space-between;
+          align-items: flex-start;
+          gap: 60px;
+          margin-bottom: 24px;  
+        }
+
+        .label {
+          font-size: 12px;
+          color: #6b7280;
+        }
+
+        .meta {
+          margin-top: 6px;
+          font-size: 12px;
+          color: #6b7280;
+        }
+
+        .card {
+          flex: 1;
+          background: #f3f4f6;
+          border-radius: 12px;
+          padding: 14px;
+        }
+
+        .card-row {
+          display: grid;
+          grid-template-columns: 140px 1fr;
+          gap: 10px;
+          font-size: 13px;
+          margin-bottom: 6px;
+        }
+
+        .section {
+          background: #ffffff;
+          border: 1px solid #e5e7eb;
+          border-radius: 14px;
+          padding: 18px;
+          margin-bottom: 10px; 
+        }
+        
+        .section table {
+          flex: 1;
+        }
+
+        .section-title {
+          font-size: 17px;
+          font-weight: 600;
+          margin-bottom: 10px;
+        }
+
+        .name {
+          font-size: 20px;
+          font-weight: 600;
+        }
+
+        table {
           width: 100%;
           border-collapse: collapse;
-          font-size: 14px;
+          background: white;
+          border-radius: 12px;
+          overflow: hidden;
         }
-        .rx-table th,
-        .rx-table td {
-          border: 1px solid #d1d5db;
-          padding: 10px 8px;
+
+        th, td {
+          padding: 12px;   /* increased from 8 → FIXED */
           text-align: center;
-          color: #111827;
-        }
-        .rx-table thead th {
-          background: #f3f4f6;
-          font-weight: 700;
-        }
-        .rx-table tbody td:first-child {
-          background: #f9fafb;
-          font-weight: 700;
-          text-align: left;
-          padding-left: 12px;
-        }
-        .doctor-pill {
-          display: inline-block;
-          margin-top: 10px;
-          padding: 7px 12px;
-          border-radius: 999px;
-          border: 1px solid #fdba74;
-          background: #fff7ed;
-          color: #9a3412;
           font-size: 13px;
-          font-weight: 700;
         }
-        .foot {
+
+        thead {
+          background: #f9fafb;
+          font-weight: 600;
+        }
+
+        tbody td {
+          border: 1px solid #eef2f7;
+          color: #6b7280;   /* consistent grey for all values */
+        }
+
+        tbody td:first-child {
+          text-align: left;
+          font-weight: 500;
+          background: #f9fafb;
+          color: #6b7280;   /* same grey */
+        }
+
+        .footer {
+          text-align: center;
+          margin-top: 20px;
+          font-size: 11px;
           color: #6b7280;
-          font-size: 14px;
         }
+
       </style>
     </head>
+
     <body>
       <div class="sheet">
+
         <div class="header">
-          <div class="brand-mark">${escapeHtml(BRAND_NAME)}</div>
-          <h1 class="title">Eye Test Prescription</h1>
+          <h2>${storeName}</h2>
+          <div class="title">Eye Test Prescription</div>
         </div>
 
-        <hr class="divider" />
+        <div class="divider"></div>
 
-        <div class="top-row">
-          <div class="customer-col">
+        <div class="top">
+          <div>
             <div class="label">Customer Name</div>
-            <div class="value-strong">${customerName}</div>
-            <div class="customer-meta">Age: ${customerAge}</div>
-            <div class="customer-meta">Phone: ${customerPhone}</div>
+            <div class="name">${customerName}</div>
+            <div class="meta">
+              Age: ${customerAge}<br/>
+              Phone: ${customerPhone}
+            </div>
           </div>
 
-          <div class="meta-card">
-            <div class="meta-row">
-              <span class="k">Eye Test Date</span>
-              <span class="v">${eyeTestDate}</span>
+          <div class="card">
+            <div class="card-row">
+              <span>Eye Test Date</span>
+              <span>${eyeTestDate}</span>
             </div>
-            <div class="meta-row">
-              <span class="k">Store Address</span>
-              <span class="v">${escapeHtml(BRAND_ADDRESS)}</span>
+            <div class="card-row">
+              <span>Store Address</span>
+              <span>${storeAddress}</span>
             </div>
           </div>
         </div>
 
-        <section class="section-card">
-          <h2 class="section-title">Eye Power</h2>
-          ${buildOldStyleTable(rx)}
-          ${rx.lensType ? `
-            <div style="margin-top:10px; font-size:14px;">
-              <b>Lens Type:</b> ${escapeHtml(rx.lensType.replace('_', ' '))}
-            </div>
-          ` : ''}
-          ${rx.doctorName ? `<div class="doctor-pill">Doctor: ${escapeHtml(rx.doctorName)}</div>` : ''}
-        </section>
+        <div class="section">
+          <div class="section-title">Single Vision Power</div>
 
-        <div class="foot">Note: This is a system-generated prescription.</div>
+          <table>
+            <thead>
+              <tr>
+                <th>Rx</th>
+                <th>Spherical</th>
+                <th>Cylindrical</th>
+                <th>Axis</th>
+                <th>Add. Power</th>
+                <th>Pupil Distance</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>Right Eye</td>
+                <td>${escapeHtml(formatSigned(rx.rightSph))}</td>
+                <td>${escapeHtml(formatSigned(rx.rightCyl))}</td>
+                <td>${escapeHtml(formatAxis(rx.rightAxis))}</td>
+                <td>${escapeHtml(formatSigned(rx.rightAdd))}</td>
+                <td>${escapeHtml(formatPd(rx.rightPd ?? rx.pd))}</td>
+              </tr>
+              <tr>
+                <td>Left Eye</td>
+                <td>${escapeHtml(formatSigned(rx.leftSph))}</td>
+                <td>${escapeHtml(formatSigned(rx.leftCyl))}</td>
+                <td>${escapeHtml(formatAxis(rx.leftAxis))}</td>
+                <td>${escapeHtml(formatSigned(rx.leftAdd))}</td>
+                <td>${escapeHtml(formatPd(rx.leftPd ?? rx.pd))}</td>
+              </tr>
+            </tbody>
+          </table>
+
+          <div style="margin-top:10px; font-size:13px; color:#374151;">
+            <strong>Lens Type:</strong> ${escapeHtml(rx.lensType || '—')}
+          </div>
+
+        </div>
+
+        <div class="footer">
+          Note: This is a system-generated prescription.
+        </div>
+
       </div>
     </body>
   </html>
   `;
 };
 
+// ─────────────────────────────────────────
+// Controller
+// ─────────────────────────────────────────
 exports.downloadPrescription = async (req, res) => {
   try {
     const { id } = req.params;
@@ -316,7 +331,13 @@ exports.downloadPrescription = async (req, res) => {
         waitUntil: 'networkidle0',
         timeout: 30000
       });
-      pdf = await page.pdf({ format: 'A4', printBackground: true });
+
+      pdf = await page.pdf({
+        width: '210mm',
+        height: '148mm', // Half A4
+        printBackground: true
+      });
+
     } finally {
       await browser.close();
     }
@@ -328,6 +349,7 @@ exports.downloadPrescription = async (req, res) => {
     });
 
     return res.end(pdf);
+
   } catch (err) {
     console.error(err);
     return res.status(500).json({ success: false, message: 'PDF generation failed' });
