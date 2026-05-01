@@ -46,14 +46,22 @@ export function printLabels(labelHtml) {
         @media print {
           @page {
             size: 70mm 20mm;
+            margin: 0mm;
+          }
+          html, body {
+            margin: 0;
+            padding: 0;
+            width: 70mm;
+            height: 20mm;
+          }
+          .container {
             margin: 0;
           }
-          body { margin: 0; }
         }
 
         .container {
           width: 70mm;
-          margin: 0 auto;   /* centres the 70mm label on the 100mm roll */
+          margin: 0 auto;
         }
 
         /* One label per physical label — force a page break after each */
@@ -61,31 +69,31 @@ export function printLabels(labelHtml) {
           width: 70mm;
           height: 20mm;
           margin: 0;
+          padding: 0;
 
           display: flex;
-          align-items: center;
-          justify-content: space-between;
+          align-items: stretch;
+          justify-content: flex-start;
 
           box-sizing: border-box;
-          padding: 0.5mm 0;
-
           overflow: hidden;
 
-          /* Critical: each label on its own page on the thermal roll */
+          /* Each label on its own page */
           break-after: page;
           page-break-after: always;
           break-inside: avoid;
         }
 
-        /* Left: Barcode Area */
+        /* Left: Barcode Area — 50% for exact fold */
         .barcode-section {
-          width: 56%;
+          width: 50%;
           display: flex;
           align-items: center;
           justify-content: center;
-          padding: 1mm 2mm;
-          border-right: 1px dashed #666;
+          padding: 1mm 1.5mm 1mm 1mm;
+          border-right: 1.5px dashed #555;
           overflow: hidden;
+          box-sizing: border-box;
         }
 
         .barcode-section svg {
@@ -93,16 +101,16 @@ export function printLabels(labelHtml) {
           height: auto;
         }
 
-        /* Right: Info Area */
+        /* Right: Info Area — 50% for exact fold */
         .details-section {
-          width: 44%;
-          /* FIX: removed margin-left:2mm — was doubling up with padding-left */
-          padding-left: 2mm;
+          width: 50%;
+          padding: 1mm 1mm 1mm 2.5mm;
           display: flex;
           flex-direction: column;
           justify-content: center;
           line-height: 1.2;
           overflow: hidden;
+          box-sizing: border-box;
         }
 
         .heading {
