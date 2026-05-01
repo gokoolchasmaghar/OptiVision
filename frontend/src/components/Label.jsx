@@ -3,7 +3,7 @@ import JsBarcode from "jsbarcode";
 import toast from "react-hot-toast";
 
 // ─────────────────────────────────────────────────────────────
-// 🖨️ PRINT HELPER — TVS LP 46 Dlite | 100mm roll | 20mm label
+// 🖨️ PRINT HELPER (FIXED FOR THERMAL PRINTER)
 // ─────────────────────────────────────────────────────────────
 export function printLabels(labelHtml) {
   const win = window.open("", "_blank", "width=600,height=400");
@@ -28,98 +28,97 @@ export function printLabels(labelHtml) {
 
         body {
           font-family: sans-serif;
+          width: 100mm;
           background: #fff;
-          width: 100mm;   /* full roll width — needed for margin:auto to centre the 70mm container */
         }
 
-        /*
-          TVS LP 46 Dlite:
-            Physical roll width : 100mm
-            Printable width     : ~70mm (hardware margin ~4mm each side)
-            Label height        : 20mm
-
-          ⚠️ NOTE: @page size is a CSS hint only.
-          Thermal drivers (TVS LP 46 Dlite) ignore it and use the paper size
-          set in Windows → Devices & Printers → Printing Preferences → Paper Size.
-          Make sure that is set to 100mm × 20mm (or your label stock size).
-        */
         @media print {
           @page {
-            size: 70mm 20mm;
-            margin: 0mm;
+            size: 100mm 20mm; /* MUST match printer */
+            margin: 0;
           }
+
           html, body {
+            width: 100mm;
             margin: 0;
             padding: 0;
-            width: 70mm;
-            height: 20mm;
           }
+
           .container {
-            margin: 0;
+            width: 70mm;
+            margin-left: 0; /* ❗ critical fix */
           }
         }
 
         .container {
           width: 70mm;
-          margin: 0 auto;
-          padding-top: 1mm;
         }
 
-        /* One label per physical label — force a page break after each */
         .label {
           width: 70mm;
           height: 20mm;
-          margin: 0;
-          padding: 0;
-
-          display: flex;
-          align-items: center;
-          justify-content: flex-start;
-
-          box-sizing: border-box;
+          position: relative;
           overflow: hidden;
 
-          /* Each label on its own page */
-          break-after: page;
           page-break-after: always;
-          break-inside: avoid;
+          break-after: page;
+          page-break-inside: avoid;
         }
 
-        /* Left: Barcode Area — 50% for exact fold */
+        /* 🔹 FOLD GUIDE (center) */
+        .label::after {
+          content: "";
+          position: absolute;
+          left: calc(35mm - 0.5mm);
+          top: 4mm;
+          bottom: 4mm;
+
+          border-left: 1px dashed #888;   /* lighter = better for manual fold */
+        }
+
+        /* 🔹 LEFT: BARCODE */
         .barcode-section {
-          width: 50%;
+          position: absolute;
+          left: 0;
+          width: 35mm;
+          height: 100%;
+
           display: flex;
           align-items: center;
           justify-content: center;
-          padding: 1.2mm 1mm 1.2mm 1mm;
-          border-right: 1.5px dashed #555;
-          overflow: hidden;
+
+          padding-right: 2.5mm;   /* 👈 more breathing space */
           box-sizing: border-box;
         }
 
         .barcode-section svg {
           max-width: 100%;
           height: auto;
+          display: block;
+          margin: auto;
         }
 
-        /* Right: Info Area — 50% for exact fold */
+        /* RIGHT DETAILS */
         .details-section {
-          width: 50%;
-          padding: 1.2mm 1mm;
+          position: absolute;
+          left: 35mm;
+          width: 35mm;
+          height: 100%;
+
           display: flex;
           flex-direction: column;
           justify-content: center;
-          line-height: 1.2;
-          overflow: hidden;
+
+          padding-left: 2.5mm;  
+          padding-right: 1mm;
+
           box-sizing: border-box;
+          line-height: 1.1;
         }
 
         .heading {
           font-weight: bold;
           font-size: 9.5px;
-
-          white-space: normal;
-          word-break: break-word;
           line-height: 1.1;
 
           display: -webkit-box;
@@ -130,9 +129,6 @@ export function printLabels(labelHtml) {
 
         .subheading {
           font-size: 8.5px;
-
-          white-space: normal;
-          word-break: break-word;
           line-height: 1.1;
 
           display: -webkit-box;
@@ -148,52 +144,54 @@ export function printLabels(labelHtml) {
         }
       </style>
     </head>
+
     <body>
       <div class="container">${labelHtml}</div>
+
       <script>
         window.onload = () => {
           setTimeout(() => {
             window.focus();
             window.print();
             window.close();
-          }, 300);
+          }, 250);
         };
       <\/script>
     </body>
     </html>
   `);
+
   win.document.close();
 }
 
 // ─────────────────────────────────────────────────────────────
-// 🔢 BARCODE GENERATOR
+// 🔢 BARCODE GENERATOR (BALANCED)
 // ─────────────────────────────────────────────────────────────
 function buildBarcodeSvg(barcode) {
   if (!barcode) return "";
+
   try {
     const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
 
     JsBarcode(svg, barcode, {
       format: "CODE128",
-      // FIX: reduced from 1.0 → 0.8 so long barcodes (13+ digits) fit within 56% of 70mm
-      // At width:1.0 a 13-digit CODE128 is ~160px wide but the container is only ~113px
       width: 0.8,
-      height: 18,
+      height: 15,        // ✅ balanced height
+      margin: 0,         // ✅ removes vertical shift
       textMargin: 0,
-      margin: 2,
       displayValue: true,
       fontSize: 8,
     });
 
     return svg.outerHTML;
   } catch (e) {
-    console.error("Barcode generation error:", e);
+    console.error(e);
     return "";
   }
 }
 
 // ─────────────────────────────────────────────────────────────
-// 🧩 PREVIEW COMPONENT (UI)
+// 🧩 PREVIEW COMPONENT (MATCHES PRINT)
 // ─────────────────────────────────────────────────────────────
 export default function Label({ product }) {
   const ref = useRef(null);
@@ -203,11 +201,10 @@ export default function Label({ product }) {
 
     JsBarcode(ref.current, product.barcode, {
       format: "CODE128",
-      // FIX: match buildBarcodeSvg — width:0.8 so preview matches print
       width: 0.8,
-      height: 18,
+      height: 15,
+      margin: 0,
       textMargin: 0,
-      margin: 2,
       displayValue: true,
       fontSize: 8,
     });
@@ -217,10 +214,9 @@ export default function Label({ product }) {
 
   return (
     <div style={{ padding: "10px" }}>
-      {/* Preview is proportionally scaled to represent the 70mm × 20mm label */}
       <div
         style={{
-          width: "280px",   // ~4× the 70mm label for screen readability
+          width: "280px",
           height: "80px",
           display: "flex",
           background: "#fff",
@@ -229,82 +225,41 @@ export default function Label({ product }) {
           overflow: "hidden",
         }}
       >
-        {/* Barcode column */}
         <div
           style={{
-            flex: "0 0 56%",
-            maxWidth: "56%",
+            flex: "0 0 50%",
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
             borderRight: "1px dashed #ccc",
-            overflow: "hidden",
-            padding: "2px 4px 2px 2px",
+            padding: "4px",
           }}
         >
-          <svg
-            ref={ref}
-            style={{
-              maxWidth: "100%",
-              height: "auto",
-              maxHeight: "64px",
-            }}
-          />
+          <svg ref={ref} style={{ maxWidth: "100%", maxHeight: "64px" }} />
         </div>
 
-        {/* Details column */}
         <div
           style={{
-            flex: "0 0 44%",
-            maxWidth: "44%",
-            /* FIX: removed marginLeft — was doubling up with paddingLeft */
+            flex: "0 0 50%",
             padding: "4px 6px",
             display: "flex",
             flexDirection: "column",
             justifyContent: "center",
-            overflow: "hidden",
           }}
         >
-          <div
-            style={{
-              fontWeight: "bold",
-              fontSize: "12px",
-              whiteSpace: "normal",
-              wordBreak: "break-word",
-              lineHeight: "1.1",
-              display: "-webkit-box",
-              WebkitLineClamp: 2,
-              WebkitBoxOrient: "vertical",
-              overflow: "hidden",
-            }}
-          >
+          <div style={{ fontWeight: "bold", fontSize: "12px" }}>
             {product.brand}
           </div>
 
-          <div
-            style={{
-              fontSize: "11px",
-              whiteSpace: "nowrap",
-              overflow: "hidden",
-              textOverflow: "ellipsis",
-            }}
-          >
+          <div style={{ fontSize: "11px" }}>
             {product.name || product.model || ""}
           </div>
 
           <div style={{ fontSize: "10px" }}>
-            {[product.color, product.size ? `${product.size}` : ""]
-              .filter(Boolean)
-              .join(" | ")}
+            {[product.color, product.size].filter(Boolean).join(" | ")}
           </div>
 
-          <div
-            style={{
-              fontWeight: "bold",
-              fontSize: "12px",
-              marginTop: "2px",
-            }}
-          >
+          <div style={{ fontWeight: "bold", fontSize: "12px" }}>
             ₹{Number(product.sellingPrice || 0).toLocaleString("en-IN")}
           </div>
         </div>
@@ -314,7 +269,7 @@ export default function Label({ product }) {
 }
 
 // ─────────────────────────────────────────────────────────────
-// 🛡️ HTML SANITIZER
+// 🛡️ SANITIZER
 // ─────────────────────────────────────────────────────────────
 function escapeHtml(str) {
   return String(str ?? "")
@@ -332,61 +287,29 @@ export function PrintLabelButton({ product, quantity = 1, className = "" }) {
     if (!product) return;
 
     const barcodeSvg = buildBarcodeSvg(product.barcode);
-
     const price = `₹${Number(product.sellingPrice || 0).toLocaleString("en-IN")}`;
 
-    let line1 = "";
-    let line2 = "";
-    let line3 = "";
+    let line1 = product.brand || "";
+    let line2 = product.model || product.name || "";
+    let line3 = [product.color, product.size].filter(Boolean).join(" | ");
 
-    // ✅ FRAME
-    if (product.model || product.size) {
-      line1 = product.brand || "";
-      line2 = product.model || "";
-      line3 = [
-        product.color,
-        product.size ? `${product.size}` : ""
-      ].filter(Boolean).join(" | ");
-    }
+    let html = "";
 
-    // ✅ LENS
-    else if (product.lensType || product.lensIndex) {
-      line1 = product.brand || "";
-      line2 = product.name || "";
-      line3 = [
-        product.lensType,
-        product.lensIndex || ""
-      ].filter(Boolean).join(" | ");
-    }
-
-    // ✅ ACCESSORY
-    else {
-      line1 = product.name || "";
-      line2 = product.category || "";
-      line3 = "";
-    }
-
-    let labelsHtml = "";
     for (let i = 0; i < quantity; i++) {
-      labelsHtml += `
-      <div class="label">
-        <div class="barcode-section">${barcodeSvg}</div>
-        <div class="details-section">
-
-          <div class="heading">${escapeHtml(line1)}</div>
-
-          ${line2 ? `<div class="subheading">${escapeHtml(line2)}</div>` : ""}
-
-          ${line3 ? `<div class="subheading">${escapeHtml(line3)}</div>` : ""}
-
-          <div class="price">${escapeHtml(price)}</div>
-
+      html += `
+        <div class="label">
+          <div class="barcode-section">${barcodeSvg}</div>
+          <div class="details-section">
+            <div class="heading">${escapeHtml(line1)}</div>
+            ${line2 ? `<div class="subheading">${escapeHtml(line2)}</div>` : ""}
+            ${line3 ? `<div class="subheading">${escapeHtml(line3)}</div>` : ""}
+            <div class="price">${price}</div>
+          </div>
         </div>
-      </div>
-    `;
+      `;
     }
 
-    printLabels(labelsHtml);
+    printLabels(html);
   };
 
   return (
