@@ -110,16 +110,29 @@ export function printLabels(labelHtml) {
 
         .heading {
           font-weight: bold;
-          font-size: 10px;
-          white-space: nowrap;
+          font-size: 9.5px;
+
+          white-space: normal;
+          word-break: break-word;
+          line-height: 1.1;
+
+          display: -webkit-box;
+          -webkit-line-clamp: 2;
+          -webkit-box-orient: vertical;
           overflow: hidden;
-          text-overflow: ellipsis;
         }
+
         .subheading {
-          font-size: 9px;
-          white-space: nowrap;
+          font-size: 8.5px;
+
+          white-space: normal;
+          word-break: break-word;
+          line-height: 1.1;
+
+          display: -webkit-box;
+          -webkit-line-clamp: 2;
+          -webkit-box-orient: vertical;
           overflow: hidden;
-          text-overflow: ellipsis;
         }
         .price {
           font-weight: bold;
@@ -156,11 +169,10 @@ function buildBarcodeSvg(barcode) {
     JsBarcode(svg, barcode, {
       format: "CODE128",
       width: 1.2,       // narrower bars to fit 58% of 70mm cleanly
-      height: 28,       // reduced from 34 — fits 20mm label height with room to breathe
+      height: 24,       // reduced from 34 — fits 20mm label height with room to breathe
       textMargin: 1,
       displayValue: true,
-      fontSize: 8,      // reduced from 8 to avoid clipping at bottom
-      marginBottom: '4px',
+      fontSize: 10,
     });
 
     /*
@@ -194,7 +206,7 @@ export default function Label({ product }) {
     JsBarcode(ref.current, product.barcode, {
       format: "CODE128",
       width: 1.2,
-      height: 28,
+      height: 24,
       textMargin: 1,
       displayValue: true,
       fontSize: 10,
@@ -259,9 +271,13 @@ export default function Label({ product }) {
             style={{
               fontWeight: "bold",
               fontSize: "12px",
-              whiteSpace: "nowrap",
+              whiteSpace: "normal",
+              wordBreak: "break-word",
+              lineHeight: "1.1",
+              display: "-webkit-box",
+              WebkitLineClamp: 2,
+              WebkitBoxOrient: "vertical",
               overflow: "hidden",
-              textOverflow: "ellipsis",
             }}
           >
             {product.brand}
@@ -279,11 +295,11 @@ export default function Label({ product }) {
           </div>
 
           <div style={{ fontSize: "10px" }}>
-            {[product.color, product.size ? `Size: ${product.size}` : ""]
+            {[product.color, product.size ? `${product.size}` : ""]
               .filter(Boolean)
               .join(" | ")}
           </div>
-
+          
           <div
             style={{
               fontWeight: "bold",
@@ -319,31 +335,57 @@ export function PrintLabelButton({ product, quantity = 1, className = "" }) {
 
     const barcodeSvg = buildBarcodeSvg(product.barcode);
 
-    const heading = [product.brand, product.model]
-      .filter(Boolean)
-      .join(" ");
-
-    const subHeading = [
-      product.color,
-      product.size ? `Size: ${product.size}` : "",
-    ]
-      .filter(Boolean)
-      .join(" ");
-
     const price = `₹${Number(product.sellingPrice || 0).toLocaleString("en-IN")}`;
+
+    let line1 = "";
+    let line2 = "";
+    let line3 = "";
+
+    // ✅ FRAME
+    if (product.model || product.size) {
+      line1 = product.brand || "";
+      line2 = product.model || "";
+      line3 = [
+        product.color,
+        product.size ? `${product.size}` : ""
+      ].filter(Boolean).join(" | ");
+    }
+
+    // ✅ LENS
+    else if (product.lensType || product.lensIndex) {
+      line1 = product.brand || "";
+      line2 = product.name || "";
+      line3 = [
+        product.lensType,
+        product.lensIndex || ""
+      ].filter(Boolean).join(" | ");
+    }
+
+    // ✅ ACCESSORY
+    else {
+      line1 = product.name || "";
+      line2 = product.category || "";
+      line3 = "";
+    }
 
     let labelsHtml = "";
     for (let i = 0; i < quantity; i++) {
       labelsHtml += `
-        <div class="label">
-          <div class="barcode-section">${barcodeSvg}</div>
-          <div class="details-section">
-            <div class="heading">${escapeHtml(heading)}</div>
-            <div class="subheading">${escapeHtml(subHeading)}</div>
-            <div class="price">${escapeHtml(price)}</div>
-          </div>
+      <div class="label">
+        <div class="barcode-section">${barcodeSvg}</div>
+        <div class="details-section">
+
+          <div class="heading">${escapeHtml(line1)}</div>
+
+          ${line2 ? `<div class="subheading">${escapeHtml(line2)}</div>` : ""}
+
+          ${line3 ? `<div class="subheading">${escapeHtml(line3)}</div>` : ""}
+
+          <div class="price">${escapeHtml(price)}</div>
+
         </div>
-      `;
+      </div>
+    `;
     }
 
     printLabels(labelsHtml);
