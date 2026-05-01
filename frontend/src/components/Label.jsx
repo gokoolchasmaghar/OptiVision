@@ -38,28 +38,24 @@ export function printLabels(labelHtml) {
             Label height        : 20mm
           We set @page to the physical stock size and centre the 70mm label.
         */
+
         @media print {
           @page {
-            size: 100mm 20mm;
+            size: 72mm 20mm;   /* exact printable width */
             margin: 0;
           }
           body { margin: 0; }
         }
 
         .container {
-          width: 100mm;
-          display: flex;
-          flex-direction: column;
-          align-items: center;
+          width: 72mm;
         }
 
         /* One label per physical label — force a page break after each */
         .label {
-          width: 70mm;
+          width: 72mm;
           height: 20mm;
-
-          /* Centre on the 100mm roll */
-          margin: 0 auto;
+          margin: 0;
 
           display: flex;
           align-items: center;
@@ -78,7 +74,7 @@ export function printLabels(labelHtml) {
 
         /* Left: Barcode Area */
         .barcode-section {
-          width: 60%;
+          width: 56%;
           display: flex;
           align-items: center;
           justify-content: center;
@@ -86,19 +82,15 @@ export function printLabels(labelHtml) {
           border-right: 1px dashed #666;
           overflow: hidden;
         }
-
-        /*
-          Keep the SVG at its natural pixel size — do NOT use width:100% here.
-          Percentage width distorts bar widths and breaks scannability.
-        */
+        
         .barcode-section svg {
-          max-width: 100%;
-          height: auto;
-        }
+            max-width: 100%;
+            height: auto;
+          }
 
         /* Right: Info Area */
         .details-section {
-          width: 40%;
+          width: 44%;
           padding-left: 1.5mm;
           display: flex;
           flex-direction: column;
@@ -168,11 +160,12 @@ function buildBarcodeSvg(barcode) {
 
     JsBarcode(svg, barcode, {
       format: "CODE128",
-      width: 1.2,       // narrower bars to fit 58% of 70mm cleanly
-      height: 24,       // reduced from 34 — fits 20mm label height with room to breathe
-      textMargin: 1,
+      width: 1.0,       // narrower bars to fit 58% of 70mm cleanly
+      height: 18,       
+      textMargin: 0,
+      margin: 2,
       displayValue: true,
-      fontSize: 10,
+      fontSize: 8,
     });
 
     /*
@@ -205,12 +198,12 @@ export default function Label({ product }) {
     */
     JsBarcode(ref.current, product.barcode, {
       format: "CODE128",
-      width: 1.2,
-      height: 24,
-      textMargin: 1,
+      width: 1.0,
+      height: 18,
+      textMargin: 0,
+      margin: 2,
       displayValue: true,
-      fontSize: 10,
-      marginBottom: '4px',
+      fontSize: 8,
     });
   }, [product]);
 
@@ -233,8 +226,8 @@ export default function Label({ product }) {
         {/* Barcode column */}
         <div
           style={{
-            flex: "0 0 55%",
-            maxWidth: "55%",
+            flex: "0 0 56%",
+            maxWidth: "56%",
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
@@ -257,8 +250,8 @@ export default function Label({ product }) {
         {/* Details column */}
         <div
           style={{
-            flex: "0 0 45%",
-            maxWidth: "45%",
+            flex: "0 0 44%",
+            maxWidth: "44%",
             marginLeft: "4px",
             padding: "4px 6px",
             display: "flex",
