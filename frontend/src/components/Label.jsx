@@ -62,6 +62,7 @@ export function printLabels(labelHtml) {
         .container {
           width: 70mm;
           margin: 0 auto;
+          padding-top: 1mm;
         }
 
         /* One label per physical label — force a page break after each */
@@ -72,7 +73,7 @@ export function printLabels(labelHtml) {
           padding: 0;
 
           display: flex;
-          align-items: stretch;
+          align-items: center;
           justify-content: flex-start;
 
           box-sizing: border-box;
@@ -90,7 +91,7 @@ export function printLabels(labelHtml) {
           display: flex;
           align-items: center;
           justify-content: center;
-          padding: 1mm 1.5mm 1mm 1mm;
+          padding: 1.2mm 1mm 1.2mm 1mm;
           border-right: 1.5px dashed #555;
           overflow: hidden;
           box-sizing: border-box;
@@ -104,7 +105,7 @@ export function printLabels(labelHtml) {
         /* Right: Info Area — 50% for exact fold */
         .details-section {
           width: 50%;
-          padding: 1mm 1mm 1mm 2.5mm;
+          padding: 1.2mm 1mm;
           display: flex;
           flex-direction: column;
           justify-content: center;
