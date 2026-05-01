@@ -29,6 +29,7 @@ export function printLabels(labelHtml) {
         body {
           font-family: sans-serif;
           background: #fff;
+          width: 100mm;   /* full roll width — needed for margin:auto to centre the 70mm container */
         }
 
         /*
@@ -52,6 +53,7 @@ export function printLabels(labelHtml) {
 
         .container {
           width: 70mm;
+          margin: 0 auto;   /* centres the 70mm label on the 100mm roll */
         }
 
         /* One label per physical label — force a page break after each */
