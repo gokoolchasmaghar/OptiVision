@@ -105,6 +105,7 @@ export function printLabels(labelHtml) {
           justify-content: center;
           line-height: 1.2;
           overflow: hidden;
+          margin-left: 2mm;
         }
 
         .heading {
@@ -158,8 +159,8 @@ function buildBarcodeSvg(barcode) {
       height: 28,       // reduced from 34 — fits 20mm label height with room to breathe
       textMargin: 1,
       displayValue: true,
-      fontSize: 7,      // reduced from 8 to avoid clipping at bottom
-      margin: 2,
+      fontSize: 8,      // reduced from 8 to avoid clipping at bottom
+      marginBottom: '4px',
     });
 
     /*
@@ -196,8 +197,8 @@ export default function Label({ product }) {
       height: 28,
       textMargin: 1,
       displayValue: true,
-      fontSize: 7,
-      margin: 2,
+      fontSize: 10,
+      marginBottom: '4px',
     });
   }, [product]);
 
@@ -245,6 +246,7 @@ export default function Label({ product }) {
           style={{
             flex: "0 0 45%",
             maxWidth: "45%",
+            marginLeft: "4px",
             padding: "4px 6px",
             display: "flex",
             flexDirection: "column",
