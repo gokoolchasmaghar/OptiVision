@@ -34,26 +34,29 @@ export function printLabels(labelHtml) {
         /*
           TVS LP 46 Dlite:
             Physical roll width : 100mm
-            Printable width     : ~72mm (hardware margin ~4mm each side)
+            Printable width     : ~70mm (hardware margin ~4mm each side)
             Label height        : 20mm
-          We set @page to the physical stock size and centre the 70mm label.
-        */
 
+          ⚠️ NOTE: @page size is a CSS hint only.
+          Thermal drivers (TVS LP 46 Dlite) ignore it and use the paper size
+          set in Windows → Devices & Printers → Printing Preferences → Paper Size.
+          Make sure that is set to 100mm × 20mm (or your label stock size).
+        */
         @media print {
           @page {
-            size: 72mm 20mm;   /* exact printable width */
+            size: 70mm 20mm;
             margin: 0;
           }
           body { margin: 0; }
         }
 
         .container {
-          width: 72mm;
+          width: 70mm;
         }
 
         /* One label per physical label — force a page break after each */
         .label {
-          width: 72mm;
+          width: 70mm;
           height: 20mm;
           margin: 0;
 
@@ -78,26 +81,26 @@ export function printLabels(labelHtml) {
           display: flex;
           align-items: center;
           justify-content: center;
-          padding: 1mm 2mm;   /* equal spacing both sides */
+          padding: 1mm 2mm;
           border-right: 1px dashed #666;
           overflow: hidden;
         }
-        
+
         .barcode-section svg {
-            max-width: 100%;
-            height: auto;
-          }
+          max-width: 100%;
+          height: auto;
+        }
 
         /* Right: Info Area */
         .details-section {
           width: 44%;
-          padding-left: 1.5mm;
+          /* FIX: removed margin-left:2mm — was doubling up with padding-left */
+          padding-left: 2mm;
           display: flex;
           flex-direction: column;
           justify-content: center;
           line-height: 1.2;
           overflow: hidden;
-          margin-left: 2mm;
         }
 
         .heading {
@@ -126,6 +129,7 @@ export function printLabels(labelHtml) {
           -webkit-box-orient: vertical;
           overflow: hidden;
         }
+
         .price {
           font-weight: bold;
           font-size: 10px;
@@ -160,20 +164,15 @@ function buildBarcodeSvg(barcode) {
 
     JsBarcode(svg, barcode, {
       format: "CODE128",
-      width: 1.0,       // narrower bars to fit 58% of 70mm cleanly
-      height: 18,       
+      // FIX: reduced from 1.0 → 0.8 so long barcodes (13+ digits) fit within 56% of 70mm
+      // At width:1.0 a 13-digit CODE128 is ~160px wide but the container is only ~113px
+      width: 0.8,
+      height: 18,
       textMargin: 0,
       margin: 2,
       displayValue: true,
       fontSize: 8,
     });
-
-    /*
-      ✅ FIX: Do NOT override width/height with "100%" here.
-      JsBarcode calculates pixel-precise dimensions for the bar widths.
-      Forcing percentage width stretches/squashes bars and breaks scannability.
-      The CSS rule `max-width: 100%` in the print stylesheet handles overflow safely.
-    */
 
     return svg.outerHTML;
   } catch (e) {
@@ -191,14 +190,10 @@ export default function Label({ product }) {
   useEffect(() => {
     if (!ref.current || !product?.barcode) return;
 
-    /*
-      ✅ FIX: Removed `ref.current.innerHTML = ""` before JsBarcode.
-      JsBarcode overwrites the SVG content itself — manual clearing caused
-      a visible blank flash on every re-render.
-    */
     JsBarcode(ref.current, product.barcode, {
       format: "CODE128",
-      width: 1.0,
+      // FIX: match buildBarcodeSvg — width:0.8 so preview matches print
+      width: 0.8,
       height: 18,
       textMargin: 0,
       margin: 2,
@@ -242,7 +237,6 @@ export default function Label({ product }) {
               maxWidth: "100%",
               height: "auto",
               maxHeight: "64px",
-              /* ✅ FIX: no explicit width/height — let JsBarcode control dimensions */
             }}
           />
         </div>
@@ -252,7 +246,7 @@ export default function Label({ product }) {
           style={{
             flex: "0 0 44%",
             maxWidth: "44%",
-            marginLeft: "4px",
+            /* FIX: removed marginLeft — was doubling up with paddingLeft */
             padding: "4px 6px",
             display: "flex",
             flexDirection: "column",
@@ -292,7 +286,7 @@ export default function Label({ product }) {
               .filter(Boolean)
               .join(" | ")}
           </div>
-          
+
           <div
             style={{
               fontWeight: "bold",
