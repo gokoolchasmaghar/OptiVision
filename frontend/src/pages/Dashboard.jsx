@@ -34,15 +34,10 @@ export default function Dashboard() {
 
   return (
     <div>
-      {/* PageHeader with NotificationBell injected via action slot */}
       <div className="flex items-start justify-between mb-6">
         <div>
           <h1 className="text-xl font-bold text-slate-800">Dashboard</h1>
           <p className="text-sm text-slate-500 mt-0.5">Today · {format(new Date(), 'EEEE, MMM d yyyy')}</p>
-        </div>
-        {/* Notification Bell — visible to all roles */}
-        <div className="flex items-center gap-2 pt-1">
-          <NotificationBell />
         </div>
       </div>
 

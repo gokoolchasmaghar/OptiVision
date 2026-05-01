@@ -3,11 +3,12 @@ import { Outlet, NavLink, useLocation, useNavigate } from 'react-router-dom';
 import {
   LayoutDashboard, Users, Glasses, Eye, ClipboardList,
   IndianRupee, Package, BarChart3, Settings, LogOut,
-  ChevronLeft, ChevronRight, Bell, Plus, Menu, X,
+  ChevronLeft, ChevronRight, Plus, Menu, X,
 } from 'lucide-react';
 import { useAuthStore } from '../../stores/authStore';
 import toast from 'react-hot-toast';
 import { isAdmin } from '../../utils/roles';
+import NotificationBell from '../NotificationBell';
 
 const NAV = [
   { to: '/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
@@ -150,10 +151,9 @@ export default function AppLayout() {
             <Menu size={17} />
           </button>
           <div className="flex-1" />
-          <button className="p-2 rounded-xl text-slate-500 hover:bg-slate-100 hover:text-slate-700 transition-colors relative">
-            <Bell size={17} />
-            <span className="absolute top-1.5 right-1.5 w-1.5 h-1.5 rounded-full bg-red-500" />
-          </button>
+
+          <NotificationBell />
+
           <div className="flex items-center gap-2 sm:gap-2.5 min-w-0">
             <div className="w-8 h-8 rounded-full flex items-center justify-center text-white font-bold text-xs"
               style={{ background: 'linear-gradient(135deg, #3b82f6, #8b5cf6)' }}>
