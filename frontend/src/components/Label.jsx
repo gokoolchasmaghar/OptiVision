@@ -57,12 +57,13 @@ export function printLabels(labelHtml) {
         .label {
           width: 70mm;
           height: 20mm;
-          position: relative;
+          display: flex;
+          flex-direction: row;
+          align-items: stretch;
           overflow: hidden;
-
           page-break-inside: avoid;
         }
-         
+
         .label:not(:last-child) {
           page-break-after: always;
           break-after: page;
@@ -90,7 +91,7 @@ export function printLabels(labelHtml) {
           align-items: center;
           justify-content: center;
 
-          padding-right: 2.5mm;   /* 👈 more breathing space */
+          padding: 0 1.25mm;   /* ✅ symmetric padding for even centering */
           box-sizing: border-box;
         }
 
