@@ -293,10 +293,10 @@ export default function Frames() {
                 placeholder="Scan or enter barcode number"
               />
               <button type="button" onClick={handleGenerateBarcode} className="btn-secondary btn-sm whitespace-nowrap" title="Auto-generate EAN-13">
-                🔄 Generate
+                🔄
               </button>
               <button type="button" onClick={toggleScanner} className={`btn-sm whitespace-nowrap ${scanning ? 'btn-danger' : 'btn-secondary'}`} title={scanning ? 'Stop camera' : 'Scan with camera'}>
-                {scanning ? '⏹ Stop' : '📷 Scan'}
+                {scanning ? '⏹' : '📷'}
               </button>
             </div>
 
