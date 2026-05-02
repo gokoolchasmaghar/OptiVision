@@ -1,10 +1,11 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import api from '../services/api';
 import { Plus, Search, Trash2 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import Label, { PrintLabelButton } from '../components/Label';
 import { useAuthStore } from '../stores/authStore';
 import { isAdmin } from '../utils/roles';
+import { Html5Qrcode } from 'html5-qrcode';
 
 const fmt = n => `₹${Number(n || 0).toLocaleString('en-IN')}`;
 
@@ -20,6 +21,9 @@ export default function Accessories() {
     const [selectedItem, setSelectedItem] = useState(null);
     const [printQty, setPrintQty] = useState(1);
     const [scanInput, setScanInput] = useState('');
+    const [scanning, setScanning] = useState(false);
+    const scannerRef = useRef(null);
+    const scannerReadyRef = useRef(false);
 
     const [showModal, setShowModal] = useState(false);
     const [form, setForm] = useState({
@@ -32,6 +36,72 @@ export default function Accessories() {
         barcode: '',
         modelCode: '',
     });
+
+    // ── Barcode generation ──────────────────────────────────────────────────────
+    const generateEAN13 = () => {
+        const digits = Array.from({ length: 12 }, () => Math.floor(Math.random() * 10));
+        const checksum = digits.reduce((sum, d, i) => sum + d * (i % 2 === 0 ? 1 : 3), 0);
+        const checkDigit = (10 - (checksum % 10)) % 10;
+        return [...digits, checkDigit].join('');
+    };
+
+    const handleGenerateBarcode = () => {
+        setForm(f => ({ ...f, barcode: generateEAN13() }));
+        toast.success('Barcode generated!');
+    };
+
+    // ── Scanner ─────────────────────────────────────────────────────────────────
+    const stopScanner = async () => {
+        scannerReadyRef.current = false;
+        if (scannerRef.current) {
+            try { await scannerRef.current.stop(); } catch { /* ignore */ }
+            try { await scannerRef.current.clear(); } catch { /* ignore */ }
+            scannerRef.current = null;
+        }
+        setScanning(false);
+    };
+
+    const startScanner = async () => {
+        if (scannerRef.current || scannerReadyRef.current) return;
+
+        await new Promise(r => setTimeout(r, 50));
+
+        const scanner = new Html5Qrcode('reader-accessories');
+        scannerRef.current = scanner;
+
+        const onSuccess = async (decodedText) => {
+            setForm(f => ({ ...f, barcode: decodedText }));
+            toast.success('Barcode scanned!');
+            await stopScanner();
+        };
+
+        const tryStart = async (constraints) => {
+            try {
+                await scanner.start(constraints, { fps: 10, qrbox: { width: 250, height: 150 } }, onSuccess, () => { });
+                scannerReadyRef.current = true;
+                setScanning(true);
+            } catch (err) {
+                if (constraints.facingMode === 'environment') {
+                    await tryStart({ facingMode: 'user' });
+                } else if (constraints.facingMode === 'user') {
+                    await tryStart({});
+                } else {
+                    scannerRef.current = null;
+                    toast.error('Could not access camera. Please allow camera permission.');
+                }
+            }
+        };
+
+        await tryStart({ facingMode: 'environment' });
+    };
+
+    const toggleScanner = () => {
+        if (scanning) {
+            stopScanner();
+        } else {
+            startScanner();
+        }
+    };
 
     // 📦 Fetch data
     const fetchData = async () => {
@@ -48,6 +118,20 @@ export default function Accessories() {
     useEffect(() => {
         fetchData();
     }, [search, category]);
+
+    // ── Cleanup scanner on component unmount or modal close ──────────────────
+    useEffect(() => {
+        return () => {
+            if (scanning) stopScanner();
+        };
+    }, [scanning]);
+
+    // ── Stop scanner when modal closes ───────────────────────────────────────
+    const handleCloseModal = () => {
+        if (scanning) stopScanner();
+        setShowModal(false);
+        setEditingItem(null);
+    };
 
     // ➕ Create
     const handleSave = async () => {
@@ -339,10 +423,7 @@ export default function Accessories() {
                                 {editingItem ? 'Edit Accessory' : 'Add Accessory'}
                             </h2>
                             <button
-                                onClick={() => {
-                                    setShowModal(false);
-                                    setEditingItem(null);
-                                }}
+                                onClick={handleCloseModal}
                                 className="text-slate-400 hover:text-slate-600 text-lg"
                             >
                                 ✕
@@ -392,25 +473,52 @@ export default function Accessories() {
                                 <div>
                                     <label className="field-label">Barcode</label>
 
-                                    <div className="flex gap-2">
+                                    <div className="flex gap-2 mb-2">
                                         <input
-                                            className="field-input flex-1"
+                                            className="field-input flex-1 font-mono"
                                             value={form.barcode}
                                             onChange={e => setForm(f => ({ ...f, barcode: e.target.value }))}
-                                            placeholder="Auto-generated or manual"
+                                            placeholder="Scan or enter barcode number"
                                         />
 
                                         <button
                                             type="button"
-                                            className="btn-secondary btn-sm"
-                                            onClick={() => {
-                                                const code = Date.now().toString().slice(-12);
-                                                setForm(f => ({ ...f, barcode: code }));
-                                            }}
+                                            className="btn-secondary btn-sm whitespace-nowrap"
+                                            onClick={handleGenerateBarcode}
+                                            title="Auto-generate EAN-13"
                                         >
-                                            🔄
+                                            🔄 Generate
+                                        </button>
+
+                                        <button
+                                            type="button"
+                                            className={`btn-sm whitespace-nowrap ${scanning ? 'btn-danger' : 'btn-secondary'}`}
+                                            onClick={toggleScanner}
+                                            title={scanning ? 'Stop camera' : 'Scan with camera'}
+                                        >
+                                            {scanning ? '⏹ Stop' : '📷 Scan'}
                                         </button>
                                     </div>
+
+                                    {/* Camera feed */}
+                                    <div
+                                        id="reader-accessories"
+                                        style={{
+                                            width: '100%',
+                                            height: scanning ? '260px' : '0px',
+                                            overflow: 'hidden',
+                                            borderRadius: '8px',
+                                            border: scanning ? '2px solid #3b82f6' : 'none',
+                                            transition: 'height 0.2s ease',
+                                            background: '#000',
+                                        }}
+                                    />
+                                    {scanning && (
+                                        <div className="text-xs text-blue-600 font-medium mt-2 flex items-center gap-2">
+                                            <div className="w-1.5 h-1.5 bg-blue-500 rounded-full animate-pulse"></div>
+                                            Scanning... Point camera at barcode
+                                        </div>
+                                    )}
                                 </div>
 
                                 {/* Purchase Price */}
@@ -481,10 +589,7 @@ export default function Accessories() {
                         {/* Footer */}
                         <div className="flex justify-end gap-3 px-6 py-4 border-t bg-slate-50">
                             <button
-                                onClick={() => {
-                                    setShowModal(false);
-                                    setEditingItem(null);
-                                }}
+                                onClick={handleCloseModal}
                                 className="btn-secondary btn-md"
                             >
                                 Cancel
@@ -554,4 +659,14 @@ export default function Accessories() {
             )}
         </div>
     );
+
+    exports.getAccessoryByBarcode = async (req, res, next) => {
+        try {
+            const item = await prisma.accessory.findFirst({
+                where: { barcode: req.params.barcode, storeId: req.storeId, isActive: true }
+            });
+            if (!item) return res.status(404).json({ success: false, message: 'Not found' });
+            res.json({ success: true, data: item });
+        } catch (err) { next(err); }
+    };
 }

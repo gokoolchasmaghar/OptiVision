@@ -32,6 +32,7 @@ export default function Frames() {
   const [scanning, setScanning] = useState(false);
   const [printQty, setPrintQty] = useState(1);
   const scannerRef = useRef(null);
+  const scannerReadyRef = useRef(false);
   const { user } = useAuthStore();
   const canManageFrames = isAdmin(user);
 
@@ -48,51 +49,57 @@ export default function Frames() {
     toast.success('Barcode generated!');
   };
 
-  const stopScanner = () => {
+  const stopScanner = async () => {
+    scannerReadyRef.current = false;
     if (scannerRef.current) {
-      scannerRef.current.stop().then(() => {
-        setScanning(false);
-        document.getElementById("reader").style.display = "none";
-      }).catch(() => { }); // ignore errors
+      try { await scannerRef.current.stop(); } catch { /* ignore */ }
+      try { await scannerRef.current.clear(); } catch { /* ignore */ }
+      scannerRef.current = null;
     }
+    setScanning(false);
+  };
+
+  const startScanner = async () => {
+    if (scannerRef.current || scannerReadyRef.current) return;
+
+    await new Promise(r => setTimeout(r, 50));
+
+    const scanner = new Html5Qrcode('reader-frames');
+    scannerRef.current = scanner;
+
+    const onSuccess = async (decodedText) => {
+      setForm(f => ({ ...f, barcode: decodedText }));
+      toast.success('Barcode scanned!');
+      await stopScanner();
+    };
+
+    const tryStart = async (constraints) => {
+      try {
+        await scanner.start(constraints, { fps: 10, qrbox: { width: 250, height: 150 } }, onSuccess, () => { });
+        scannerReadyRef.current = true;
+        setScanning(true);
+      } catch (err) {
+        if (constraints.facingMode === 'environment') {
+          await tryStart({ facingMode: 'user' });
+        } else if (constraints.facingMode === 'user') {
+          await tryStart({});
+        } else {
+          scannerRef.current = null;
+          toast.error('Could not access camera. Please allow camera permission.');
+        }
+      }
+    };
+
+    await tryStart({ facingMode: 'environment' });
   };
 
   const toggleScanner = () => {
-    if (scanning) {
-      stopScanner();
-    } else {
-      const scanner = new Html5Qrcode("reader");
-      scannerRef.current = scanner;
+    if (scanning) { stopScanner(); } else { startScanner(); }
+  };
 
-      const tryStartScanner = (constraints) => {
-        scanner.start(
-          constraints,
-          { fps: 10, qrbox: 250 },
-          (decodedText) => {
-            setForm(f => ({ ...f, barcode: decodedText }));
-            toast.success('Barcode scanned successfully!');
-            stopScanner();
-          },
-          (error) => {
-            // ignore scan errors
-          }
-        ).then(() => {
-          setScanning(true);
-          document.getElementById("reader").style.display = "block";
-        }).catch((err) => {
-          // Try next constraint if available
-          if (constraints.facingMode === "environment") {
-            tryStartScanner({ facingMode: "user" });
-          } else if (constraints.facingMode === "user") {
-            tryStartScanner({});
-          } else {
-            toast.error('Failed to start camera: ' + err);
-          }
-        });
-      };
-
-      tryStartScanner({ facingMode: "environment" });
-    }
+  const handleModalClose = () => {
+    if (scanning) stopScanner();
+    setModal(false);
   };
 
   const load = async (q = '', f = {}) => {
@@ -107,6 +114,11 @@ export default function Frames() {
 
   useEffect(() => { load(); }, []);
   useEffect(() => { const t = setTimeout(() => load(search, filters), 350); return () => clearTimeout(t); }, [search, filters]);
+  useEffect(() => {
+    return () => {
+      if (scanning) stopScanner();
+    };
+  }, [scanning]);
 
   const openAdd = () => { setEditFrame(null); setForm({ brand: '', model: '', shape: 'RECTANGLE', size: '', color: '', material: '', gender: '', purchasePrice: '', sellingPrice: '', stockQty: '', lowStockAlert: '5', barcode: '' }); setModal(true); };
   const openEdit = f => { setEditFrame(f); setForm({ brand: f.brand, model: f.model || '', shape: f.shape, size: f.size || '', color: f.color || '', material: f.material || '', gender: f.gender || '', purchasePrice: f.purchasePrice, sellingPrice: f.sellingPrice, stockQty: f.stockQty, lowStockAlert: f.lowStockAlert, barcode: f.barcode || '' }); setModal(true); };
@@ -258,9 +270,9 @@ export default function Frames() {
         </div>
       )}
 
-      <Modal open={modal} onClose={() => { if (scanning) stopScanner(); setModal(false); }} title={editFrame ? 'Edit Frame' : 'Add Frame'} size="lg"
+      <Modal open={modal} onClose={handleModalClose} title={editFrame ? 'Edit Frame' : 'Add Frame'} size="lg"
         footer={<>
-          <button className="btn-secondary btn-md" onClick={() => setModal(false)}>Cancel</button>
+          <button className="btn-secondary btn-md" onClick={handleModalClose}>Cancel</button>
           <button className="btn-primary btn-md" onClick={save} disabled={saving}>{saving ? 'Saving…' : editFrame ? 'Update' : 'Add Frame'}</button>
         </>}>
         <div className="grid grid-cols-2 gap-4">
@@ -273,54 +285,40 @@ export default function Frames() {
           <div><label className="field-label">Gender</label><select className="field-select" value={form.gender} onChange={e => setForm(f => ({ ...f, gender: e.target.value }))}><option value="">Unisex</option><option value="Male">Male</option><option value="Female">Female</option></select></div>
           <div>
             <label className="field-label">Barcode</label>
-
-            <div className="flex gap-2">
+            <div className="flex gap-2 mb-2">
               <input
-                className="field-input flex-1"
+                className="field-input flex-1 font-mono"
                 value={form.barcode}
                 onChange={e => setForm(f => ({ ...f, barcode: e.target.value }))}
-                placeholder="Auto-generated or manual"
+                placeholder="Scan or enter barcode number"
               />
-
-              {/* Generate button */}
-              <button
-                type="button"
-                onClick={handleGenerateBarcode}
-                className="btn-secondary btn-sm"
-              >
-                🔄
+              <button type="button" onClick={handleGenerateBarcode} className="btn-secondary btn-sm whitespace-nowrap" title="Auto-generate EAN-13">
+                🔄 Generate
               </button>
-
-              {/* Scanner button */}
-              <button
-                type="button"
-                onClick={toggleScanner}
-                className="btn-secondary btn-sm"
-              >
-                {scanning ? "Stop" : "📷"}
+              <button type="button" onClick={toggleScanner} className={`btn-sm whitespace-nowrap ${scanning ? 'btn-danger' : 'btn-secondary'}`} title={scanning ? 'Stop camera' : 'Scan with camera'}>
+                {scanning ? '⏹ Stop' : '📷 Scan'}
               </button>
             </div>
 
-            {/* Scanner container */}
+            {/* Camera feed */}
+            <div
+              id="reader-frames"
+              style={{
+                width: '100%',
+                height: scanning ? '260px' : '0px',
+                overflow: 'hidden',
+                borderRadius: '8px',
+                border: scanning ? '2px solid #3b82f6' : 'none',
+                transition: 'height 0.2s ease',
+                background: '#000',
+              }}
+            />
             {scanning && (
-              <div className="text-sm text-blue-600 font-medium mt-2 flex items-center gap-2">
-                <div className="w-2 h-2 bg-blue-500 rounded-full animate-pulse"></div>
-                Scanning for QR code... Point camera at the barcode.
+              <div className="text-xs text-blue-600 font-medium mt-2 flex items-center gap-2">
+                <div className="w-1.5 h-1.5 bg-blue-500 rounded-full animate-pulse"></div>
+                Scanning... Point camera at barcode
               </div>
             )}
-            <div
-              id="reader"
-              style={{
-                width: "100%",
-                maxWidth: "400px",
-                height: "300px",
-                marginTop: "10px",
-                display: "none",
-                border: scanning ? "2px solid #3b82f6" : "none",
-                borderRadius: "8px",
-                overflow: "hidden",
-              }}
-            ></div>
           </div>
           <div><label className="field-label">Model Code</label><input className="field-input" value={form.modelCode || ''} onChange={e => setForm(f => ({ ...f, modelCode: e.target.value }))}/></div>
           <div><label className="field-label">Purchase Price ₹</label><input className="field-input" type="number" value={form.purchasePrice} onChange={e => setForm(f => ({ ...f, purchasePrice: e.target.value }))} /></div>

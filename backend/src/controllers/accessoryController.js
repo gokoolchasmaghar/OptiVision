@@ -166,3 +166,14 @@ exports.deleteAccessory = async (req, res, next) => {
     next(err);
   }
 };
+
+exports.getAccessoryByBarcode = async (req, res, next) => {
+  try {
+    const { barcode } = req.params;
+    const accessory = await prisma.accessory.findFirst({
+      where: { barcode, storeId: req.storeId, isActive: true }
+    });
+    if (!accessory) return res.status(404).json({ success: false, message: 'Accessory not found' });
+    res.json({ success: true, data: accessory });
+  } catch (e) { next(e); }
+};
