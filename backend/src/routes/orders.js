@@ -7,6 +7,76 @@ const { PAYMENT_METHODS, ORDER_STATUSES, enumValue, positiveInt, numberOrDefault
 
 const roundMoney = value => Math.round((Number(value) || 0) * 100) / 100;
 
+const restoreOrderItemStock = async (tx, storeId, order, item, reason = 'Order Cancel') => {
+  if (item.frameId) {
+    const frame = await tx.frame.findFirst({ where: { id: item.frameId, storeId } });
+    if (!frame) return;
+
+    await tx.frame.updateMany({
+      where: { id: item.frameId, storeId },
+      data: { stockQty: { increment: item.quantity } },
+    });
+    await tx.stockMovement.create({
+      data: {
+        storeId,
+        frameId: item.frameId,
+        type: 'IN',
+        quantity: item.quantity,
+        beforeQty: frame.stockQty,
+        afterQty: frame.stockQty + item.quantity,
+        reason,
+        reference: order.orderNumber,
+      },
+    });
+    return;
+  }
+
+  if (item.lensId) {
+    const lens = await tx.lens.findFirst({ where: { id: item.lensId, storeId } });
+    if (!lens) return;
+
+    await tx.lens.updateMany({
+      where: { id: item.lensId, storeId },
+      data: { stockQty: { increment: item.quantity } },
+    });
+    await tx.stockMovement.create({
+      data: {
+        storeId,
+        lensId: item.lensId,
+        type: 'IN',
+        quantity: item.quantity,
+        beforeQty: lens.stockQty,
+        afterQty: lens.stockQty + item.quantity,
+        reason,
+        reference: order.orderNumber,
+      },
+    });
+    return;
+  }
+
+  if (item.accessoryId) {
+    const accessory = await tx.accessory.findFirst({ where: { id: item.accessoryId, storeId } });
+    if (!accessory) return;
+
+    await tx.accessory.updateMany({
+      where: { id: item.accessoryId, storeId },
+      data: { stockQty: { increment: item.quantity } },
+    });
+    await tx.stockMovement.create({
+      data: {
+        storeId,
+        accessoryId: item.accessoryId,
+        type: 'IN',
+        quantity: item.quantity,
+        beforeQty: accessory.stockQty,
+        afterQty: accessory.stockQty + item.quantity,
+        reason,
+        reference: order.orderNumber,
+      },
+    });
+  }
+};
+
 router.get('/public/:id/invoice', generatePublicInvoice);
 
 router.use(authenticate);
@@ -24,7 +94,7 @@ router.get('/', async (req, res, next) => {
       ...(dateTo && { createdAt: { ...(dateFrom ? { gte: new Date(dateFrom) } : {}), lte: new Date(dateTo + 'T23:59:59') } }),
     };
     const [orders, total] = await Promise.all([
-      prisma.order.findMany({ where, skip, take: Number(limit), orderBy: { createdAt: 'desc' }, include: { customer: { select: { id: true, name: true, phone: true } }, staff: { select: { id: true, name: true } }, items: true, payments: true } }),
+      prisma.order.findMany({ where, skip, take: Number(limit), orderBy: { createdAt: 'desc' }, include: { customer: { select: { id: true, name: true, phone: true } }, staff: { select: { id: true, name: true } }, refundedBy: { select: { id: true, name: true, role: true } }, items: true, payments: true } }),
       prisma.order.count({ where })
     ]);
     res.json({ success: true, data: orders, pagination: { page: Number(page), limit: Number(limit), total, pages: Math.ceil(total / Number(limit)) } });
@@ -38,6 +108,7 @@ router.get('/:id', async (req, res, next) => {
       include: {
         customer: true, prescription: true,
         staff: { select: { id: true, name: true, role: true } },
+        refundedBy: { select: { id: true, name: true, role: true } },
         items: { include: { frame: { select: { id: true, brand: true, model: true, imageUrl: true } }, lens: { select: { id: true, name: true } } } },
         payments: { orderBy: { paidAt: 'asc' } },
         statusLogs: { orderBy: { changedAt: 'asc' } }
@@ -242,10 +313,12 @@ router.patch('/:id/status', requireStaff, async (req, res, next) => {
       where: { id: req.params.id, storeId: req.storeId },
       select: {
         id: true,
+        orderNumber: true,
         customerId: true,
         redeemPoints: true,
         totalAmount: true,
-        status: true
+        status: true,
+        items: true,
       },
     });
 
@@ -287,6 +360,10 @@ router.patch('/:id/status', requireStaff, async (req, res, next) => {
       if (!result.count) throw Object.assign(new Error('Order not found'), { status: 404 });
       // ✅ Refund loyalty points
       if (nextStatus === 'CANCELLED') {
+        for (const item of existing.items) {
+          await restoreOrderItemStock(tx, req.storeId, existing, item);
+        }
+
         const earnedPoints = Math.floor(Number(existing.totalAmount || 0) / 100);
         await tx.customer.updateMany({
           where: { id: existing.customerId, storeId: req.storeId },
@@ -313,6 +390,9 @@ router.post('/:id/payment', requireAdmin, async (req, res, next) => {
 
     const order = await prisma.order.findFirst({ where: { id: req.params.id, storeId: req.storeId } });
     if (!order) return res.status(404).json({ success: false, message: 'Not found' });
+    if (order.status === 'CANCELLED') {
+      return res.status(400).json({ success: false, message: 'Cannot collect payment for a cancelled order' });
+    }
     await prisma.$transaction(async tx => {
       await tx.payment.create({ data: { orderId: req.params.id, amount: Number(amount), method: finalMethod, reference, note } });
       const agg = await tx.payment.aggregate({ where: { orderId: req.params.id }, _sum: { amount: true } });
@@ -325,6 +405,78 @@ router.post('/:id/payment', requireAdmin, async (req, res, next) => {
       if (!result.count) throw Object.assign(new Error('Order not found'), { status: 404 });
     });
     res.status(201).json({ success: true });
+  } catch (e) { next(e); }
+});
+
+router.post('/:id/refund', requireAdmin, async (req, res, next) => {
+  try {
+    const { note } = req.body;
+    const order = await prisma.order.findFirst({
+      where: { id: req.params.id, storeId: req.storeId },
+      select: {
+        id: true,
+        status: true,
+        totalAmount: true,
+        balanceAmount: true,
+        refundAmount: true,
+        refundedAt: true,
+      }
+    });
+
+    if (!order) return res.status(404).json({ success: false, message: 'Not found' });
+    if (order.status !== 'CANCELLED') {
+      return res.status(400).json({ success: false, message: 'Refund is allowed only after order cancellation' });
+    }
+    if (order.refundedAt || Number(order.refundAmount || 0) > 0) {
+      return res.status(400).json({ success: false, message: 'Order has already been refunded' });
+    }
+
+    const paymentAgg = await prisma.payment.aggregate({
+      where: { orderId: req.params.id, amount: { gt: 0 } },
+      _sum: { amount: true },
+    });
+    const paidAmount = roundMoney(paymentAgg._sum.amount || (Number(order.totalAmount || 0) - Number(order.balanceAmount || 0)));
+    if (paidAmount <= 0) {
+      return res.status(400).json({ success: false, message: 'No collected payment available to refund' });
+    }
+
+    const refundedAt = new Date();
+    const refunded = await prisma.$transaction(async tx => {
+      const result = await tx.order.updateMany({
+        where: { id: req.params.id, storeId: req.storeId, refundedAt: null },
+        data: {
+          refundAmount: paidAmount,
+          refundedAt,
+          refundedById: req.user.id,
+          refundNote: note || null,
+        }
+      });
+      if (!result.count) {
+        throw Object.assign(new Error('Order has already been refunded'), { status: 400 });
+      }
+
+      await tx.orderStatusLog.create({
+        data: {
+          orderId: req.params.id,
+          status: 'CANCELLED',
+          note: `Refunded ${paidAmount.toLocaleString('en-IN', { style: 'currency', currency: 'INR' })}${note ? ` - ${note}` : ''}`,
+        }
+      });
+
+      return tx.order.findFirst({
+        where: { id: req.params.id, storeId: req.storeId },
+        include: {
+          customer: true,
+          staff: { select: { id: true, name: true, role: true } },
+          refundedBy: { select: { id: true, name: true, role: true } },
+          items: true,
+          payments: { orderBy: { paidAt: 'asc' } },
+          statusLogs: { orderBy: { changedAt: 'asc' } },
+        }
+      });
+    });
+
+    res.json({ success: true, data: refunded });
   } catch (e) { next(e); }
 });
 

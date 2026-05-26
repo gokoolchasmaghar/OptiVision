@@ -1,14 +1,11 @@
-const BARCODE_RE = /^\d{13}$/;
-
-const isValidBarcode = value => BARCODE_RE.test(String(value || '').trim());
-
-const generateBarcode = () => {
-  let code = '';
-  for (let i = 0; i < 13; i += 1) {
-    code += Math.floor(Math.random() * 10);
-  }
-  return code;
+const normalizeBarcode = value => {
+  if (value === undefined || value === null) return '';
+  return String(value);
 };
+
+const isValidBarcode = value => normalizeBarcode(value).length > 0;
+
+const makeBarcode = () => `BC-${Date.now()}-${Math.floor(100000 + Math.random() * 900000)}`;
 
 const barcodeExists = async (prisma, barcode, exclude = {}) => {
   const [frame, lens, accessory] = await Promise.all([
@@ -23,26 +20,26 @@ const barcodeExists = async (prisma, barcode, exclude = {}) => {
   );
 };
 
-const createUniqueBarcode = async (prisma, reserved = new Set(), exclude) => {
+const resolveBarcode = async (prisma, value, reserved = new Set(), exclude) => {
+  const input = normalizeBarcode(value).trim();
+  if (isValidBarcode(input)) {
+    if (reserved.has(input) || await barcodeExists(prisma, input, exclude)) {
+      throw new Error('Barcode already exists');
+    }
+
+    reserved.add(input);
+    return input;
+  }
+
   for (let attempt = 0; attempt < 50; attempt += 1) {
-    const barcode = generateBarcode();
-    if (reserved.has(barcode)) continue;
-    if (await barcodeExists(prisma, barcode, exclude)) continue;
-    reserved.add(barcode);
-    return barcode;
+    const barcode = makeBarcode();
+    if (!reserved.has(barcode) && !(await barcodeExists(prisma, barcode, exclude))) {
+      reserved.add(barcode);
+      return barcode;
+    }
   }
 
   throw new Error('Could not generate a unique barcode');
-};
-
-const resolveBarcode = async (prisma, value, reserved = new Set(), exclude) => {
-  const barcode = String(value || '').trim();
-  if (isValidBarcode(barcode) && !reserved.has(barcode) && !(await barcodeExists(prisma, barcode, exclude))) {
-    reserved.add(barcode);
-    return barcode;
-  }
-
-  return createUniqueBarcode(prisma, reserved, exclude);
 };
 
 module.exports = {

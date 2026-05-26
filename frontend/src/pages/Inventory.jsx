@@ -4,9 +4,11 @@ import api from '../services/api';
 import { PageHeader, Tabs, Modal, Spinner, Empty } from '../components/ui';
 import toast from 'react-hot-toast';
 import { useAuthStore } from '../stores/authStore';
-import { isAdmin } from '../utils/roles';
+import { isAdmin, isSuperAdmin } from '../utils/roles';
+import * as XLSX from 'xlsx';
+import { ChevronDown, ChevronUp } from 'lucide-react';
 
-const fmt = n => `₹${Number(n || 0).toLocaleString('en-IN')}`;
+const fmt = n => `Rs ${Number(n || 0).toLocaleString('en-IN')}`;
 
 function StockStatus({ qty, alert }) {
   if (qty === 0) return <span className="badge-red badge">Out of Stock</span>;
@@ -23,9 +25,29 @@ export default function Inventory() {
   const [itemType, setItemType] = useState('frame'); // for adj modal
   const [adjForm, setAdjForm] = useState({ frameId: '', lensId: '', accessoryId: '', type: 'IN', quantity: '', reason: '' });
   const [saving, setSaving] = useState(false);
+
+  // Stock report actions with independent loading states
+  const [reportDropdownOpen, setReportDropdownOpen] = useState(false);
+  const [pdfLoading, setPdfLoading] = useState(false);
+  const [excelLoading, setExcelLoading] = useState(false);
+  const [historyLoading, setHistoryLoading] = useState(false);
+  const [uploadLoading, setUploadLoading] = useState(false);
+
+  // Excel audit workflow states
+  const [auditModal, setAuditModal] = useState(false);
+  const [auditReview, setAuditReview] = useState(false);
+  const [auditChanges, setAuditChanges] = useState([]);
+  const [auditNotes, setAuditNotes] = useState('');
+  const [submitAudit, setSubmitAudit] = useState(false);
+
+  // Audit history states
+  const [auditHistoryModal, setAuditHistoryModal] = useState(false);
+  const [audits, setAudits] = useState([]);
+
   const navigate = useNavigate();
   const { user } = useAuthStore();
   const canManageInventory = isAdmin(user);
+  const canDownloadStockReport = isSuperAdmin(user);
 
   const load = () => Promise.all([
     api.get('/inventory').then(r => setData(r.data.data)),
@@ -44,8 +66,180 @@ export default function Inventory() {
       setAdjModal(false);
       setAdjForm({ frameId: '', lensId: '', accessoryId: '', type: 'IN', quantity: '', reason: '' });
       load();
-    } catch { toast.error('Error adjusting stock'); }
-    setSaving(false);
+    } catch (e) {
+      toast.error(e.response?.data?.message || 'Error adjusting stock');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const downloadStockReport = async () => {
+    setPdfLoading(true);
+    try {
+      const res = await api.get('/inventory/stock-report/pdf', { responseType: 'blob' });
+      const disposition = res.headers['content-disposition'] || '';
+      const filename = disposition.match(/filename="?([^"]+)"?/)?.[1] || 'stock-report.pdf';
+      const url = URL.createObjectURL(new Blob([res.data], { type: 'application/pdf' }));
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = filename;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      URL.revokeObjectURL(url);
+      toast.success('Stock report downloaded');
+    } catch (e) {
+      toast.error(e.response?.status === 403 ? 'Only super admin can download stock reports' : 'Failed to download stock report');
+    } finally {
+      setPdfLoading(false);
+      setReportDropdownOpen(false);
+    }
+  };
+
+  const downloadExcelAudit = async () => {
+    setExcelLoading(true);
+    try {
+      const res = await api.get('/inventory/stock-report/excel', { responseType: 'blob' });
+      const disposition = res.headers['content-disposition'] || '';
+      const filename = disposition.match(/filename="?([^"]+)"?/)?.[1] || 'stock-audit.xlsx';
+      const url = URL.createObjectURL(new Blob([res.data], {
+        type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      }));
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = filename;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      URL.revokeObjectURL(url);
+      toast.success('Excel audit sheet downloaded');
+      setAuditModal(true);
+    } catch (e) {
+      toast.error('Failed to download Excel sheet');
+    } finally {
+      setExcelLoading(false);
+      setReportDropdownOpen(false);
+    }
+  };
+
+  const handleExcelUpload = (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setUploadLoading(true);
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      try {
+        const wb = XLSX.read(event.target.result, { type: 'array' });
+        const ws = wb.Sheets['Stock Audit'];
+        if (!ws) {
+          toast.error('The workbook must contain a "Stock Audit" sheet');
+          return;
+        }
+
+        const data = XLSX.utils.sheet_to_json(ws);
+        const changesByItem = new Map();
+
+        // Filter for changed items (where New Stock differs from Current Stock)
+        data.filter(row => {
+          const newQty = Number(row['New Stock']);
+          const oldQty = Number(row['Current Stock']);
+          return Number.isInteger(newQty) && newQty >= 0 && Number.isInteger(oldQty) && newQty !== oldQty && (row.ID || row.Barcode);
+        }).forEach(row => {
+          const itemType = String(row['Item Type'] || '').trim().toUpperCase();
+          const itemId = String(row.ID || '').trim();
+          const itemBarcode = String(row.Barcode || '').trim();
+          const oldQuantity = Number(row['Current Stock']);
+          const newQuantity = Number(row['New Stock']);
+
+          changesByItem.set(`${itemType}:${itemId || itemBarcode}`, {
+            itemId,
+            itemType,
+            itemName: row.Name || itemId,
+            itemBarcode,
+            oldQuantity,
+            newQuantity,
+            difference: newQuantity - oldQuantity,
+            reason: row.Reason || '',
+          });
+        });
+
+        const changes = [...changesByItem.values()];
+
+        if (changes.length === 0) {
+          toast.error('No changes found in the spreadsheet');
+          return;
+        }
+
+        setAuditChanges(changes);
+        setAuditReview(true);
+        setAuditModal(false);
+      } catch (err) {
+        toast.error('Failed to read Excel file: ' + err.message);
+      } finally {
+        setUploadLoading(false);
+        e.target.value = '';
+      }
+    };
+    reader.onerror = () => {
+      setUploadLoading(false);
+      e.target.value = '';
+      toast.error('Failed to read Excel file');
+    };
+    reader.readAsArrayBuffer(file);
+  };
+
+  const submitAuditChanges = async () => {
+    if (auditChanges.length === 0) return toast.error('No changes to submit');
+    setSubmitAudit(true);
+    try {
+      const res = await api.post('/inventory/audit/submit', {
+        items: auditChanges,
+        notes: auditNotes,
+      });
+      if (res.data.success) {
+        toast.success(res.data.data.message);
+        setAuditChanges([]);
+        setAuditNotes('');
+        setAuditReview(false);
+        load();
+      }
+    } catch (e) {
+      toast.error(e.response?.data?.message || 'Failed to submit audit');
+    } finally {
+      setSubmitAudit(false);
+    }
+  };
+
+  const loadAuditHistory = async () => {
+    setHistoryLoading(true);
+    setAuditHistoryModal(true);
+    setReportDropdownOpen(false);
+    try {
+      const res = await api.get('/inventory/audits?limit=50');
+      if (res.data.success) {
+        setAudits(res.data.data.audits);
+      }
+    } catch (e) {
+      toast.error('Failed to load audit history');
+    } finally {
+      setHistoryLoading(false);
+    }
+  };
+
+  const confirmAudit = async (auditId) => {
+    if (!window.confirm('Confirm this audit? All changes will be applied to inventory.')) return;
+
+    try {
+      const res = await api.post(`/inventory/audit/${auditId}/confirm`);
+      if (res.data.success) {
+        toast.success(res.data.data.message);
+        loadAuditHistory();
+        load();
+      }
+    } catch (e) {
+      toast.error(e.response?.data?.message || 'Failed to confirm audit');
+    }
   };
 
   const allFrames = data.frames || [];
@@ -59,10 +253,50 @@ export default function Inventory() {
         subtitle="Stock levels and movements"
         action={canManageInventory && (
           <div className="flex flex-wrap gap-2">
+            {canDownloadStockReport && (
+              <div className="relative">
+                <button
+                  className="btn-secondary btn-md"
+                  onClick={() => setReportDropdownOpen(!reportDropdownOpen)}
+                >
+                  Stock Report
+                  {reportDropdownOpen ? (
+                    <ChevronUp size={16} />
+                  ) : (
+                    <ChevronDown size={16} />
+                  )}
+                </button>
+                {reportDropdownOpen && (
+                  <div className="absolute top-full right-0 mt-1 bg-white border border-slate-200 rounded-lg shadow-lg z-50 min-w-48">
+                    <button
+                      onClick={downloadStockReport}
+                      disabled={pdfLoading}
+                      className="w-full text-left px-4 py-2.5 hover:bg-slate-50 border-b border-slate-100 text-sm flex items-center gap-2 disabled:opacity-60"
+                    >
+                      {pdfLoading ? <Spinner size={16} /> : '📄'}
+                      {pdfLoading ? 'Preparing...' : 'Download PDF Report'}
+                    </button>
+                    <button
+                      onClick={() => { setAuditModal(true); setReportDropdownOpen(false); }}
+                      className="w-full text-left px-4 py-2.5 hover:bg-slate-50 border-b border-slate-100 text-sm flex items-center gap-2"
+                    >
+                      📊 Stock Audit
+                    </button>
+                    <button
+                      onClick={loadAuditHistory}
+                      disabled={historyLoading}
+                      className="w-full text-left px-4 py-2.5 hover:bg-slate-50 text-sm flex items-center gap-2 disabled:opacity-60"
+                    >
+                      {historyLoading ? <Spinner size={16} /> : '📜'}
+                      {historyLoading ? 'Loading...' : 'Audit History'}
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
             <button className="btn-primary btn-md" onClick={() => setAdjModal(true)}>
               Adjust Stock
             </button>
-            {/* FIX: correct route path */}
             <button className="btn-secondary btn-md" onClick={() => navigate('/bulk-import')}>
               Bulk Import
             </button>
@@ -223,11 +457,10 @@ export default function Inventory() {
                             : m.lens?.name || m.accessory?.name || '—'}
                         </td>
                         <td>
-                          <span className={`badge text-xs ${
-                            m.type === 'IN' || m.type === 'RETURN' ? 'badge-green'
-                            : m.type === 'OUT' ? 'badge-red'
-                            : 'badge-yellow'
-                          }`}>{m.type}</span>
+                          <span className={`badge text-xs ${m.type === 'IN' || m.type === 'RETURN' ? 'badge-green'
+                              : m.type === 'OUT' ? 'badge-red'
+                                : 'badge-yellow'
+                            }`}>{m.type}</span>
                         </td>
                         <td className="font-bold text-center">{m.quantity}</td>
                         <td className="hidden sm:table-cell text-center text-slate-400 text-sm">{m.beforeQty}</td>
@@ -336,6 +569,181 @@ export default function Inventory() {
               placeholder="Damage, correction, restock…"
             />
           </div>
+        </div>
+      </Modal>
+
+      {/* ── Stock Audit Modal ── */}
+      <Modal
+        open={auditModal}
+        onClose={() => setAuditModal(false)}
+        title="Stock Audit"
+        footer={
+          <>
+            <button className="btn-secondary btn-md" onClick={() => setAuditModal(false)}>Close</button>
+          </>
+        }
+      >
+        <div className="space-y-6">
+          {/* Upload Section */}
+          <div className="border-b pb-6">
+            <h3 className="font-bold text-slate-800 mb-3">📤 Upload Audited Excel</h3>
+            <p className="text-sm text-slate-600 mb-4">
+              Upload an Excel file with updated stock quantities. The "New Stock" column will be compared against current inventory.
+            </p>
+            <label className="block">
+              <span className={`btn-primary btn-md cursor-pointer inline-flex items-center gap-2 ${uploadLoading ? 'opacity-60 cursor-not-allowed' : ''}`}>
+                {uploadLoading ? <Spinner size={16} /> : '📁'}
+                {uploadLoading ? 'Processing...' : 'Choose Excel File'}
+                <input
+                  type="file"
+                  accept=".xlsx,.xls"
+                  onChange={handleExcelUpload}
+                  disabled={uploadLoading}
+                  className="hidden"
+                />
+              </span>
+            </label>
+            <p className="text-xs text-slate-400 mt-2">Supports .xlsx and .xls formats</p>
+          </div>
+
+          {/* Download Section */}
+          <div>
+            <h3 className="font-bold text-slate-800 mb-3">📥 Download Template</h3>
+            <p className="text-sm text-slate-600 mb-4">
+              Download the current inventory as an Excel template. Edit it offline and upload when ready.
+            </p>
+            <button
+              onClick={downloadExcelAudit}
+              disabled={excelLoading}
+              className={`btn-secondary btn-md inline-flex items-center gap-2 ${excelLoading ? 'opacity-60 cursor-not-allowed' : ''}`}
+            >
+              {excelLoading ? <Spinner size={16} /> : '⬇️'}
+              {excelLoading ? 'Preparing...' : 'Download Excel Template'}
+            </button>
+          </div>
+        </div>
+      </Modal>
+
+      {/* ── Audit Review Modal ── */}
+      <Modal
+        open={auditReview}
+        onClose={() => setAuditReview(false)}
+        title="Review Stock Changes"
+        footer={
+          <>
+            <button className="btn-secondary btn-md" onClick={() => setAuditReview(false)}>Cancel</button>
+            <button className="btn-primary btn-md" onClick={submitAuditChanges} disabled={submitAudit}>
+              {submitAudit ? 'Submitting…' : 'Submit Audit'}
+            </button>
+          </>
+        }
+      >
+        <div className="space-y-4">
+          <div>
+            <label className="field-label">Audit Notes (optional)</label>
+            <textarea
+              className="field-input"
+              rows="3"
+              value={auditNotes}
+              onChange={e => setAuditNotes(e.target.value)}
+              placeholder="Add notes for this audit…"
+            />
+          </div>
+
+          <div className="max-h-96 overflow-y-auto">
+            <table className="tbl w-full text-xs">
+              <thead>
+                <tr>
+                  <th>Item</th>
+                  <th>Current</th>
+                  <th>New</th>
+                  <th className="text-center">Diff</th>
+                  <th>Reason</th>
+                </tr>
+              </thead>
+              <tbody>
+                {auditChanges.map((change, i) => (
+                  <tr key={i}>
+                    <td className="font-semibold text-slate-700">{change.itemName}</td>
+                    <td>{change.oldQuantity}</td>
+                    <td className="font-bold">{change.newQuantity}</td>
+                    <td className={`text-center font-bold ${change.difference > 0 ? 'text-green-600' : 'text-red-600'}`}>
+                      {change.difference > 0 ? '+' : ''}{change.difference}
+                    </td>
+                    <td className="text-slate-500">{change.reason || '—'}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+
+          <div className="bg-slate-50 p-3 rounded-lg text-sm">
+            <strong>Summary:</strong> {auditChanges.length} items with {auditChanges.reduce((sum, c) => sum + c.difference, 0)} total unit changes
+          </div>
+        </div>
+      </Modal>
+
+      {/* ── Audit History Modal ── */}
+      <Modal
+        open={auditHistoryModal}
+        onClose={() => setAuditHistoryModal(false)}
+        title="Audit History"
+        width="w-4/5"
+      >
+        <div className="space-y-4">
+          {historyLoading ? (
+            <div className="flex justify-center py-8"><Spinner size={28} /></div>
+          ) : audits.length === 0 ? (
+            <Empty icon="📋" title="No audits yet" />
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="tbl min-w-[800px] text-xs">
+                <thead>
+                  <tr>
+                    <th>Date</th>
+                    <th>User</th>
+                    <th>Items</th>
+                    <th className="text-center">Status</th>
+                    <th>Notes</th>
+                    <th>Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {audits.map(audit => (
+                    <tr key={audit.id}>
+                      <td className="text-xs text-slate-400 whitespace-nowrap">
+                        {new Date(audit.submittedAt).toLocaleDateString('en-IN')}
+                      </td>
+                      <td className="font-semibold text-slate-700">{audit.user?.name || 'Unknown user'}</td>
+                      <td className="text-center font-bold">{audit.items?.length || 0}</td>
+                      <td className="text-center">
+                        <span className={`badge text-xs ${audit.status === 'PENDING' ? 'badge-yellow'
+                            : audit.status === 'CONFIRMED' ? 'badge-green'
+                              : 'badge-red'
+                          }`}>{audit.status}</span>
+                      </td>
+                      <td className="text-slate-500 truncate max-w-xs">{audit.notes || '—'}</td>
+                      <td className="space-x-2">
+                        {audit.status === 'PENDING' && (
+                          <button
+                            className="text-primary-600 hover:underline"
+                            onClick={() => confirmAudit(audit.id)}
+                          >
+                            Confirm
+                          </button>
+                        )}
+                        {audit.confirmedBy && (
+                          <span className="text-xs text-slate-400">
+                            ✓ by {audit.confirmedBy.name || 'Unknown user'}
+                          </span>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
         </div>
       </Modal>
     </div>

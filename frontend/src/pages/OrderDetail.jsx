@@ -25,6 +25,8 @@ export default function OrderDetail() {
   const [loading, setLoading] = useState(true);
   const [payModal, setPayModal] = useState(false);
   const [payForm, setPayForm] = useState({ amount: '', method: 'CASH', note: '' });
+  const [refundModal, setRefundModal] = useState(false);
+  const [refundNote, setRefundNote] = useState('');
   const [saving, setSaving] = useState(false);
   const [invoiceMenu, setInvoiceMenu] = useState(false);
   const invoiceMenuRef = useRef(null);
@@ -67,6 +69,20 @@ export default function OrderDetail() {
     setSaving(false);
   };
 
+  const saveRefund = async () => {
+    setSaving(true);
+    try {
+      await api.post(`/orders/${id}/refund`, { note: refundNote });
+      toast.success('Refund recorded');
+      setRefundModal(false);
+      setRefundNote('');
+      load();
+    } catch (e) {
+      toast.error(e.response?.data?.message || 'Failed to record refund');
+    }
+    setSaving(false);
+  };
+
   const handleCancelOrder = async () => {
     const ok = window.confirm("Are you sure you want to cancel this order?");
     if (!ok) return;
@@ -85,7 +101,13 @@ export default function OrderDetail() {
 
   const curIdx = STATUS_FLOW.indexOf(order.status);
   const nextStatus = NEXT_MAP[order.status];
-  const paidAmount = Math.max(0, Number(order.totalAmount || 0) - Number(order.balanceAmount || 0));
+  const collectedAmount = order.payments?.length
+    ? order.payments.reduce((sum, p) => sum + Math.max(0, Number(p.amount || 0)), 0)
+    : Number(order.totalAmount || 0) - Number(order.balanceAmount || 0);
+  const paidAmount = Math.max(0, collectedAmount);
+  const refundAmount = Number(order.refundAmount || 0);
+  const hasRefund = Boolean(order.refundedAt) || refundAmount > 0;
+  const canRefundOrder = canAdminOrder && order.status === 'CANCELLED' && paidAmount > 0 && !hasRefund;
   const paidPercent = order.totalAmount > 0 ? Math.round((paidAmount / Number(order.totalAmount)) * 100) : 0;
 
   const subtotal = order.items.reduce(
@@ -206,9 +228,14 @@ Thank you for trusting us 🙏`
         </div>
         <div className="flex gap-2 flex-wrap no-print">
           {/* <button onClick={() => window.print()} className="btn-secondary btn-md"><Printer size={15} /> Print</button> */}
-          {canAdminOrder && order.balanceAmount > 0 && (
+          {canAdminOrder && order.status !== 'CANCELLED' && order.balanceAmount > 0 && (
             <button onClick={() => { setPayForm({ amount: String(order.balanceAmount), method: 'CASH', note: '' }); setPayModal(true); }}
               className="btn-success btn-md"><CreditCard size={15} /> Collect {fmt(order.balanceAmount)}</button>
+          )}
+          {canRefundOrder && (
+            <button onClick={() => setRefundModal(true)} className="btn-danger btn-md">
+              <CreditCard size={15} /> Refund {fmt(paidAmount)}
+            </button>
           )}
           {/* INVOICE */}
           <div className="relative" ref={invoiceMenuRef}>
@@ -295,7 +322,7 @@ Thank you for trusting us 🙏`
             )}
           </div>
 
-          {canAdminOrder && typeof handleCancelOrder === 'function' && (
+          {canAdminOrder && order.status !== 'CANCELLED' && typeof handleCancelOrder === 'function' && (
             <button onClick={handleCancelOrder} className="btn-danger btn-md">
               Cancel Order
             </button>
@@ -403,7 +430,12 @@ Thank you for trusting us 🙏`
                   <span>Advance Paid</span><span>{fmt(order.advanceAmount)}</span>
                 </div>
               )}
-              {canAdminOrder && order.balanceAmount > 0 && (
+              {hasRefund && (
+                <div className="flex justify-between text-sm text-red-600 font-semibold">
+                  <span>Refunded</span><span>{fmt(refundAmount)}</span>
+                </div>
+              )}
+              {canAdminOrder && order.status !== 'CANCELLED' && order.balanceAmount > 0 && (
                 <div className="flex justify-between text-sm text-red-600 font-bold">
                   <span>Balance Due</span><span>{fmt(order.balanceAmount)}</span>
                 </div>
@@ -507,6 +539,10 @@ Thank you for trusting us 🙏`
                 ['Created', format(new Date(order.createdAt), 'MMM d, yyyy')],
                 order.deliveryDate ? ['Delivery', format(new Date(order.deliveryDate), 'MMM d, yyyy')] : null,
                 order.deliveredAt ? ['Delivered', format(new Date(order.deliveredAt), 'MMM d, yyyy')] : null,
+                order.cancelledAt ? ['Cancelled', format(new Date(order.cancelledAt), 'MMM d, yyyy')] : null,
+                order.refundedAt ? ['Refunded', fmt(refundAmount)] : null,
+                order.refundedAt ? ['Refund Date', format(new Date(order.refundedAt), 'MMM d, yyyy h:mm a')] : null,
+                order.refundedBy ? ['Refunded By', order.refundedBy.name] : null,
               ].filter(Boolean).map(([k, v]) => (
                 <div key={k} className="flex justify-between">
                   <span className="text-slate-500">{k}</span>
@@ -519,8 +555,12 @@ Thank you for trusting us 🙏`
                 📝 {order.notes}
               </div>
             )}
+            {order.refundNote && (
+              <div className="mt-3 p-3 bg-red-50 border border-red-100 rounded-xl text-xs text-red-700">
+                Refund note: {order.refundNote}
+              </div>
+            )}
           </div>
-
           {/* Status log */}
           {order.statusLogs?.length > 0 && (
             <div className="card p-5 no-print">
@@ -528,9 +568,9 @@ Thank you for trusting us 🙏`
               <div className="space-y-2.5">
                 {order.statusLogs.map((log, i) => (
                   <div key={log.id} className="flex items-start gap-2.5">
-                    <div className={`w-2 h-2 rounded-full mt-1.5 flex-shrink-0 ${i === 0 ? 'bg-primary-600' : 'bg-slate-300'}`} />
+                    <div className={`w-2 h-2 rounded-full mt-1.5 flex-shrink-0 ${log.note?.toLowerCase().includes('refunded') ? 'bg-red-500' : i === 0 ? 'bg-primary-600' : 'bg-slate-300'}`} />
                     <div>
-                      <div className="text-xs font-semibold text-slate-700">{log.status.replace('_', ' ')}</div>
+                      <div className="text-xs font-semibold text-slate-700">{log.note?.toLowerCase().includes('refunded') ? 'REFUND' : log.status.replace('_', ' ')}</div>
                       <div className="text-xs text-slate-400">{format(new Date(log.changedAt), 'MMM d, h:mm a')}</div>
                       {log.note && <div className="text-xs text-slate-500 mt-0.5">{log.note}</div>}
                     </div>
@@ -567,6 +607,25 @@ Thank you for trusting us 🙏`
           <div>
             <label className="field-label">Note / Reference</label>
             <input className="field-input" value={payForm.note} onChange={e => setPayForm(f => ({ ...f, note: e.target.value }))} placeholder="UPI ref / cheque no." />
+          </div>
+        </div>
+      </Modal>
+
+      {/* Refund modal */}
+      <Modal open={refundModal} onClose={() => setRefundModal(false)} title="Record Refund"
+        footer={<>
+          <button className="btn-secondary btn-md" onClick={() => setRefundModal(false)}>Cancel</button>
+          <button className="btn-danger btn-md" onClick={saveRefund} disabled={saving}>{saving ? 'Saving...' : 'Record Refund'}</button>
+        </>}>
+        <div className="space-y-4">
+          <div className="rounded-xl border border-red-100 bg-red-50 p-3">
+            <div className="text-xs font-semibold text-red-500 uppercase tracking-wider">Refund Amount</div>
+            <div className="text-lg font-bold text-red-700 mt-1">{fmt(paidAmount)}</div>
+            <div className="text-xs text-red-600 mt-1">This can be recorded only once for this cancelled order.</div>
+          </div>
+          <div>
+            <label className="field-label">Refund Note <span className="text-slate-400 font-normal">(optional)</span></label>
+            <input className="field-input" value={refundNote} onChange={e => setRefundNote(e.target.value)} placeholder="Cash returned, UPI refund ref..." />
           </div>
         </div>
       </Modal>

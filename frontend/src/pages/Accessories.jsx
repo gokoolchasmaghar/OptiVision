@@ -6,6 +6,7 @@ import Label, { PrintLabelButton } from '../components/Label';
 import { useAuthStore } from '../stores/authStore';
 import { isAdmin } from '../utils/roles';
 import { Html5Qrcode } from 'html5-qrcode';
+import { assetUrl } from '../utils/assets';
 
 const fmt = n => `₹${Number(n || 0).toLocaleString('en-IN')}`;
 
@@ -24,6 +25,7 @@ export default function Accessories() {
     const [scanning, setScanning] = useState(false);
     const scannerRef = useRef(null);
     const scannerReadyRef = useRef(false);
+    const imageInputRef = useRef(null);
 
     const [showModal, setShowModal] = useState(false);
     const [form, setForm] = useState({
@@ -35,6 +37,7 @@ export default function Accessories() {
         lowStockAlert: '5',
         barcode: '',
         modelCode: '',
+        imageUrl: '',
     });
 
     // ── Barcode generation ──────────────────────────────────────────────────────
@@ -103,6 +106,20 @@ export default function Accessories() {
         }
     };
 
+    const uploadImage = async (file) => {
+        if (!file) return;
+        const data = new FormData();
+        data.append('type', 'accessories');
+        data.append('file', file);
+        try {
+            const res = await api.post('/upload', data, { headers: { 'Content-Type': 'multipart/form-data' } });
+            setForm(f => ({ ...f, imageUrl: res.data.url }));
+            toast.success('Image uploaded');
+        } catch (e) {
+            toast.error(e.response?.data?.message || 'Image upload failed');
+        }
+    };
+
     // 📦 Fetch data
     const fetchData = async () => {
         try {
@@ -133,26 +150,57 @@ export default function Accessories() {
         setEditingItem(null);
     };
 
+    const resetImageInput = () => {
+        if (imageInputRef.current) imageInputRef.current.value = '';
+    };
+
+    const removeImage = () => {
+        setForm(f => ({ ...f, imageUrl: '' }));
+        resetImageInput();
+    };
+
     // ➕ Create
     const handleSave = async () => {
+        if (!form.name || !form.sellingPrice) {
+            toast.error('Name and selling price are required');
+            return;
+        }
 
         const cleanData = {
-            ...form,
-            barcode: form.barcode || undefined,
-            purchasePrice: Number(form.purchasePrice) || 0,
+            name: form.name,
+            category: form.category,
+            purchasePrice: form.purchasePrice ? Number(form.purchasePrice) : 0,
             sellingPrice: Number(form.sellingPrice),
-            stockQty: Number(form.stockQty) || 0,
-            lowStockAlert: Number(form.lowStockAlert) || 5,
+            stockQty: form.stockQty ? Number(form.stockQty) : 0,
+            lowStockAlert: form.lowStockAlert ? Number(form.lowStockAlert) : 5,
+            modelCode: form.modelCode || undefined,
         };
+
+        if (editingItem) {
+            cleanData.imageUrl = form.imageUrl || null;
+        } else if (form.imageUrl) {
+            cleanData.imageUrl = form.imageUrl;
+        }
+
+        // Only include barcode if it's not empty
+        if (form.barcode) {
+            cleanData.barcode = form.barcode;
+        }
 
         try {
             if (editingItem) {
-                // ✏️ UPDATE
-                await api.put(`/accessories/${editingItem.id}`, form);
+                // ✏️ UPDATE - only include barcode if it's being changed
+                const updateData = { ...cleanData };
+                if (form.barcode && form.barcode !== editingItem.barcode) {
+                    updateData.barcode = form.barcode;
+                } else if (form.barcode === editingItem.barcode) {
+                    delete updateData.barcode;
+                }
+                await api.put(`/accessories/${editingItem.id}`, updateData);
                 toast.success('Updated successfully');
             } else {
                 // ➕ CREATE
-                await api.post('/accessories', form);
+                await api.post('/accessories', cleanData);
                 toast.success('Accessory added');
             }
 
@@ -166,6 +214,9 @@ export default function Accessories() {
                 purchasePrice: '',
                 stockQty: '',
                 barcode: '',
+                modelCode: '',
+                lowStockAlert: '5',
+                imageUrl: '',
             });
 
             fetchData();
@@ -234,7 +285,22 @@ export default function Accessories() {
 
                 {canManageAccessories && (
                     <button
-                        onClick={() => setShowModal(true)}
+                        onClick={() => {
+                            setEditingItem(null);
+                            setForm({
+                                name: '',
+                                category: 'SUNGLASSES',
+                                purchasePrice: '',
+                                sellingPrice: '',
+                                stockQty: '',
+                                lowStockAlert: '5',
+                                barcode: '',
+                                modelCode: '',
+                                imageUrl: '',
+                            });
+                            resetImageInput();
+                            setShowModal(true);
+                        }}
                         className="btn-primary btn-sm px-4 py-2 rounded-xl flex items-center gap-2"
                     >
                         <Plus size={16} /> Add Accessory
@@ -306,11 +372,15 @@ export default function Accessories() {
                     >
                         {/* Top */}
                         <div className="h-32 bg-slate-100 flex items-center justify-center relative">
-                            <div className="text-3xl">
-                                {i.category === 'SUNGLASSES' ? '🕶️' :
-                                    i.category === 'SOLUTION' ? '🧴' :
-                                        i.category === 'CASE' ? '📦' : '🛍️'}
-                            </div>
+                            {i.imageUrl ? (
+                                <img src={assetUrl(i.imageUrl)} alt={i.name} className="absolute inset-0 w-full h-full object-cover" />
+                            ) : (
+                                <div className="text-3xl">
+                                    {i.category === 'SUNGLASSES' ? '🕶️' :
+                                        i.category === 'SOLUTION' ? '🧴' :
+                                            i.category === 'CASE' ? '📦' : '🛍️'}
+                                </div>
+                            )}
 
                             {(() => {
                                 if (i.stockQty === 0) {
@@ -390,7 +460,9 @@ export default function Accessories() {
                                                     stockQty: i.stockQty || '',
                                                     barcode: i.barcode || '',
                                                     lowStockAlert: i.lowStockAlert || '2',
+                                                    imageUrl: i.imageUrl || '',
                                                 });
+                                                resetImageInput();
                                                 setShowModal(true);
                                             }}
                                             className="btn-ghost btn-xs"
@@ -469,6 +541,38 @@ export default function Accessories() {
                                     />
                                 </div>
 
+                                {/* Image */}
+                                <div>
+                                    <label className="field-label">Image</label>
+                                    <input
+                                        ref={imageInputRef}
+                                        className="field-input"
+                                        type="file"
+                                        accept="image/*"
+                                        capture="environment"
+                                        onChange={e => uploadImage(e.target.files?.[0])}
+                                    />
+                                    <div className="mt-2 h-24 rounded-xl border border-slate-200 bg-slate-50 overflow-hidden flex items-center justify-center">
+                                        {form.imageUrl ? (
+                                            <img src={assetUrl(form.imageUrl)} alt="Accessory preview" className="w-full h-full object-cover" />
+                                        ) : (
+                                            <div className="text-3xl">
+                                                {form.category === 'SUNGLASSES' ? '🕶️' :
+                                                    form.category === 'SOLUTION' ? '🧴' :
+                                                        form.category === 'CASE' ? '📦' : '🛍️'}
+                                            </div>
+                                        )}
+                                    </div>
+                                    <div className="mt-1 flex items-center justify-between gap-2">
+                                        <div className="text-xs text-slate-400 truncate">{form.imageUrl ? 'Image selected' : 'No image selected'}</div>
+                                        {form.imageUrl && (
+                                            <button type="button" className="text-xs text-red-600 hover:underline" onClick={removeImage}>
+                                                Remove
+                                            </button>
+                                        )}
+                                    </div>
+                                </div>
+
                                 {/* Barcode */}
                                 <div>
                                     <label className="field-label">Barcode</label>
@@ -487,7 +591,7 @@ export default function Accessories() {
                                             onClick={handleGenerateBarcode}
                                             title="Auto-generate EAN-13"
                                         >
-                                            🔄 Generate
+                                            🔄
                                         </button>
 
                                         <button
@@ -496,7 +600,7 @@ export default function Accessories() {
                                             onClick={toggleScanner}
                                             title={scanning ? 'Stop camera' : 'Scan with camera'}
                                         >
-                                            {scanning ? '⏹ Stop' : '📷 Scan'}
+                                            {scanning ? '⏹' : '📷'}
                                         </button>
                                     </div>
 

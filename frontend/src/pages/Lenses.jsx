@@ -130,19 +130,35 @@ export default function Lenses() {
 
   const save = async () => {
     if (!form.name || !form.sellingPrice) return toast.error('Name and price required');
+    
+    const cleanData = {
+      name: form.name,
+      lensType: form.lensType,
+      lensIndex: form.lensIndex || undefined,
+      coating: form.coating,
+      brand: form.brand || undefined,
+      purchasePrice: form.purchasePrice ? Number(form.purchasePrice) : 0,
+      sellingPrice: Number(form.sellingPrice),
+      stockQty: form.stockQty ? Number(form.stockQty) : 0,
+    };
+
+    if (form.barcode) {
+      cleanData.barcode = form.barcode;
+    }
+
     setSaving(true);
     try {
       if (editLens) {
-        await api.put(`/lenses/${editLens.id}`, form);
+        const updateData = { ...cleanData };
+        if (form.barcode && form.barcode !== editLens.barcode) {
+          updateData.barcode = form.barcode;
+        } else if (form.barcode === editLens.barcode) {
+          delete updateData.barcode;
+        }
+        await api.put(`/lenses/${editLens.id}`, updateData);
         toast.success('Lens updated');
       } else {
-        await api.post('/lenses', {
-          ...form,
-          barcode: form.barcode?.trim() || undefined,
-          sellingPrice: Number(form.sellingPrice),
-          purchasePrice: Number(form.purchasePrice) || 0,
-          stockQty: Number(form.stockQty) || 0,
-        });
+        await api.post('/lenses', cleanData);
         toast.success('Lens added');
       }
       setModal(false);
@@ -171,15 +187,6 @@ export default function Lenses() {
 
             return (
               <div key={l.id} className="card p-5 card-hover relative">
-
-                {/* 🔴 OUT OF STOCK OVERLAY */}
-                {isOutOfStock && (
-                  <div className="absolute inset-0 bg-gray-200/70 flex items-center justify-center rounded-xl z-10">
-                    <span className="bg-red-500 text-white px-4 py-1.5 rounded-full text-sm font-semibold shadow">
-                      Out of Stock
-                    </span>
-                  </div>
-                )}
 
                 <div className="flex items-start justify-between mb-3">
                   <span className={`badge badge-${TYPE_COLORS[l.lensType] || 'gray'}`}>

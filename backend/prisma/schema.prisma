@@ -78,6 +78,12 @@ enum AccessoryCategory {
   OTHER
 }
 
+enum InventoryAuditStatus {
+  PENDING
+  CONFIRMED
+  REJECTED
+}
+
 model Store {
   id              String   @id @default(uuid())
   name            String
@@ -103,6 +109,7 @@ model Store {
   accessories Accessory[]
   suppliers   Supplier[]
   purchases   Purchase[]
+  inventoryAudits InventoryAudit[]
 
   @@map("stores")
 }
@@ -122,6 +129,9 @@ model User {
 
   store  Store   @relation(fields: [storeId], references: [id])
   orders Order[]
+  refundedOrders Order[] @relation("OrderRefundedBy")
+  inventoryAudits InventoryAudit[]
+  confirmedAudits InventoryAudit[] @relation("AuditConfirmedBy")
 
   @@index([storeId])
   @@index([email])
@@ -261,6 +271,7 @@ model Accessory {
   barcode       String  @unique
   sku           String  @unique
   modelCode     String?
+  imageUrl      String?
   isActive      Boolean @default(true)
 
   createdAt DateTime @default(now())
@@ -298,6 +309,10 @@ model Order {
   deliveredAt    DateTime?
   cancelledAt    DateTime?
   cancelReason   String?
+  refundAmount   Float         @default(0)
+  refundedAt     DateTime?
+  refundedById   String?
+  refundNote     String?
   paymentStatus  PaymentStatus @default(PENDING)
   paymentMethod  PaymentMethod @default(CASH)
   createdAt      DateTime      @default(now())
@@ -307,6 +322,7 @@ model Order {
   customer     Customer         @relation(fields: [customerId], references: [id])
   prescription Prescription?    @relation(fields: [prescriptionId], references: [id])
   staff        User             @relation(fields: [staffId], references: [id])
+  refundedBy   User?            @relation("OrderRefundedBy", fields: [refundedById], references: [id], onDelete: SetNull)
   items        OrderItem[]
   payments     Payment[]
   statusLogs   OrderStatusLog[]
@@ -315,6 +331,7 @@ model Order {
   @@index([customerId])
   @@index([orderNumber])
   @@index([status])
+  @@index([refundedById])
   @@map("orders")
 }
 
@@ -443,4 +460,47 @@ model PurchaseItem {
 
   @@index([purchaseId])
   @@map("purchase_items")
+}
+
+model InventoryAudit {
+  id            String                     @id @default(uuid())
+  storeId       String
+  userId        String
+  status        InventoryAuditStatus       @default(PENDING)
+  notes         String?
+  submittedAt   DateTime                   @default(now())
+  confirmedAt   DateTime?
+  confirmedById String?
+  createdAt     DateTime                   @default(now())
+  updatedAt     DateTime                   @updatedAt
+
+  store        Store                    @relation(fields: [storeId], references: [id])
+  user         User                     @relation(fields: [userId], references: [id])
+  confirmedBy  User?                    @relation("AuditConfirmedBy", fields: [confirmedById], references: [id], onDelete: SetNull)
+  items        InventoryAuditItem[]
+
+  @@index([storeId])
+  @@index([userId])
+  @@index([status])
+  @@map("inventory_audits")
+}
+
+model InventoryAuditItem {
+  id            String   @id @default(uuid())
+  auditId       String
+  itemType      String   // 'FRAME', 'LENS', 'ACCESSORY'
+  itemId        String
+  itemName      String
+  itemBarcode   String?
+  oldQuantity   Int
+  newQuantity   Int
+  difference    Int      // newQuantity - oldQuantity
+  reason        String?
+  createdAt     DateTime @default(now())
+
+  audit InventoryAudit @relation(fields: [auditId], references: [id], onDelete: Cascade)
+
+  @@index([auditId])
+  @@index([itemId])
+  @@map("inventory_audit_items")
 }

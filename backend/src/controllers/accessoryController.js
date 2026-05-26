@@ -44,6 +44,7 @@ exports.createAccessory = async (req, res, next) => {
       barcode,
       sku,
       modelCode,
+      imageUrl,
     } = req.body;
 
     if (!name || sellingPrice === undefined || sellingPrice === '') {
@@ -66,6 +67,7 @@ exports.createAccessory = async (req, res, next) => {
         barcode: finalBarcode,
         sku: finalSku,
         modelCode,
+        imageUrl,
       },
     });
     if (numberOrDefault(stockQty, 0) > 0) {
@@ -101,6 +103,7 @@ exports.updateAccessory = async (req, res, next) => {
       barcode,
       sku,
       modelCode,
+      imageUrl,
     } = req.body;
 
     const existing = await prisma.accessory.findFirst({
@@ -131,6 +134,7 @@ exports.updateAccessory = async (req, res, next) => {
         ...(finalBarcode !== undefined && { barcode: finalBarcode }),
         ...(finalSku !== undefined && { sku: finalSku }),
         ...(modelCode !== undefined && { modelCode }),
+        ...(imageUrl !== undefined && { imageUrl }),
       },
     });
     if (stockQty !== undefined && existing.stockQty !== updated.stockQty) {

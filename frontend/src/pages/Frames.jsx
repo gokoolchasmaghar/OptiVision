@@ -7,6 +7,7 @@ import Label, { PrintLabelButton } from '../components/Label';
 import { Html5Qrcode } from "html5-qrcode";
 import { useAuthStore } from '../stores/authStore';
 import { isAdmin } from '../utils/roles';
+import { assetUrl } from '../utils/assets';
 
 const SHAPES = ['ROUND', 'OVAL', 'RECTANGLE', 'SQUARE', 'CAT_EYE', 'AVIATOR', 'WAYFARER', 'GEOMETRIC', 'RIMLESS', 'SEMI_RIMLESS'];
 const fmt = n => `₹${Number(n || 0).toLocaleString('en-IN')}`;
@@ -26,13 +27,14 @@ export default function Frames() {
   const [view, setView] = useState('grid');
   const [modal, setModal] = useState(false);
   const [editFrame, setEditFrame] = useState(null);
-  const [form, setForm] = useState({ brand: '', model: '', shape: 'RECTANGLE', size: '', color: '', material: '', gender: '', purchasePrice: '', sellingPrice: '', stockQty: '', lowStockAlert: '5', barcode: '' });
+  const [form, setForm] = useState({ brand: '', model: '', shape: 'RECTANGLE', size: '', color: '', material: '', gender: '', purchasePrice: '', sellingPrice: '', stockQty: '', lowStockAlert: '5', barcode: '', imageUrl: '' });
   const [saving, setSaving] = useState(false);
   const [selectedFrame, setSelectedFrame] = useState(null);
   const [scanning, setScanning] = useState(false);
   const [printQty, setPrintQty] = useState(1);
   const scannerRef = useRef(null);
   const scannerReadyRef = useRef(false);
+  const imageInputRef = useRef(null);
   const { user } = useAuthStore();
   const canManageFrames = isAdmin(user);
 
@@ -97,6 +99,20 @@ export default function Frames() {
     if (scanning) { stopScanner(); } else { startScanner(); }
   };
 
+  const uploadImage = async (file) => {
+    if (!file) return;
+    const data = new FormData();
+    data.append('type', 'frames');
+    data.append('file', file);
+    try {
+      const res = await api.post('/upload', data, { headers: { 'Content-Type': 'multipart/form-data' } });
+      setForm(f => ({ ...f, imageUrl: res.data.url }));
+      toast.success('Image uploaded');
+    } catch (e) {
+      toast.error(e.response?.data?.message || 'Image upload failed');
+    }
+  };
+
   const handleModalClose = () => {
     if (scanning) stopScanner();
     setModal(false);
@@ -120,18 +136,58 @@ export default function Frames() {
     };
   }, [scanning]);
 
-  const openAdd = () => { setEditFrame(null); setForm({ brand: '', model: '', shape: 'RECTANGLE', size: '', color: '', material: '', gender: '', purchasePrice: '', sellingPrice: '', stockQty: '', lowStockAlert: '5', barcode: '' }); setModal(true); };
-  const openEdit = f => { setEditFrame(f); setForm({ brand: f.brand, model: f.model || '', shape: f.shape, size: f.size || '', color: f.color || '', material: f.material || '', gender: f.gender || '', purchasePrice: f.purchasePrice, sellingPrice: f.sellingPrice, stockQty: f.stockQty, lowStockAlert: f.lowStockAlert, barcode: f.barcode || '' }); setModal(true); };
+  const resetImageInput = () => {
+    if (imageInputRef.current) imageInputRef.current.value = '';
+  };
+
+  const removeImage = () => {
+    setForm(f => ({ ...f, imageUrl: '' }));
+    resetImageInput();
+  };
+
+  const openAdd = () => { setEditFrame(null); setForm({ brand: '', model: '', shape: 'RECTANGLE', size: '', color: '', material: '', gender: '', purchasePrice: '', sellingPrice: '', stockQty: '', lowStockAlert: '5', barcode: '', imageUrl: '' }); resetImageInput(); setModal(true); };
+  const openEdit = f => { setEditFrame(f); setForm({ brand: f.brand, model: f.model || '', shape: f.shape, size: f.size || '', color: f.color || '', material: f.material || '', gender: f.gender || '', purchasePrice: f.purchasePrice, sellingPrice: f.sellingPrice, stockQty: f.stockQty, lowStockAlert: f.lowStockAlert, barcode: f.barcode || '', imageUrl: f.imageUrl || '' }); resetImageInput(); setModal(true); };
 
   const save = async () => {
     if (!form.brand || !form.sellingPrice) return toast.error('Brand and selling price required');
+    
+    const cleanData = {
+      brand: form.brand,
+      model: form.model || undefined,
+      shape: form.shape,
+      size: form.size || undefined,
+      color: form.color || undefined,
+      material: form.material || undefined,
+      gender: form.gender || undefined,
+      purchasePrice: form.purchasePrice ? Number(form.purchasePrice) : 0,
+      sellingPrice: Number(form.sellingPrice),
+      stockQty: form.stockQty ? Number(form.stockQty) : 0,
+      lowStockAlert: form.lowStockAlert ? Number(form.lowStockAlert) : 5,
+    };
+
+    if (editFrame) {
+      cleanData.imageUrl = form.imageUrl || null;
+    } else if (form.imageUrl) {
+      cleanData.imageUrl = form.imageUrl;
+    }
+
+    if (form.barcode) {
+      cleanData.barcode = form.barcode;
+    }
+
     setSaving(true);
     try {
       if (editFrame) {
-        await api.put(`/frames/${editFrame.id}`, form);
+        const updateData = { ...cleanData };
+        if (form.barcode && form.barcode !== editFrame.barcode) {
+          updateData.barcode = form.barcode;
+        } else if (form.barcode === editFrame.barcode) {
+          delete updateData.barcode;
+        }
+        await api.put(`/frames/${editFrame.id}`, updateData);
         toast.success('Frame updated');
       } else {
-        await api.post('/frames', form);
+        await api.post('/frames', cleanData);
         toast.success('Frame added');
       }
       setModal(false); load(search, filters);
@@ -198,7 +254,11 @@ export default function Frames() {
           {frames.map(fr => (
             <div key={fr.id} className="card card-hover overflow-hidden group">
               <div className="h-36 bg-gradient-to-br from-slate-50 to-slate-100 flex items-center justify-center relative">
-                <span className="text-6xl opacity-60">🕶️</span>
+                {fr.imageUrl ? (
+                  <img src={assetUrl(fr.imageUrl)} alt={`${fr.brand} ${fr.model || ''}`.trim()} className="w-full h-full object-cover" />
+                ) : (
+                  <span className="text-6xl opacity-60">🕶️</span>
+                )}
                 {canManageFrames && (
                   <div className="absolute top-2.5 right-2.5 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                     <button onClick={() => openEdit(fr)} className="btn-secondary btn-xs shadow-sm">Edit</button>
@@ -284,6 +344,25 @@ export default function Frames() {
           <div><label className="field-label">Material</label><input className="field-input" value={form.material} onChange={e => setForm(f => ({ ...f, material: e.target.value }))} /></div>
           <div><label className="field-label">Gender</label><select className="field-select" value={form.gender} onChange={e => setForm(f => ({ ...f, gender: e.target.value }))}><option value="">Unisex</option><option value="Male">Male</option><option value="Female">Female</option></select></div>
           <div>
+            <label className="field-label">Image</label>
+            <input ref={imageInputRef} className="field-input" type="file" accept="image/*" capture="environment" onChange={e => uploadImage(e.target.files?.[0])} />
+            <div className="mt-2 h-24 rounded-xl border border-slate-200 bg-slate-50 overflow-hidden flex items-center justify-center">
+              {form.imageUrl ? (
+                <img src={assetUrl(form.imageUrl)} alt="Frame preview" className="w-full h-full object-cover" />
+              ) : (
+                <span className="text-4xl opacity-60">🕶️</span>
+              )}
+            </div>
+            <div className="mt-1 flex items-center justify-between gap-2">
+              <div className="text-xs text-slate-400 truncate">{form.imageUrl ? 'Image selected' : 'No image selected'}</div>
+              {form.imageUrl && (
+                <button type="button" className="text-xs text-red-600 hover:underline" onClick={removeImage}>
+                  Remove
+                </button>
+              )}
+            </div>
+          </div>
+          <div>
             <label className="field-label">Barcode</label>
             <div className="flex gap-2 mb-2">
               <input
@@ -293,10 +372,10 @@ export default function Frames() {
                 placeholder="Scan or enter barcode number"
               />
               <button type="button" onClick={handleGenerateBarcode} className="btn-secondary btn-sm whitespace-nowrap" title="Auto-generate EAN-13">
-                🔄 Generate
+                🔄
               </button>
               <button type="button" onClick={toggleScanner} className={`btn-sm whitespace-nowrap ${scanning ? 'btn-danger' : 'btn-secondary'}`} title={scanning ? 'Stop camera' : 'Scan with camera'}>
-                {scanning ? '⏹ Stop' : '📷 Scan'}
+                {scanning ? '⏹' : '📷'}
               </button>
             </div>
 

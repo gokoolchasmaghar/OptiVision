@@ -67,7 +67,7 @@ function validateRow(type, row) {
 
 // ── Build Prisma data objects ─────────────────────────────────────────────────
 function cleanBarcode(value) {
-    const barcode = value?.toString().trim();
+    const barcode = value === undefined || value === null ? '' : value.toString();
     return isValidBarcode(barcode) ? barcode : null;
 }
 
