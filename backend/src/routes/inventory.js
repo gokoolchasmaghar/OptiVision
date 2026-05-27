@@ -484,7 +484,7 @@ router.get('/stock-report/excel', requireRole('SUPER_ADMIN'), async (req, res, n
     ];
 
     const ws = XLSX.utils.json_to_sheet(excelData);
-    
+
     // Style the header row
     ws['!cols'] = [
       { wch: 12 }, // Item Type
@@ -516,7 +516,7 @@ router.get('/stock-report/excel', requireRole('SUPER_ADMIN'), async (req, res, n
 
     const buffer = XLSX.write(wb, { bookType: 'xlsx', type: 'buffer' });
     const stamp = new Date().toISOString().slice(0, 10);
-    
+
     res.set({
       'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
       'Content-Disposition': `attachment; filename=stock-audit-${stamp}.xlsx`,
@@ -535,7 +535,7 @@ router.post('/audit/submit', requireAdmin, async (req, res, next) => {
     assertInventoryAuditClient();
     const userId = authenticatedUserId(req);
     const { items, notes } = req.body;
-    
+
     if (!Array.isArray(items) || items.length === 0) {
       return res.status(400).json({ success: false, message: 'Items array required' });
     }
@@ -696,6 +696,67 @@ const confirmInventoryAudit = async (req, res, next) => {
 
 router.post('/audit/:auditId/confirm', requireRole('SUPER_ADMIN'), confirmInventoryAudit);
 router.post('/audits/:auditId/confirm', requireRole('SUPER_ADMIN'), confirmInventoryAudit);
+
+const rejectInventoryAudit = async (req, res, next) => {
+  try {
+    assertInventoryAuditClient();
+
+    const userId = authenticatedUserId(req);
+    const { auditId } = req.params;
+    const { note } = req.body;
+
+    const audit = await prisma.inventoryAudit.findFirst({
+      where: {
+        id: auditId,
+        storeId: req.storeId,
+      },
+    });
+
+    if (!audit) {
+      return res.status(404).json({
+        success: false,
+        message: 'Audit not found',
+      });
+    }
+
+    if (audit.status !== 'PENDING') {
+      return res.status(400).json({
+        success: false,
+        message: `Cannot reject ${audit.status.toLowerCase()} audit`,
+      });
+    }
+
+    await prisma.inventoryAudit.update({
+      where: { id: auditId },
+      data: {
+        status: 'REJECTED',
+        rejectedAt: new Date(),
+        rejectedById: userId,
+        rejectionNote: note || null,
+      },
+    });
+
+    res.json({
+      success: true,
+      message: 'Audit rejected successfully',
+    });
+
+  } catch (e) {
+    next(e);
+  }
+};
+
+router.post(
+  '/audit/:auditId/reject',
+  requireRole('SUPER_ADMIN'),
+  rejectInventoryAudit
+);
+
+router.post(
+  '/audits/:auditId/reject',
+  requireRole('SUPER_ADMIN'),
+  rejectInventoryAudit
+);
 
 // ═══════════════════════════════════════════════════════════════════════════
 // Audit History - View & Filter

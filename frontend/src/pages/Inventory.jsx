@@ -205,7 +205,11 @@ export default function Inventory() {
         load();
       }
     } catch (e) {
-      toast.error(e.response?.data?.message || 'Failed to submit audit');
+      if (e.response?.status === 409) {
+        toast.error('Stock changed after audit download. Please refresh audit sheet.');
+      } else {
+        toast.error(e.response?.data?.message || 'Failed to submit audit');
+      }
     } finally {
       setSubmitAudit(false);
     }
@@ -241,6 +245,25 @@ export default function Inventory() {
       toast.error(e.response?.data?.message || 'Failed to confirm audit');
     }
   };
+  const rejectAudit = async (id) => {
+    try {
+      const res = await api.post(`/inventory/audit/${id}/reject`);
+
+      if (res.data.success) {
+        toast.success('Audit rejected');
+
+        await load();
+        await loadAuditHistory();
+      }
+
+    } catch (e) {
+      console.error(e);
+
+      toast.error(
+        e.response?.data?.message || 'Failed to reject audit'
+      );
+    }
+  };
 
   const allFrames = data.frames || [];
   const allLenses = data.lenses || [];
@@ -273,21 +296,21 @@ export default function Inventory() {
                       disabled={pdfLoading}
                       className="w-full text-left px-4 py-2.5 hover:bg-slate-50 border-b border-slate-100 text-sm flex items-center gap-2 disabled:opacity-60"
                     >
-                      {pdfLoading ? <Spinner size={16} /> : '📄'}
+                      {pdfLoading ? <Spinner size={16} /> : ''}
                       {pdfLoading ? 'Preparing...' : 'Download PDF Report'}
                     </button>
                     <button
                       onClick={() => { setAuditModal(true); setReportDropdownOpen(false); }}
                       className="w-full text-left px-4 py-2.5 hover:bg-slate-50 border-b border-slate-100 text-sm flex items-center gap-2"
                     >
-                      📊 Stock Audit
+                      Stock Audit
                     </button>
                     <button
                       onClick={loadAuditHistory}
                       disabled={historyLoading}
                       className="w-full text-left px-4 py-2.5 hover:bg-slate-50 text-sm flex items-center gap-2 disabled:opacity-60"
                     >
-                      {historyLoading ? <Spinner size={16} /> : '📜'}
+                      {historyLoading ? <Spinner size={16} /> : ''}
                       {historyLoading ? 'Loading...' : 'Audit History'}
                     </button>
                   </div>
@@ -458,8 +481,8 @@ export default function Inventory() {
                         </td>
                         <td>
                           <span className={`badge text-xs ${m.type === 'IN' || m.type === 'RETURN' ? 'badge-green'
-                              : m.type === 'OUT' ? 'badge-red'
-                                : 'badge-yellow'
+                            : m.type === 'OUT' ? 'badge-red'
+                              : 'badge-yellow'
                             }`}>{m.type}</span>
                         </td>
                         <td className="font-bold text-center">{m.quantity}</td>
@@ -718,19 +741,28 @@ export default function Inventory() {
                       <td className="text-center font-bold">{audit.items?.length || 0}</td>
                       <td className="text-center">
                         <span className={`badge text-xs ${audit.status === 'PENDING' ? 'badge-yellow'
-                            : audit.status === 'CONFIRMED' ? 'badge-green'
-                              : 'badge-red'
+                          : audit.status === 'CONFIRMED' ? 'badge-green'
+                            : 'badge-red'
                           }`}>{audit.status}</span>
                       </td>
                       <td className="text-slate-500 truncate max-w-xs">{audit.notes || '—'}</td>
                       <td className="space-x-2">
                         {audit.status === 'PENDING' && (
-                          <button
-                            className="text-primary-600 hover:underline"
-                            onClick={() => confirmAudit(audit.id)}
-                          >
-                            Confirm
-                          </button>
+                          <>
+                            <button
+                              className="text-primary-600 hover:underline"
+                              onClick={() => confirmAudit(audit.id)}
+                            >
+                              Confirm
+                            </button>
+
+                            <button
+                              onClick={() => rejectAudit(audit.id)}
+                              className="text-red-600 font-medium"
+                            >
+                              Reject
+                            </button>
+                          </>
                         )}
                         {audit.confirmedBy && (
                           <span className="text-xs text-slate-400">

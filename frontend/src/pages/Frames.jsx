@@ -121,7 +121,7 @@ export default function Frames() {
   const load = async (q = '', f = {}) => {
     setLoading(true);
     try {
-      const r = await api.get('/frames', { params: { search: q, ...f, limit: 60 } });
+      const r = await api.get('/frames', { params: { search: q, ...f, limit: 5000 } });
       setFrames(r.data.data);
       if (r.data.filters?.brands?.length) setBrands(r.data.filters.brands);
     } catch (e) { toast.error('Failed to load frames'); }

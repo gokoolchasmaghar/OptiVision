@@ -132,6 +132,7 @@ model User {
   refundedOrders Order[] @relation("OrderRefundedBy")
   inventoryAudits InventoryAudit[]
   confirmedAudits InventoryAudit[] @relation("AuditConfirmedBy")
+  rejectedAudits InventoryAudit[] @relation("RejectedAudits")
 
   @@index([storeId])
   @@index([email])
@@ -480,6 +481,12 @@ model InventoryAudit {
   user         User                     @relation(fields: [userId], references: [id])
   confirmedBy  User?                    @relation("AuditConfirmedBy", fields: [confirmedById], references: [id], onDelete: SetNull)
   items        InventoryAuditItem[]
+
+  rejectedAt    DateTime?
+  rejectedById  String?
+  rejectionNote String?
+
+  rejectedBy User? @relation("RejectedAudits", fields: [rejectedById], references: [id])
 
   @@index([storeId])
   @@index([userId])
