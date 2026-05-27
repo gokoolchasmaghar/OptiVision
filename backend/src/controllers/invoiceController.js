@@ -1,6 +1,5 @@
 const bwipjs = require('bwip-js');
 const prisma = require('../utils/prisma');
-const { applyDiscount } = require('../utils/calculatePay');
 const { launchPdfBrowser } = require('../utils/pdfBrowser');
 
 const fmt = n => `&#8377;${Number(n || 0).toLocaleString('en-IN')}`;
@@ -22,33 +21,20 @@ const formatPD = val => {
   return Number(val).toFixed(0);
 };
 
-const getDiscountedItems = order => {
-  const subtotal = Number(order.subtotal || 0) || order.items.reduce(
+const buildInvoiceHtml = (order, barcodeImg = '') => {
+  const rx = order.prescription || {};
+  const itemsTotal = order.items.reduce(
     (sum, i) => sum + Number(i.totalPrice || 0),
     0
   );
 
-  return applyDiscount({
-    ...order,
-    subtotal,
-  });
-};
-
-const buildInvoiceHtml = (order, barcodeImg = '') => {
-  const rx = order.prescription || {};
-  const itemsWithDiscount = getDiscountedItems(order);
-  const subtotalAfterDiscount = itemsWithDiscount.reduce(
-    (sum, i) => sum + Number(i.finalPrice || 0),
-    0
-  );
-
-  const itemRows = itemsWithDiscount.map(i => `
+  const itemRows = order.items.map(i => `
     <tr>
       <td class="left">${i.name}</td>
       <td>${i.quantity}</td>
       <td>${fmt(i.unitPrice)}</td>
-      <td>${i.appliedDiscountPct.toFixed(2)}%</td>
-      <td>${fmt(i.finalPrice)}</td>
+      <td>${Number(i.discountPct || 0).toFixed(2)}%</td>
+      <td>${fmt(i.totalPrice)}</td>
     </tr>
   `).join('');
 
@@ -167,8 +153,14 @@ const buildInvoiceHtml = (order, barcodeImg = '') => {
         <table>
           <tr>
             <td class="left">Items Total</td>
-            <td class="right">${fmt(subtotalAfterDiscount)}</td>
+            <td class="right">${fmt(itemsTotal)}</td>
           </tr>
+          ${Number(order.discountAmount || 0) > 0 ? `
+          <tr>
+            <td class="left">Discount</td>
+            <td class="right">-${fmt(order.discountAmount)}</td>
+          </tr>
+          ` : ''}
           <tr>
             <td class="left">Loyalty Redeemed</td>
             <td class="right">-${fmt(order.redeemPoints)}</td>

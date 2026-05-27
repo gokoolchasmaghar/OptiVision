@@ -127,45 +127,18 @@ const generateInvoiceHTML = (order) => {
     console.error(e);
   }
 
-  let remainingDiscount = Number(order.discountAmount || 0);
-  const itemsWithDiscount = order.items.map((item, index) => {
-    const itemTotal = Number(item.totalPrice || 0);
-    const ratio = subtotal > 0 ? itemTotal / subtotal : 0;
-
-    let discountAmount = Number((ratio * remainingDiscount).toFixed(2));
-    if (index === order.items.length - 1) {
-      discountAmount = Number(remainingDiscount.toFixed(2));
-    }
-
-    remainingDiscount -= discountAmount;
-    const discountPct =
-      itemTotal > 0 ? (discountAmount / itemTotal) * 100 : 0;
-
-    return {
-      ...item,
-      discountAmount,
-      discountPct,
-      finalPrice: itemTotal - discountAmount,
-    };
-  });
-
-  const subtotalAfterDiscount = itemsWithDiscount.reduce(
-    (sum, i) => sum + Number(i.finalPrice || 0),
-    0
-  );
-
   const rx = order.prescription || {};
 
   // ----------------------
   // 🔥 Rows
   // ----------------------
-  const rows = itemsWithDiscount.map((i) => `
+  const rows = order.items.map((i) => `
     <tr>
       <td class="left">${i.name}</td>
       <td>${i.quantity}</td>
       <td>${fmt(i.unitPrice)}</td>
-      <td>${Number(i.discountPct.toFixed(1))}%</td>
-      <td>${fmt(i.finalPrice)}</td>
+      <td>${Number(i.discountPct || 0).toFixed(1)}%</td>
+      <td>${fmt(i.totalPrice)}</td>
     </tr>
   `).join('');
 
@@ -334,8 +307,15 @@ const generateInvoiceHTML = (order) => {
       <table>
         <tr>
           <td class="left">Items Total</td>
-          <td class="right">${fmt(subtotalAfterDiscount)}</td>
+          <td class="right">${fmt(subtotal)}</td>
         </tr>
+
+        ${Number(order.discountAmount || 0) > 0 ? `
+        <tr>
+          <td class="left">Discount</td>
+          <td class="right">−${fmt(order.discountAmount)}</td>
+        </tr>
+        ` : ''}
 
         <tr>
           <td class="left">Loyalty Redeemed</td>

@@ -168,7 +168,7 @@ router.get('/profit', async (req, res, next) => {
   try {
     const { from, to } = req.query;
     const { dateFrom, dateTo } = parseDateRange(from, to);
-    const data = await prisma.$queryRaw`SELECT COALESCE(SUM(o."totalAmount"),0)::float as "totalRevenue", COALESCE(SUM(o."taxAmount"),0)::float as "totalTax", COALESCE(SUM(o."discountAmount"),0)::float as "totalDiscounts", COALESCE(SUM(CASE WHEN oi."frameId" IS NOT NULL THEN oi.quantity*(oi."unitPrice"-f."purchasePrice") WHEN oi."lensId" IS NOT NULL THEN oi.quantity*(oi."unitPrice"-l."purchasePrice") ELSE oi."totalPrice" END),0)::float as "grossProfit" FROM orders o JOIN order_items oi ON o.id=oi."orderId" LEFT JOIN frames f ON oi."frameId"=f.id LEFT JOIN lenses l ON oi."lensId"=l.id WHERE o."storeId"=${req.storeId} AND o.status!='CANCELLED' AND o."createdAt" BETWEEN ${dateFrom} AND ${dateTo}`;
+    const data = await prisma.$queryRaw`SELECT COALESCE(SUM(o."totalAmount"),0)::float as "totalRevenue", COALESCE(SUM(o."taxAmount"),0)::float as "totalTax", COALESCE(SUM(o."discountAmount"),0)::float as "totalDiscounts", COALESCE(SUM(CASE WHEN oi."frameId" IS NOT NULL THEN oi."totalPrice" - oi.quantity*f."purchasePrice" WHEN oi."lensId" IS NOT NULL THEN oi."totalPrice" - oi.quantity*l."purchasePrice" ELSE oi."totalPrice" END),0)::float as "grossProfit" FROM orders o JOIN order_items oi ON o.id=oi."orderId" LEFT JOIN frames f ON oi."frameId"=f.id LEFT JOIN lenses l ON oi."lensId"=l.id WHERE o."storeId"=${req.storeId} AND o.status!='CANCELLED' AND o."createdAt" BETWEEN ${dateFrom} AND ${dateTo}`;
     res.json({ success: true, data: data[0] });
   } catch (e) { next(e); }
 });

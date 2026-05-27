@@ -26,6 +26,7 @@ export default function OrderCreate() {
   const [frameSearch, setFrameSearch] = useState('');
   const [frames, setFrames] = useState([]);
   const [selFrames, setSelFrames] = useState([]);
+  const [frameDiscounts, setFrameDiscounts] = useState({});
 
   // Step 3: Prescription
   const [prescriptions, setPrescriptions] = useState([]);
@@ -36,6 +37,7 @@ export default function OrderCreate() {
   // Step 4: Lens
   const [lenses, setLenses] = useState([]);
   const [selLens, setSelLens] = useState(null);
+  const [lensDiscount, setLensDiscount] = useState(0);
 
   // Step 5: Checkout
   const [discount, setDiscount] = useState(0);
@@ -80,8 +82,15 @@ export default function OrderCreate() {
   useEffect(() => { if (step === 3) api.get('/lenses').then(r => setLenses(r.data.data)); }, [step]);
 
   // Financials
-  const frameCost = selFrames.reduce((sum, f) => sum + f.sellingPrice, 0);
-  const lensCost = selLens ? selLens.sellingPrice * 2 * selFrames.length : 0;
+  const frameDiscount = frame => {
+    const discountPct = Math.min(Math.max(Number(frameDiscounts[frame.id] || 0), 0), 100);
+    return (Number(frame.sellingPrice || 0) * discountPct) / 100;
+  };
+  const lensGross = selLens ? Number(selLens.sellingPrice || 0) * 2 * selFrames.length : 0;
+  const lensDiscountPct = Math.min(Math.max(Number(lensDiscount) || 0, 0), 100);
+  const safeLensDiscount = (lensGross * lensDiscountPct) / 100;
+  const frameCost = selFrames.reduce((sum, f) => sum + Math.max(0, Number(f.sellingPrice || 0) - frameDiscount(f)), 0);
+  const lensCost = Math.max(0, lensGross - safeLensDiscount);
   const subtotal = frameCost + lensCost;
   const discountPct = Math.max(0, Math.min(100, Number(discount) || 0));
   const discountAmt = (subtotal * discountPct) / 100;
@@ -133,16 +142,18 @@ export default function OrderCreate() {
 
       const items = [];
       selFrames.forEach(f => {
+        const discountPct = Math.min(Math.max(Number(frameDiscounts[f.id] || 0), 0), 100);
         items.push({
           itemType: 'frame',
           frameId: f.id,
           name: `${f.brand} ${f.model || ''}`.trim(),
           quantity: 1,
           unitPrice: f.sellingPrice,
-          totalPrice: f.sellingPrice,
+          discountPct,
+          totalPrice: Math.max(0, Number(f.sellingPrice || 0) - frameDiscount(f)),
         });
       });
-      if (selLens) items.push({ itemType: 'lens', lensId: selLens.id, name: selLens.name, quantity: 2 * selFrames.length, unitPrice: selLens.sellingPrice, totalPrice: selLens.sellingPrice * 2 * selFrames.length });
+      if (selLens) items.push({ itemType: 'lens', lensId: selLens.id, name: selLens.name, quantity: 2 * selFrames.length, unitPrice: selLens.sellingPrice, discountPct: lensDiscountPct, totalPrice: lensCost });
 
       const r = await api.post('/orders', {
         customerId: selCustomer.id,
@@ -232,6 +243,11 @@ export default function OrderCreate() {
                   setSelFrames(prev => {
                     const exists = prev.find(x => x.id === f.id);
                     if (exists) {
+                      setFrameDiscounts(d => {
+                        const next = { ...d };
+                        delete next[f.id];
+                        return next;
+                      });
                       return prev.filter(x => x.id !== f.id); // remove
                     }
                     return [...prev, f]; // add
@@ -320,7 +336,7 @@ export default function OrderCreate() {
         {step === 3 && (
           <div>
             <h2 className="font-bold text-lg text-slate-900 mb-4">Select Lens Package</h2>
-            <button onClick={() => setSelLens(null)} className={`mb-4 btn-sm ${!selLens ? 'btn-primary' : 'btn-secondary'}`}>No Lens (Frame Only)</button>
+            <button onClick={() => { setSelLens(null); setLensDiscount(0); }} className={`mb-4 btn-sm ${!selLens ? 'btn-primary' : 'btn-secondary'}`}>No Lens (Frame Only)</button>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-h-80 overflow-y-auto">
               {lenses.map(l => (
                 <div key={l.id} onClick={() => setSelLens(l)}
@@ -346,6 +362,18 @@ export default function OrderCreate() {
                   <div className="flex justify-between"><span className="text-slate-600">Customer</span><span className="font-semibold">{selCustomer?.name}</span></div>
                   <div className="flex justify-between"><span className="text-slate-600">Frame</span><span className="font-semibold text-right max-w-36 truncate">{selFrames.map(f => `${f.brand} ${f.model}`).join(', ')}</span></div>
                   {selLens && <div className="flex justify-between"><span className="text-slate-600">Lens</span><span className="font-semibold text-right max-w-36 truncate">{selLens.name} ×2</span></div>}
+                  {selFrames.map(f => (
+                    <div key={f.id} className="flex justify-between text-xs text-slate-500">
+                      <span>{`${f.brand} ${f.model || ''}`.trim()}</span>
+                      <span>{fmt(Math.max(0, Number(f.sellingPrice || 0) - frameDiscount(f)))}</span>
+                    </div>
+                  ))}
+                  {selLens && (
+                    <div className="flex justify-between text-xs text-slate-500">
+                      <span>{selLens.name} item total</span>
+                      <span>{fmt(lensCost)}</span>
+                    </div>
+                  )}
                   <div className="border-t border-slate-200 pt-2 mt-1 space-y-1">
                     <div className="flex justify-between text-slate-500"><span>Subtotal</span><span>{fmt(subtotal)}</span></div>
                     {discountAmt > 0 && <div className="flex justify-between text-red-500"><span>Discount</span><span>−{fmt(discountAmt)}</span></div>}
@@ -365,7 +393,44 @@ export default function OrderCreate() {
                 </div>
               </div>
               <div className="space-y-3">
-                <div><label className="field-label">Discount %</label><input className="field-input" type="number" value={discount} onChange={e => setDiscount(Number(e.target.value))} /></div>
+                <div className="rounded-xl border border-slate-100 p-3 space-y-2">
+                  <div className="text-xs font-bold text-slate-600 uppercase tracking-wide">Item Discounts (%)</div>
+                  {selFrames.map(f => (
+                    <div key={f.id}>
+                      <label className="field-label">{`${f.brand} ${f.model || ''}`.trim()}</label>
+                      <div className="flex items-center gap-2">
+                        <input
+                          className="field-input flex-1"
+                          type="number"
+                          min="0"
+                          max="100"
+                          value={frameDiscounts[f.id] || ''}
+                          onChange={e => setFrameDiscounts(d => ({ ...d, [f.id]: Math.min(Math.max(Number(e.target.value) || 0, 0), 100) }))}
+                          placeholder="0"
+                        />
+                        <span className="text-sm font-semibold text-slate-600">%</span>
+                      </div>
+                    </div>
+                  ))}
+                  {selLens && (
+                    <div>
+                      <label className="field-label">{selLens.name} discount</label>
+                      <div className="flex items-center gap-2">
+                        <input
+                          className="field-input flex-1"
+                          type="number"
+                          min="0"
+                          max="100"
+                          value={lensDiscount || ''}
+                          onChange={e => setLensDiscount(Math.min(Math.max(Number(e.target.value) || 0, 0), 100))}
+                          placeholder="0"
+                        />
+                        <span className="text-sm font-semibold text-slate-600">%</span>
+                      </div>
+                    </div>
+                  )}
+                </div>
+                <div><label className="field-label">Final Bill Discount %</label><input className="field-input" type="number" value={discount} onChange={e => setDiscount(Number(e.target.value))} /></div>
                 {selCustomer && (
                   <div>
                     <label className="field-label">

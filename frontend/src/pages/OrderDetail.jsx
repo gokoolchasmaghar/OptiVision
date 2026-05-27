@@ -115,33 +115,6 @@ export default function OrderDetail() {
     0
   );
 
-  let remainingDiscount = Number(order.discountAmount || 0);
-  const itemsWithDiscount = order.items.map((item, index) => {
-    const itemTotal = Number(item.totalPrice || 0);
-    const ratio = subtotal > 0 ? itemTotal / subtotal : 0;
-    let discountAmount = Number((ratio * remainingDiscount).toFixed(2));
-
-    if (index === order.items.length - 1) {
-      discountAmount = Number(remainingDiscount.toFixed(2));
-    }
-
-    remainingDiscount -= discountAmount;
-    const discountPct =
-      itemTotal > 0 ? (discountAmount / itemTotal) * 100 : 0;
-
-    return {
-      ...item,
-      discountAmount,
-      discountPct,
-      finalPrice: itemTotal - discountAmount,
-    };
-  });
-
-  const subtotalAfterDiscount = itemsWithDiscount.reduce(
-    (sum, i) => sum + Number(i.finalPrice || 0),
-    0
-  );
-
   const sendWhatsAppUpdate = (status) => {
     const phone = order.customer?.phone;
     if (!phone) return toast.error('Customer phone not available');
@@ -393,14 +366,14 @@ Thank you for trusting us 🙏`
             <table className="tbl">
               <thead><tr><th>Item</th><th>Type</th><th className="text-right">Qty</th><th className="text-right">Unit Price</th><th className="text-right">Discount</th><th className="text-right">Total</th></tr></thead>
               <tbody>
-                {itemsWithDiscount.map(item => (
+                {order.items.map(item => (
                   <tr key={item.id}>
                     <td className="font-semibold text-slate-800">{item.name}</td>
                     <td><span className="badge-gray badge capitalize">{item.itemType}</span></td>
                     <td className="text-right">{item.quantity}</td>
                     <td className="text-right text-slate-500">{fmt(item.unitPrice)}</td>
-                    <td className="text-right text-red-500">{item.discountPct.toFixed(2)}%</td>
-                    <td className="text-right font-semibold">{fmt(item.finalPrice)}</td>
+                    <td className="text-right text-red-500">{Number(item.discountPct || 0).toFixed(2)}%</td>
+                    <td className="text-right font-semibold">{fmt(item.totalPrice)}</td>
                   </tr>
                 ))}
               </tbody>
@@ -408,7 +381,7 @@ Thank you for trusting us 🙏`
             {/* Bill summary */}
             <div className="px-5 py-4 border-t border-slate-100 space-y-2 bg-slate-50/50">
               {[
-                ['Items Total', fmt(order.subtotal)],
+                ['Items Total', fmt(subtotal)],
 
                 order.discountAmount > 0
                   ? ['Discount', `−${fmt(order.discountAmount)}`]

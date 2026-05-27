@@ -84,14 +84,31 @@ export default function Billing() {
     setCart(c => {
       const ex = c.find(x => x.id === item.id && x.itemType === item.itemType);
       if (ex) return c.map(x => x.id === item.id && x.itemType === item.itemType ? { ...x, qty: x.qty + 1 } : x);
-      return [...c, { ...item, qty: 1 }];
+      return [...c, { ...item, qty: 1, itemDiscountPct: 0 }];
     });
     setProdSearch('');
     setProducts([]);
   };
 
   const updateQty = (id, type, delta) =>
-    setCart(c => c.map(x => x.id === id && x.itemType === type ? { ...x, qty: Math.max(1, x.qty + delta) } : x));
+    setCart(c => c.map(x => {
+      if (x.id !== id || x.itemType !== type) return x;
+      const qty = Math.max(1, x.qty + delta);
+      return { ...x, qty, itemDiscountPct: Math.min(Number(x.itemDiscountPct || 0), 100) };
+    }));
+
+  const itemGross = item => Number(item.sellingPrice || 0) * Number(item.qty || 0);
+  const itemDiscount = item => {
+    const discountPct = Math.min(Math.max(Number(item.itemDiscountPct || 0), 0), 100);
+    return (itemGross(item) * discountPct) / 100;
+  };
+  const itemTotal = item => Math.max(0, itemGross(item) - itemDiscount(item));
+
+  const updateItemDiscount = (id, type, value) =>
+    setCart(c => c.map(x => {
+      if (x.id !== id || x.itemType !== type) return x;
+      return { ...x, itemDiscountPct: Math.min(Math.max(Number(value) || 0, 0), 100) };
+    }));
 
   const removeItem = (id, type) =>
     setCart(c => c.filter(x => !(x.id === id && x.itemType === type)));
@@ -180,7 +197,7 @@ export default function Billing() {
   };
 
   // ── Totals ──────────────────────────────────────────────────────────────────
-  const subtotal = cart.reduce((s, x) => s + x.sellingPrice * x.qty, 0);
+  const subtotal = cart.reduce((s, x) => s + itemTotal(x), 0);
   const discountPct = Math.max(0, Math.min(100, Number(discount) || 0));
   const discAmt = (subtotal * discountPct) / 100;
   const gstRate = storePricing.gstEnabled ? Number(storePricing.taxRate) || 0 : 0;
@@ -205,7 +222,8 @@ export default function Billing() {
         name: x.displayName,
         quantity: x.qty,
         unitPrice: x.sellingPrice,
-        totalPrice: x.sellingPrice * x.qty,
+        discountPct: Math.min(Math.max(Number(x.itemDiscountPct || 0), 0), 100),
+        totalPrice: itemTotal(x),
       }));
       const r = await api.post('/orders', {
         customerId: selCustomer.id, items,
@@ -339,7 +357,7 @@ export default function Billing() {
             ) : (
               <table className="tbl">
                 <thead>
-                  <tr><th>Item</th><th className="text-center">Qty</th><th className="text-right">Price</th><th className="text-right">Total</th><th></th></tr>
+                  <tr><th>Item</th><th className="text-center">Qty</th><th className="text-right">Price</th><th className="text-right">Item Discount %</th><th className="text-right">Total</th><th></th></tr>
                 </thead>
                 <tbody>
                   {cart.map(item => (
@@ -356,7 +374,21 @@ export default function Billing() {
                         </div>
                       </td>
                       <td className="text-right text-slate-500 text-sm">{fmt(item.sellingPrice)}</td>
-                      <td className="text-right font-semibold text-sm">{fmt(item.sellingPrice * item.qty)}</td>
+                      <td className="text-right">
+                        <div className="flex items-center justify-end gap-1">
+                          <input
+                            className="field-input h-8 w-20 text-right text-xs"
+                            type="number"
+                            min="0"
+                            max="100"
+                            value={item.itemDiscountPct || ''}
+                            onChange={e => updateItemDiscount(item.id, item.itemType, e.target.value)}
+                            placeholder="0"
+                          />
+                          <span className="text-xs font-semibold text-slate-600">%</span>
+                        </div>
+                      </td>
+                      <td className="text-right font-semibold text-sm">{fmt(itemTotal(item))}</td>
                       <td><button onClick={() => removeItem(item.id, item.itemType)} className="text-slate-300 hover:text-red-500 transition-colors"><Trash2 size={14} /></button></td>
                     </tr>
                   ))}
@@ -372,7 +404,7 @@ export default function Billing() {
             <h3 className="font-bold text-slate-800">Payment Summary</h3>
 
             <div>
-              <label className="field-label">Discount %</label>
+              <label className="field-label">Final Bill Discount %</label>
               <input className="field-input" type="number" value={discount} onChange={e => setDiscount(e.target.value)} placeholder="0" />
             </div>
 

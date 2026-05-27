@@ -7,6 +7,28 @@ const { PAYMENT_METHODS, ORDER_STATUSES, enumValue, positiveInt, numberOrDefault
 
 const roundMoney = value => Math.round((Number(value) || 0) * 100) / 100;
 
+const normalizeOrderItem = item => {
+  const quantity = positiveInt(item.quantity);
+  const unitPrice = Math.max(0, numberOrDefault(item.unitPrice, 0));
+  const grossTotal = roundMoney(unitPrice * Number(quantity || 0));
+  const rawDiscountAmount = item.discountAmount !== undefined
+    ? numberOrDefault(item.discountAmount, 0)
+    : item.discountPct !== undefined
+      ? (grossTotal * numberOrDefault(item.discountPct, 0)) / 100
+      : 0;
+  const discountAmount = Math.min(Math.max(roundMoney(rawDiscountAmount), 0), grossTotal);
+  const discountPct = grossTotal > 0 ? roundMoney((discountAmount / grossTotal) * 100) : 0;
+
+  return {
+    ...item,
+    quantity,
+    unitPrice,
+    discountAmount,
+    discountPct,
+    totalPrice: roundMoney(grossTotal - discountAmount),
+  };
+};
+
 const restoreOrderItemStock = async (tx, storeId, order, item, reason = 'Order Cancel') => {
   if (item.frameId) {
     const frame = await tx.frame.findFirst({ where: { id: item.frameId, storeId } });
@@ -136,12 +158,7 @@ router.post('/', requireStaff, async (req, res, next) => {
     const finalPaymentMethod = enumValue(paymentMethod, PAYMENT_METHODS);
     if (!finalPaymentMethod) return res.status(400).json({ success: false, message: 'Invalid payment method' });
 
-    const normalizedItems = items.map(item => ({
-      ...item,
-      quantity: positiveInt(item.quantity),
-      unitPrice: numberOrDefault(item.unitPrice, 0),
-      totalPrice: numberOrDefault(item.totalPrice, 0),
-    }));
+    const normalizedItems = items.map(normalizeOrderItem);
     if (normalizedItems.some(item => !item.quantity || !['frame', 'lens', 'accessory'].includes(item.itemType))) {
       return res.status(400).json({ success: false, message: 'Invalid order items' });
     }
@@ -270,12 +287,39 @@ router.post('/', requireStaff, async (req, res, next) => {
       const newOrder = await tx.order.create({
         data: {
           storeId: req.storeId, orderNumber, customerId, prescriptionId: prescriptionId || null, staffId: req.user.id,
-          subtotal: calculatedSubtotal, discountAmount: safeDiscount, redeemPoints: safeRedeemPoints, taxAmount: calculatedTax, taxPct: effectiveTaxRate, totalAmount: calculatedTotal,
+          subtotal: calculatedSubtotal, discountAmount: safeDiscount, discountPct: calculatedSubtotal > 0 ? roundMoney((safeDiscount / calculatedSubtotal) * 100) : 0, redeemPoints: safeRedeemPoints, taxAmount: calculatedTax, taxPct: effectiveTaxRate, totalAmount: calculatedTotal,
           advanceAmount: safeAdvanceAmount, balanceAmount: Math.max(0, calculatedTotal - safeAdvanceAmount),
           paymentMethod: finalPaymentMethod, paymentStatus: safeAdvanceAmount >= calculatedTotal ? 'PAID' : safeAdvanceAmount > 0 ? 'PARTIAL' : 'PENDING',
           deliveryDate: deliveryDate ? new Date(deliveryDate) : null, frameDetails, lensDetails, notes,
-          items: { create: normalizedItems.map(i => ({ itemType: i.itemType, frameId: i.frameId || null, lensId: i.lensId || null, accessoryId: i.accessoryId || null, name: i.name, quantity: i.quantity, unitPrice: i.unitPrice, totalPrice: i.totalPrice })) },
-          statusLogs: { create: { status: 'CREATED', note: 'Order created' } },
+          items: {
+            create: normalizedItems.map(i => ({
+              itemType: i.itemType,
+              name: i.name,
+              quantity: i.quantity,
+              unitPrice: i.unitPrice,
+              discountAmount: i.discountAmount,
+              discountPct: i.discountPct,
+              totalPrice: i.totalPrice,
+
+              ...(i.frameId && {
+                frame: {
+                  connect: { id: i.frameId }
+                }
+              }),
+
+              ...(i.lensId && {
+                lens: {
+                  connect: { id: i.lensId }
+                }
+              }),
+
+              ...(i.accessoryId && {
+                accessory: {
+                  connect: { id: i.accessoryId }
+                }
+              }),
+            }))
+          }, statusLogs: { create: { status: 'CREATED', note: 'Order created' } },
           ...(safeAdvanceAmount > 0 ? { payments: { create: [{ amount: safeAdvanceAmount, method: finalPaymentMethod, note: 'Advance' }] } } : {})
         },
         include: { customer: true, items: true }
