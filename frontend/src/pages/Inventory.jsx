@@ -48,6 +48,7 @@ export default function Inventory() {
   const { user } = useAuthStore();
   const canManageInventory = isAdmin(user);
   const canDownloadStockReport = isSuperAdmin(user);
+  const canViewCost = isAdmin(user);
 
   const load = () => Promise.all([
     api.get('/inventory').then(r => setData(r.data.data)),
@@ -352,7 +353,9 @@ export default function Inventory() {
                     <tr>
                       <th>Brand / Model</th>
                       <th className="hidden sm:table-cell">Color</th>
-                      <th className="hidden lg:table-cell">Cost</th>
+                      {canViewCost && (
+                        <th className="hidden lg:table-cell">Cost</th>
+                      )}
                       <th>Price</th>
                       <th className="text-center">Stock</th>
                       <th className="hidden md:table-cell text-center">Alert</th>
@@ -367,7 +370,11 @@ export default function Inventory() {
                           <div className="text-xs text-slate-400">{f.model || f.frameCode}</div>
                         </td>
                         <td className="hidden sm:table-cell text-xs text-slate-500">{f.color || '—'}</td>
-                        <td className="hidden lg:table-cell text-xs text-slate-400">{fmt(f.purchasePrice)}</td>
+                        {canViewCost && (
+                          <td className="hidden lg:table-cell text-xs text-slate-400">
+                            {fmt(f.purchasePrice)}
+                          </td>
+                        )}
                         <td className="font-semibold text-sm">{fmt(f.sellingPrice)}</td>
                         <td className="font-bold text-center">{f.stockQty}</td>
                         <td className="hidden md:table-cell text-center text-xs text-slate-400">{f.lowStockAlert}</td>

@@ -362,12 +362,43 @@ router.get('/stock-report/pdf', requireRole('SUPER_ADMIN'), async (req, res, nex
 router.get('/', async (req, res, next) => {
   try {
     const [frames, lenses, accessories] = await Promise.all([
-      prisma.frame.findMany({ where: { storeId: req.storeId, isActive: true }, orderBy: { brand: 'asc' } }),
-      prisma.lens.findMany({ where: { storeId: req.storeId, isActive: true }, orderBy: { name: 'asc' } }),
-      prisma.accessory.findMany({ where: { storeId: req.storeId, isActive: true }, orderBy: { name: 'asc' } }),
+      prisma.frame.findMany({
+        where: { storeId: req.storeId, isActive: true },
+        orderBy: { brand: 'asc' }
+      }),
+      prisma.lens.findMany({
+        where: { storeId: req.storeId, isActive: true },
+        orderBy: { name: 'asc' }
+      }),
+      prisma.accessory.findMany({
+        where: { storeId: req.storeId, isActive: true },
+        orderBy: { name: 'asc' }
+      }),
     ]);
-    res.json({ success: true, data: { frames, lenses, accessories } });
-  } catch (e) { next(e); }
+
+    const canViewCost =
+      req.user?.role === 'SUPER_ADMIN' ||
+      req.user?.role === 'SHOP_ADMIN';
+
+    const sanitize = item => {
+      if (canViewCost) return item;
+
+      const { purchasePrice, ...rest } = item;
+      return rest;
+    };
+
+    res.json({
+      success: true,
+      data: {
+        frames: frames.map(sanitize),
+        lenses: lenses.map(sanitize),
+        accessories: accessories.map(sanitize),
+      },
+    });
+
+  } catch (e) {
+    next(e);
+  }
 });
 
 router.get('/movements', async (req, res, next) => {
