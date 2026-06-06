@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Printer, CreditCard, Check, Download, MessageCircle, ReceiptText, X } from 'lucide-react';
+import { ArrowLeft, Printer, CreditCard, Check, Download, MessageCircle, ReceiptText, X, Edit2 } from 'lucide-react';
 import api from '../services/api';
 import { StatusBadge, Modal, Spinner } from '../components/ui';
 import { format } from 'date-fns';
@@ -110,10 +110,14 @@ export default function OrderDetail() {
   const canRefundOrder = canAdminOrder && order.status === 'CANCELLED' && paidAmount > 0 && !hasRefund;
   const paidPercent = order.totalAmount > 0 ? Math.round((paidAmount / Number(order.totalAmount)) * 100) : 0;
 
-  const subtotal = order.items.reduce(
-    (sum, i) => sum + Number(i.totalPrice || 0),
-    0
-  );
+  const itemGross = item => Number(item.unitPrice || 0) * Number(item.quantity || 0);
+  const itemDiscount = item => Number(item.discountAmount ?? (
+    itemGross(item) * Math.max(0, Number(item.discountPct || 0)) / 100
+  ));
+  const itemPayable = item => itemGross(item)
+    + (item.rateInclusiveOfGst ? 0 : Number(item.gstAmount || 0))
+    - itemDiscount(item);
+  const subtotal = order.items.reduce((sum, item) => sum + itemPayable(item), 0);
 
   const sendWhatsAppUpdate = (status) => {
     const phone = order.customer?.phone;
@@ -205,6 +209,11 @@ Thank you for trusting us 🙏`
             <button onClick={() => { setPayForm({ amount: String(order.balanceAmount), method: 'CASH', note: '' }); setPayModal(true); }}
               className="btn-success btn-md"><CreditCard size={15} /> Collect {fmt(order.balanceAmount)}</button>
           )}
+          {canAdminOrder && order.status !== 'CANCELLED' && !(order.returns?.length > 0) && (
+            <button onClick={() => navigate(`/orders/${id}/edit`)} className="btn-secondary btn-md">
+              <Edit2 size={15} /> Edit Bill
+            </button>
+          )}
           {canRefundOrder && (
             <button onClick={() => setRefundModal(true)} className="btn-danger btn-md">
               <CreditCard size={15} /> Refund {fmt(paidAmount)}
@@ -295,6 +304,21 @@ Thank you for trusting us 🙏`
             )}
           </div>
 
+          {canAdminOrder &&
+          !['CANCELLED', 'RETURNED', 'PARTIALLY_RETURNED'].includes(order.status) && (
+              <button
+                onClick={() => navigate('/sales-returns', {
+                  state: {
+                    orderId: order.id,
+                    orderNumber: order.orderNumber
+                  }
+                })}
+                className="btn-secondary btn-md"
+              >
+                Return
+              </button>
+            )}
+
           {canAdminOrder && order.status !== 'CANCELLED' && typeof handleCancelOrder === 'function' && (
             <button onClick={handleCancelOrder} className="btn-danger btn-md">
               Cancel Order
@@ -364,7 +388,7 @@ Thank you for trusting us 🙏`
           <div className="card overflow-hidden">
             <div className="px-5 py-4 border-b border-slate-100"><h3 className="font-bold text-slate-800 text-sm">Order Items</h3></div>
             <table className="tbl">
-              <thead><tr><th>Item</th><th>Type</th><th className="text-right">Qty</th><th className="text-right">Unit Price</th><th className="text-right">Discount</th><th className="text-right">Total</th></tr></thead>
+              <thead><tr><th>Item</th><th>Type</th><th className="text-right">Qty</th><th className="text-right">Unit Price</th><th className="text-right">GST</th><th className="text-right">Discount</th><th className="text-right">Total</th></tr></thead>
               <tbody>
                 {order.items.map(item => (
                   <tr key={item.id}>
@@ -372,8 +396,15 @@ Thank you for trusting us 🙏`
                     <td><span className="badge-gray badge capitalize">{item.itemType}</span></td>
                     <td className="text-right">{item.quantity}</td>
                     <td className="text-right text-slate-500">{fmt(item.unitPrice)}</td>
-                    <td className="text-right text-red-500">{Number(item.discountPct || 0).toFixed(2)}%</td>
-                    <td className="text-right font-semibold">{fmt(item.totalPrice)}</td>
+                    <td className="text-right text-slate-600">
+                      <div>{Number(item.gstRate || 0).toFixed(2)}%</div>
+                      <div className="text-xs text-slate-400">{fmt(item.gstAmount)}</div>
+                    </td>
+                    <td className="text-right text-red-500">
+                      <div>{Number(item.discountPct || 0).toFixed(2)}%</div>
+                      <div className="text-xs text-red-400">−{fmt(itemDiscount(item))}</div>
+                    </td>
+                    <td className="text-right font-semibold">{fmt(itemPayable(item))}</td>
                   </tr>
                 ))}
               </tbody>
@@ -384,14 +415,13 @@ Thank you for trusting us 🙏`
                 ['Items Total', fmt(subtotal)],
 
                 order.discountAmount > 0
-                  ? ['Discount', `−${fmt(order.discountAmount)}`]
+                  ? ['Bill Discount', `−${fmt(order.discountAmount)}`]
                   : null,
 
                 order.redeemPoints > 0
                   ? ['Loyalty Points Used', `−${fmt(order.redeemPoints)}`]
                   : null,
 
-                [`GST ${order.taxPct}%`, fmt(order.taxAmount)],
               ].filter(Boolean).map(([k, v]) => (
                 <div key={k} className="flex justify-between text-sm text-slate-600"><span>{k}</span><span>{v}</span></div>
               ))}
@@ -476,6 +506,46 @@ Thank you for trusting us 🙏`
                           `₹${Number(p.amount).toLocaleString('en-IN')}`
                         )}
                       </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+
+          {order.returns?.length > 0 && (
+            <div className="card overflow-hidden">
+              <div className="px-5 py-4 border-b border-slate-100"><h3 className="font-bold text-slate-800 text-sm">Sales Return History</h3></div>
+              <table className="tbl">
+                <thead><tr><th>Date</th><th>Staff</th><th>Items</th><th>Reason</th><th className="text-right">Refund</th></tr></thead>
+                <tbody>
+                  {order.returns.map(ret => (
+                    <tr key={ret.id}>
+                      <td>{format(new Date(ret.returnedAt), 'MMM d, yyyy h:mm a')}</td>
+                      <td>{ret.staff?.name || '-'}</td>
+                      <td>{ret.items?.reduce((sum, item) => sum + Number(item.quantity || 0), 0) || 0}</td>
+                      <td className="max-w-sm truncate" title={ret.reason}>{ret.reason}</td>
+                      <td className="text-right font-bold text-red-600">{fmt(ret.refundAmount)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+
+          {order.editLogs?.length > 0 && (
+            <div className="card overflow-hidden">
+              <div className="px-5 py-4 border-b border-slate-100"><h3 className="font-bold text-slate-800 text-sm">Bill Edit History</h3></div>
+              <table className="tbl">
+                <thead><tr><th>Date</th><th>User</th><th>Reason</th><th className="text-right">Before</th><th className="text-right">After</th></tr></thead>
+                <tbody>
+                  {order.editLogs.map(log => (
+                    <tr key={log.id}>
+                      <td>{format(new Date(log.createdAt), 'MMM d, yyyy h:mm a')}</td>
+                      <td>{log.user?.name || '-'}</td>
+                      <td className="max-w-sm truncate" title={log.changes?.reason || ''}>{log.changes?.reason || '-'}</td>
+                      <td className="text-right">{fmt(log.changes?.before?.totalAmount)}</td>
+                      <td className="text-right font-bold">{fmt(log.changes?.after?.totalAmount)}</td>
                     </tr>
                   ))}
                 </tbody>

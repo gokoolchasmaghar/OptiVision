@@ -9,6 +9,7 @@ const ORDER_INCLUDE = {
   items: true,
   payments: true,
   prescription: true,
+  store: true,
 };
 
 const formatPower = val => {
@@ -23,20 +24,35 @@ const formatPD = val => {
 
 const buildInvoiceHtml = (order, barcodeImg = '') => {
   const rx = order.prescription || {};
-  const itemsTotal = order.items.reduce(
-    (sum, i) => sum + Number(i.totalPrice || 0),
+  const itemGross = item => Number(item.unitPrice || 0) * Number(item.quantity || 0);
+  const itemDiscount = item => Number(item.discountAmount ?? (
+    itemGross(item) * Math.max(0, Number(item.discountPct || 0)) / 100
+  ));
+  const itemPayable = item => itemGross(item)
+    + (item.rateInclusiveOfGst ? 0 : Number(item.gstAmount || 0))
+    - itemDiscount(item);
+  const itemsTotal = order.items.reduce((sum, item) => sum + itemPayable(item), 0);
+
+  const totalTaxableValue = order.items.reduce(
+    (sum, item) => sum + Number(item.taxableValue || 0),
+    0
+  );
+
+  const totalGSTAmount = order.items.reduce(
+    (sum, item) => sum + Number(item.gstAmount || 0),
     0
   );
 
   const itemRows = order.items.map(i => `
     <tr>
       <td class="left">${i.name}</td>
+      <td>${Number(i.gstRate || 0).toFixed(2)}%<br/>HSN ${i.hsn || '-'}</td>
       <td>${i.quantity}</td>
       <td>${fmt(i.unitPrice)}</td>
       <td>${Number(i.discountPct || 0).toFixed(2)}%</td>
-      <td>${fmt(i.totalPrice)}</td>
+      <td>${fmt(itemPayable(i))}</td>
     </tr>
-  `).join('');
+    `).join('');
 
   return `
     <html>
@@ -60,12 +76,10 @@ const buildInvoiceHtml = (order, barcodeImg = '') => {
     <body>
       <div class="header">
         <div>
-          <div class="title">GO-KOOL CHASMAGHAR</div>
-          <div>235, Parbirata G.T. Road, Sripally</div>
-          <div>Near State Bank of India</div>
-          <div>Burdwan, Purba Bardhaman</div>
-          <div>West Bengal - 713103</div>
-          <div>Phone: +91 9832906048</div>
+          <div class="title">${order.store?.name || 'GO-KOOL CHASMAGHAR'}</div>
+          <div>${order.store?.address || '235, Parbirata G.T. Road, Sripally'}</div>
+          ${order.store?.gstNumber ? `<div>GSTIN: ${order.store.gstNumber}</div>` : ''}
+          <div>Phone: ${order.store?.phone || '+91 9832906048'}</div>
         </div>
         <div style="text-align:right">
           ${barcodeImg ? `<img src="${barcodeImg}" style="height:70px;" />` : ''}
@@ -80,11 +94,10 @@ const buildInvoiceHtml = (order, barcodeImg = '') => {
 
         <div style="text-align:right">
           <div><b>Date:</b> ${new Date(order.createdAt).toLocaleDateString()}</div>
-          <div><b>Delivery Date:</b> ${
-            order.deliveryDate
-              ? new Date(order.deliveryDate).toLocaleDateString()
-              : 'Pending'
-          }</div>
+          <div><b>Delivery Date:</b> ${order.deliveryDate
+      ? new Date(order.deliveryDate).toLocaleDateString()
+      : 'Pending'
+    }</div>
         </div>
       </div>
 
@@ -125,11 +138,10 @@ const buildInvoiceHtml = (order, barcodeImg = '') => {
           </div>
 
           <div style="margin-top:4px;">
-            <b>Lens Type:</b> ${
-              rx.lensType
-                ? rx.lensType.replace('_', ' ')
-                : 'NULL'
-            }
+            <b>Lens Type:</b> ${rx.lensType
+        ? rx.lensType.replace('_', ' ')
+        : 'NULL'
+      }
           </div>
         </div>
       ` : ''}
@@ -140,6 +152,7 @@ const buildInvoiceHtml = (order, barcodeImg = '') => {
         <table>
           <tr>
             <th class="left">Product</th>
+            <th>GST (HSN)</th>
             <th>Qty</th>
             <th>Rate</th>
             <th>Discount</th>
@@ -155,28 +168,39 @@ const buildInvoiceHtml = (order, barcodeImg = '') => {
             <td class="left">Items Total</td>
             <td class="right">${fmt(itemsTotal)}</td>
           </tr>
+
+          <tr>
+            <td class="left">Taxable Value</td>
+            <td class="right">${fmt(totalTaxableValue)}</td>
+          </tr>
+
+          <tr>
+            <td class="left">GST Amount</td>
+            <td class="right">${fmt(totalGSTAmount)}</td>
+          </tr>
+
           ${Number(order.discountAmount || 0) > 0 ? `
           <tr>
-            <td class="left">Discount</td>
+            <td class="left">Bill Discount</td>
             <td class="right">-${fmt(order.discountAmount)}</td>
           </tr>
+
           ` : ''}
-          <tr>
+          ${Number(order.redeemPoints || 0) > 0 ? `<tr>
             <td class="left">Loyalty Redeemed</td>
             <td class="right">-${fmt(order.redeemPoints)}</td>
-          </tr>
+          </tr>` : ''}
+
           <tr>
-            <td class="left">GST (Included)</td>
-            <td class="right">${fmt(order.taxAmount)}</td>
-          </tr>
-          <tr>
-            <td class="left bold">Total Payable</td>
+            <td class="left bold">Grand Total</td>
             <td class="right bold">${fmt(order.totalAmount)}</td>
           </tr>
+
           <tr>
             <td class="left">Advance Paid</td>
             <td class="right">${fmt(order.advanceAmount)}</td>
           </tr>
+          
           <tr>
             <td class="left bold">Balance</td>
             <td class="right bold">${fmt(order.balanceAmount)}</td>

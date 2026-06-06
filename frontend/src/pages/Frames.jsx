@@ -27,7 +27,7 @@ export default function Frames() {
   const [view, setView] = useState('grid');
   const [modal, setModal] = useState(false);
   const [editFrame, setEditFrame] = useState(null);
-  const [form, setForm] = useState({ brand: '', model: '', shape: 'RECTANGLE', size: '', color: '', material: '', gender: '', purchasePrice: '', sellingPrice: '', stockQty: '', lowStockAlert: '5', barcode: '', imageUrl: '' });
+  const [form, setForm] = useState({ brand: '', model: '', shape: 'RECTANGLE', size: '', color: '', material: '', gender: '', purchasePrice: '', sellingPrice: '', stockQty: '', lowStockAlert: '5', barcode: '', imageUrl: '', hsn: '9003', gstRate: '5' });
   const [saving, setSaving] = useState(false);
   const [selectedFrame, setSelectedFrame] = useState(null);
   const [scanning, setScanning] = useState(false);
@@ -145,12 +145,12 @@ export default function Frames() {
     resetImageInput();
   };
 
-  const openAdd = () => { setEditFrame(null); setForm({ brand: '', model: '', shape: 'RECTANGLE', size: '', color: '', material: '', gender: '', purchasePrice: '', sellingPrice: '', stockQty: '', lowStockAlert: '5', barcode: '', imageUrl: '' }); resetImageInput(); setModal(true); };
-  const openEdit = f => { setEditFrame(f); setForm({ brand: f.brand, model: f.model || '', shape: f.shape, size: f.size || '', color: f.color || '', material: f.material || '', gender: f.gender || '', purchasePrice: f.purchasePrice, sellingPrice: f.sellingPrice, stockQty: f.stockQty, lowStockAlert: f.lowStockAlert, barcode: f.barcode || '', imageUrl: f.imageUrl || '' }); resetImageInput(); setModal(true); };
+  const openAdd = () => { setEditFrame(null); setForm({ brand: '', model: '', shape: 'RECTANGLE', size: '', color: '', material: '', gender: '', purchasePrice: '', sellingPrice: '', stockQty: '', lowStockAlert: '5', barcode: '', imageUrl: '', hsn: '9003', gstRate: '5' }); resetImageInput(); setModal(true); };
+  const openEdit = f => { setEditFrame(f); setForm({ brand: f.brand, model: f.model || '', shape: f.shape, size: f.size || '', color: f.color || '', material: f.material || '', gender: f.gender || '', purchasePrice: f.purchasePrice, sellingPrice: f.sellingPrice, stockQty: f.stockQty, lowStockAlert: f.lowStockAlert, barcode: f.barcode || '', imageUrl: f.imageUrl || '', hsn: f.hsn || '9003', gstRate: f.gstRate || 5 }); resetImageInput(); setModal(true); };
 
   const save = async () => {
     if (!form.brand || !form.sellingPrice) return toast.error('Brand and selling price required');
-    
+
     const cleanData = {
       brand: form.brand,
       model: form.model || undefined,
@@ -163,6 +163,8 @@ export default function Frames() {
       sellingPrice: Number(form.sellingPrice),
       stockQty: form.stockQty ? Number(form.stockQty) : 0,
       lowStockAlert: form.lowStockAlert ? Number(form.lowStockAlert) : 5,
+      hsn: form.hsn || '9003',
+      gstRate: form.gstRate ? Number(form.gstRate) : 5,
     };
 
     if (editFrame) {
@@ -222,6 +224,14 @@ export default function Frames() {
       load(search, filters);
     }
   };
+
+  const selling = Number(form.sellingPrice || 0);
+  const purchase = Number(form.purchasePrice || 0);
+
+  const margin =
+    selling > 0
+      ? Math.round(((selling - purchase) / selling) * 100)
+      : 0;
 
   return (
     <div>
@@ -399,15 +409,18 @@ export default function Frames() {
               </div>
             )}
           </div>
-          <div><label className="field-label">Model Code</label><input className="field-input" value={form.modelCode || ''} onChange={e => setForm(f => ({ ...f, modelCode: e.target.value }))}/></div>
+          <div><label className="field-label">Model Code</label><input className="field-input" value={form.modelCode || ''} onChange={e => setForm(f => ({ ...f, modelCode: e.target.value }))} /></div>
           <div><label className="field-label">Purchase Price ₹</label><input className="field-input" type="number" value={form.purchasePrice} onChange={e => setForm(f => ({ ...f, purchasePrice: e.target.value }))} /></div>
           <div><label className="field-label">Selling Price ₹ *</label><input className="field-input" type="number" value={form.sellingPrice} onChange={e => setForm(f => ({ ...f, sellingPrice: e.target.value }))} /></div>
+          <div><label className="field-label">HSN Code</label><input className="field-input" type="text" placeholder="9003" value={form.hsn} onChange={e => setForm(f => ({ ...f, hsn: e.target.value }))} /></div>
+          <div><label className="field-label">GST Rate (%)</label><input className="field-input" type="number" min={0} max={100} step="0.01" placeholder="5" value={form.gstRate} onChange={e => setForm(f => ({ ...f, gstRate: e.target.value }))} /></div>
           <div><label className="field-label">Stock Qty</label><input className="field-input" type="number" value={form.stockQty} onChange={e => setForm(f => ({ ...f, stockQty: e.target.value }))} /></div>
           <div><label className="field-label">Low Stock Alert</label><input className="field-input" type="number" value={form.lowStockAlert} onChange={e => setForm(f => ({ ...f, lowStockAlert: e.target.value }))} /></div>
           {form.purchasePrice && form.sellingPrice && (
             <div className="col-span-2 bg-emerald-50 border border-emerald-100 rounded-xl p-3 text-sm">
-              <span className="text-emerald-700 font-semibold">Margin: {Math.round((form.sellingPrice - form.purchasePrice) / form.sellingPrice * 100)}%</span>
+              <span className="text-emerald-700 font-semibold">{margin}%</span>
               <span className="text-emerald-600 ml-3">Profit: {fmt(form.sellingPrice - form.purchasePrice)} per unit</span>
+              {form.gstRate && <span className="text-slate-600 ml-3">| GST: {form.gstRate}% (HSN: {form.hsn || '9003'})</span>}
             </div>
           )}
         </div>

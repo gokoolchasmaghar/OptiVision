@@ -5,7 +5,7 @@ router.use(authenticate);
 router.get('/current', async (req, res, next) => { try { const s = await prisma.store.findUnique({ where: { id: req.storeId } }); res.json({ success: true, data: s }); } catch (e) { next(e); } });
 router.put('/current', requireAdmin, async (req, res, next) => {
   try {
-    const { name, address, phone, email, gstNumber, gstEnabled, taxRate, invoicePrefix } = req.body;
+    const { name, address, phone, email, gstNumber, gstEnabled, pricesInclusiveOfGst, taxRate, invoicePrefix } = req.body;
     const s = await prisma.store.update({
       where: { id: req.storeId },
       data: {
@@ -15,6 +15,7 @@ router.put('/current', requireAdmin, async (req, res, next) => {
         ...(email !== undefined && { email }),
         ...(gstNumber !== undefined && { gstNumber }),
         ...(gstEnabled !== undefined && { gstEnabled: gstEnabled === true || gstEnabled === 'true' }),
+        ...(pricesInclusiveOfGst !== undefined && { pricesInclusiveOfGst: pricesInclusiveOfGst === true || pricesInclusiveOfGst === 'true' }),
         ...(taxRate !== undefined && { taxRate: Number(taxRate) }),
         ...(invoicePrefix && { invoicePrefix })
       }

@@ -3,7 +3,7 @@ import { Outlet, NavLink, useLocation, useNavigate } from 'react-router-dom';
 import {
   LayoutDashboard, Users, Glasses, Eye, ClipboardList,
   IndianRupee, Package, BarChart3, Settings, LogOut,
-  ChevronLeft, ChevronRight, Plus, Menu, X,
+  ChevronLeft, ChevronRight, Plus, Menu, X, DollarSign, RotateCcw,
 } from 'lucide-react';
 import { useAuthStore } from '../../stores/authStore';
 import toast from 'react-hot-toast';
@@ -17,9 +17,11 @@ const NAV = [
   { to: '/lenses', icon: Eye, label: 'Lenses' },
   { to: '/accessories', icon: Package, label: 'Accessories' },
   { to: '/orders', icon: ClipboardList, label: 'Orders' },
+  { to: '/sales-returns', icon: RotateCcw, label: 'Returns' },
   { to: '/billing', icon: IndianRupee, label: 'Billing' },
   { to: '/inventory', icon: Package, label: 'Inventory' },
   { to: '/reports', icon: BarChart3, label: 'Reports', adminOnly: true },
+  { to: '/expenses', icon: DollarSign, label: 'Expenses', adminOnly: true },
   { to: '/settings', icon: Settings, label: 'Settings' },
 ];
 

@@ -5,6 +5,7 @@ const { authenticate, requireAdmin } = require('../middleware/auth');
 const { resolveBarcode } = require('../utils/barcode');
 const { resolveSku } = require('../utils/sku');
 const { LENS_TYPES, enumValue, numberOrDefault } = require('../utils/normalize');
+const { getLensGSTMapping } = require('../utils/gst');
 
 router.use(authenticate);
 
@@ -31,8 +32,17 @@ router.post('/', requireAdmin, async (req, res, next) => {
       lowStockAlert,
       supplierId,
       barcode,
-      sku
+      sku,
+      hsn,
+      gstRate
     } = req.body;
+
+    if (!name || !sellingPrice) {
+      return res.status(400).json({
+        success: false,
+        message: 'name and sellingPrice required'
+      });
+    }
 
     let resolvedSupplierId = null;
     if (supplierId) {
@@ -49,6 +59,7 @@ router.post('/', requireAdmin, async (req, res, next) => {
     const finalBarcode = await resolveBarcode(prisma, barcode);
     const finalSku = await resolveSku(prisma, 'lens', 'LENS', sku);
     const finalLensType = enumValue(lensType, LENS_TYPES, 'SINGLE_VISION');
+    const gstMapping = getLensGSTMapping(finalLensType);
 
     const lens = await prisma.lens.create({
       data: {
@@ -60,11 +71,13 @@ router.post('/', requireAdmin, async (req, res, next) => {
         brand,
         purchasePrice: numberOrDefault(purchasePrice, 0),
         sellingPrice: numberOrDefault(sellingPrice, 0),
-        stockQty: numberOrDefault(stockQty, 100),
+        stockQty: numberOrDefault(stockQty, 0),
         lowStockAlert: numberOrDefault(lowStockAlert, 10),
         supplierId: resolvedSupplierId,
         barcode: finalBarcode,
-        sku: finalSku
+        sku: finalSku,
+        hsn: hsn || gstMapping.hsn,
+        gstRate: gstRate !== undefined ? Math.max(0, Number(gstRate) || 0) : gstMapping.gstRate,
       }
     });
     if (numberOrDefault(stockQty, 100) > 0) {
@@ -89,7 +102,7 @@ router.post('/', requireAdmin, async (req, res, next) => {
 
 router.put('/:id', requireAdmin, async (req, res, next) => {
   try {
-    const { storeId, id, createdAt, updatedAt, barcode, sku, lensType, coating, supplierId, purchasePrice, sellingPrice, stockQty, lowStockAlert, ...safeData } = req.body;
+    const { storeId, id, createdAt, updatedAt, barcode, sku, lensType, coating, supplierId, purchasePrice, sellingPrice, stockQty, lowStockAlert, hsn, gstRate, ...safeData } = req.body;
     if (barcode !== undefined) {
       safeData.barcode = await resolveBarcode(prisma, barcode, new Set(), { model: 'lens', id: req.params.id });
     }
@@ -111,6 +124,9 @@ router.put('/:id', requireAdmin, async (req, res, next) => {
     }
     if (purchasePrice !== undefined) safeData.purchasePrice = numberOrDefault(purchasePrice, 0);
     if (sellingPrice !== undefined) safeData.sellingPrice = numberOrDefault(sellingPrice, 0);
+    if (hsn !== undefined) safeData.hsn = hsn;
+    if (gstRate !== undefined) safeData.gstRate = Math.max(0, Number(gstRate) || 0);
+
     const existing = stockQty !== undefined
       ? await prisma.lens.findFirst({ where: { id: req.params.id, storeId: req.storeId }, select: { id: true, stockQty: true } })
       : null;

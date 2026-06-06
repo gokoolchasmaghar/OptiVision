@@ -9,7 +9,7 @@ const fmt = n => `₹${Number(n || 0).toLocaleString('en-IN')}`;
 const STEPS = ['Customer', 'Frame', 'Prescription', 'Lens Package', 'Checkout'];
 const LENS_TYPES = ['SINGLE_VISION', 'BIFOCAL', 'PROGRESSIVE', 'READING'];
 
-const DEFAULT_STORE_PRICING = { gstEnabled: true, taxRate: 18 };
+const DEFAULT_STORE_PRICING = { gstEnabled: true, taxRate: 18, pricesInclusiveOfGst: false };
 
 export default function OrderCreate() {
   const navigate = useNavigate();
@@ -55,6 +55,7 @@ export default function OrderCreate() {
     api.get('/stores/current').then(r => setStorePricing({
       gstEnabled: r.data.data?.gstEnabled !== false,
       taxRate: Number.isFinite(Number(r.data.data?.taxRate)) ? Math.max(0, Number(r.data.data.taxRate)) : 18,
+      pricesInclusiveOfGst: r.data.data?.pricesInclusiveOfGst === true,
     })).catch(() => { });
     const cid = params.get('customerId');
     if (cid) {
@@ -81,6 +82,31 @@ export default function OrderCreate() {
   }, [step]);
   useEffect(() => { if (step === 3) api.get('/lenses').then(r => setLenses(r.data.data)); }, [step]);
 
+  const calculateGSTForAmount = (amount, gstRate, isInclusive) => {
+    const rate = storePricing.gstEnabled ? Number(gstRate || 0) : 0;
+    const gstPercentage = rate / 100;
+    if (isInclusive) {
+      const taxableValue = amount / (1 + gstPercentage);
+      const gstAmount = amount - taxableValue;
+      return { taxableValue: Math.round(taxableValue * 100) / 100, gstAmount: Math.round(gstAmount * 100) / 100 };
+    }
+    const gstAmount = amount * gstPercentage;
+    return { taxableValue: amount, gstAmount: Math.round(gstAmount * 100) / 100 };
+  };
+
+  const linePayable = (grossAmount, discountAmount, gstRate) => {
+    const netAmount = Math.max(0, grossAmount - discountAmount);
+
+    const { gstAmount } = calculateGSTForAmount(
+      netAmount,
+      gstRate,
+      storePricing.pricesInclusiveOfGst === true
+    );
+
+    return netAmount +
+      (storePricing.pricesInclusiveOfGst ? 0 : gstAmount);
+  };
+
   // Financials
   const frameDiscount = frame => {
     const discountPct = Math.min(Math.max(Number(frameDiscounts[frame.id] || 0), 0), 100);
@@ -94,11 +120,18 @@ export default function OrderCreate() {
   const subtotal = frameCost + lensCost;
   const discountPct = Math.max(0, Math.min(100, Number(discount) || 0));
   const discountAmt = (subtotal * discountPct) / 100;
-  const gstRate = storePricing.gstEnabled ? Number(storePricing.taxRate) || 0 : 0;
-  const taxable = subtotal - discountAmt;
-  const loyaltyDiscount = Math.min(Number(redeemPoints) || 0, selCustomer?.loyaltyPoints || 0);
-  const tax = (taxable * gstRate) / 100;
-  const total = Math.max(0, taxable + tax - loyaltyDiscount);
+  let itemsPayable = 0;
+  selFrames.forEach(f => {
+    const frameGross = Number(f.sellingPrice || 0);
+    const discountAmount = frameDiscount(f);
+    itemsPayable += linePayable(frameGross, discountAmount, f.gstRate || 0);
+  });
+  if (selLens) {
+    itemsPayable += linePayable(lensGross, safeLensDiscount, selLens.gstRate || 0);
+  }
+
+  const loyaltyDiscount = Math.min(Number(redeemPoints) || 0, selCustomer?.loyaltyPoints || 0, Math.max(0, itemsPayable - discountAmt));
+  const total = Math.max(0, itemsPayable - discountAmt - loyaltyDiscount);
   const balance = Math.max(0, total - advance);
 
   const hasPrescription =
@@ -151,9 +184,21 @@ export default function OrderCreate() {
           unitPrice: f.sellingPrice,
           discountPct,
           totalPrice: Math.max(0, Number(f.sellingPrice || 0) - frameDiscount(f)),
+          hsn: f.hsn || '9003',
+          gstRate: f.gstRate || 5,
         });
       });
-      if (selLens) items.push({ itemType: 'lens', lensId: selLens.id, name: selLens.name, quantity: 2 * selFrames.length, unitPrice: selLens.sellingPrice, discountPct: lensDiscountPct, totalPrice: lensCost });
+      if (selLens) items.push({
+        itemType: 'lens',
+        lensId: selLens.id,
+        name: selLens.name,
+        quantity: 2 * selFrames.length,
+        unitPrice: selLens.sellingPrice,
+        discountPct: lensDiscountPct,
+        totalPrice: lensCost,
+        hsn: selLens.hsn || '9001',
+        gstRate: selLens.gstRate || 5,
+      });
 
       const r = await api.post('/orders', {
         customerId: selCustomer.id,
@@ -365,28 +410,23 @@ export default function OrderCreate() {
                   {selFrames.map(f => (
                     <div key={f.id} className="flex justify-between text-xs text-slate-500">
                       <span>{`${f.brand} ${f.model || ''}`.trim()}</span>
-                      <span>{fmt(Math.max(0, Number(f.sellingPrice || 0) - frameDiscount(f)))}</span>
+                      <span>{fmt(linePayable(Number(f.sellingPrice || 0), frameDiscount(f), f.gstRate || 0))}</span>
                     </div>
                   ))}
                   {selLens && (
                     <div className="flex justify-between text-xs text-slate-500">
                       <span>{selLens.name} item total</span>
-                      <span>{fmt(lensCost)}</span>
+                      <span>{fmt(linePayable(lensGross, safeLensDiscount, selLens.gstRate || 0))}</span>
                     </div>
                   )}
                   <div className="border-t border-slate-200 pt-2 mt-1 space-y-1">
-                    <div className="flex justify-between text-slate-500"><span>Subtotal</span><span>{fmt(subtotal)}</span></div>
-                    {discountAmt > 0 && <div className="flex justify-between text-red-500"><span>Discount</span><span>−{fmt(discountAmt)}</span></div>}
+                    <div className="flex justify-between text-slate-500"><span>Items Total</span><span>{fmt(itemsPayable)}</span></div>
+                    {discountAmt > 0 && <div className="flex justify-between text-red-500"><span>Bill Discount</span><span>−{fmt(discountAmt)}</span></div>}
                     {loyaltyDiscount > 0 && (
                       <div className="flex justify-between text-emerald-600">
                         <span>Loyalty Points</span>
                         <span>−{fmt(loyaltyDiscount)}</span>
                       </div>
-                    )}
-                    {gstRate > 0 ? (
-                      <div className="flex justify-between text-slate-500"><span>{`GST ${gstRate}%`}</span><span>{fmt(tax)}</span></div>
-                    ) : (
-                      <div className="flex justify-between text-slate-500"><span>GST</span><span>Off</span></div>
                     )}
                     <div className="flex justify-between font-bold text-base border-t border-slate-200 pt-1.5 mt-1"><span>Total</span><span>{fmt(total)}</span></div>
                   </div>

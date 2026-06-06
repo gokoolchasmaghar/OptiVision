@@ -112,8 +112,34 @@ router.get('/sales', async (req, res, next) => {
   try {
     const { from, to } = req.query;
     const { dateFrom, dateTo } = parseDateRange(from, to);
-    const [sales, summary] = await Promise.all([
-      prisma.$queryRaw`SELECT DATE("createdAt") as date, COUNT(*)::int as orders, COALESCE(SUM("totalAmount"),0)::float as revenue, COALESCE(SUM("discountAmount"),0)::float as discounts, COALESCE(SUM("taxAmount"),0)::float as tax FROM orders WHERE "storeId"=${req.storeId} AND status!='CANCELLED' AND "createdAt" BETWEEN ${dateFrom} AND ${dateTo} GROUP BY DATE("createdAt") ORDER BY date ASC`,
+    const [sales, summary, returnSummary] = await Promise.all([
+      prisma.$queryRaw`
+        SELECT
+          d.date,
+          COALESCE(o.orders, 0)::int as orders,
+          (COALESCE(o.revenue, 0) - COALESCE(r.returns, 0))::float as revenue,
+          COALESCE(o.discounts, 0)::float as discounts,
+          COALESCE(o.tax, 0)::float as tax,
+          COALESCE(r.returns, 0)::float as returns
+        FROM (
+          SELECT DATE("createdAt") as date FROM orders WHERE "storeId"=${req.storeId} AND status!='CANCELLED' AND "createdAt" BETWEEN ${dateFrom} AND ${dateTo}
+          UNION
+          SELECT DATE("returnedAt") as date FROM sales_returns WHERE "storeId"=${req.storeId} AND "returnedAt" BETWEEN ${dateFrom} AND ${dateTo}
+        ) d
+        LEFT JOIN (
+          SELECT DATE("createdAt") as date, COUNT(*)::int as orders, COALESCE(SUM("totalAmount"),0)::float as revenue, COALESCE(SUM("discountAmount"),0)::float as discounts, COALESCE(SUM("taxAmount"),0)::float as tax
+          FROM orders
+          WHERE "storeId"=${req.storeId} AND status!='CANCELLED' AND "createdAt" BETWEEN ${dateFrom} AND ${dateTo}
+          GROUP BY DATE("createdAt")
+        ) o ON o.date = d.date
+        LEFT JOIN (
+          SELECT DATE("returnedAt") as date, COALESCE(SUM("refundAmount"),0)::float as returns
+          FROM sales_returns
+          WHERE "storeId"=${req.storeId} AND "returnedAt" BETWEEN ${dateFrom} AND ${dateTo}
+          GROUP BY DATE("returnedAt")
+        ) r ON r.date = d.date
+        ORDER BY d.date ASC
+      `,
       prisma.order.aggregate({
         where: {
           storeId: req.storeId,
@@ -123,9 +149,29 @@ router.get('/sales', async (req, res, next) => {
         _sum: { totalAmount: true, discountAmount: true, taxAmount: true },
         _count: true,
         _avg: { totalAmount: true }
-      })
+      }),
+      prisma.salesReturn.aggregate({
+        where: {
+          storeId: req.storeId,
+          returnedAt: { gte: dateFrom, lte: dateTo }
+        },
+        _sum: { refundAmount: true },
+        _count: true,
+      }),
     ]);
-    res.json({ success: true, data: { sales, summary } });
+    const returnedAmount = returnSummary._sum.refundAmount || 0;
+    res.json({
+      success: true,
+      data: {
+        sales,
+        summary: {
+          ...summary,
+          returns: returnedAmount,
+          returnCount: returnSummary._count || 0,
+          netRevenue: Number(summary._sum.totalAmount || 0) - returnedAmount,
+        }
+      }
+    });
   } catch (e) { next(e); }
 });
 
@@ -168,8 +214,105 @@ router.get('/profit', async (req, res, next) => {
   try {
     const { from, to } = req.query;
     const { dateFrom, dateTo } = parseDateRange(from, to);
-    const data = await prisma.$queryRaw`SELECT COALESCE(SUM(o."totalAmount"),0)::float as "totalRevenue", COALESCE(SUM(o."taxAmount"),0)::float as "totalTax", COALESCE(SUM(o."discountAmount"),0)::float as "totalDiscounts", COALESCE(SUM(CASE WHEN oi."frameId" IS NOT NULL THEN oi."totalPrice" - oi.quantity*f."purchasePrice" WHEN oi."lensId" IS NOT NULL THEN oi."totalPrice" - oi.quantity*l."purchasePrice" ELSE oi."totalPrice" END),0)::float as "grossProfit" FROM orders o JOIN order_items oi ON o.id=oi."orderId" LEFT JOIN frames f ON oi."frameId"=f.id LEFT JOIN lenses l ON oi."lensId"=l.id WHERE o."storeId"=${req.storeId} AND o.status!='CANCELLED' AND o."createdAt" BETWEEN ${dateFrom} AND ${dateTo}`;
-    res.json({ success: true, data: data[0] });
+    const [data, expenses, returns] = await Promise.all([
+      prisma.$queryRaw`
+        SELECT
+          COALESCE(SUM(o."totalAmount"),0)::float as "totalRevenue",
+          COALESCE(SUM(o."taxAmount"),0)::float as "totalTax",
+          COALESCE(SUM(o."discountAmount"),0)::float as "totalDiscounts",
+          COALESCE(
+            SUM(
+              CASE
+                WHEN oi."frameId" IS NOT NULL
+                  THEN oi."totalPrice" - oi.quantity * f."purchasePrice"
+
+                WHEN oi."lensId" IS NOT NULL
+                  THEN oi."totalPrice" - oi.quantity * l."purchasePrice"
+
+                WHEN oi."accessoryId" IS NOT NULL
+                  THEN oi."totalPrice" - oi.quantity * a."purchasePrice"
+
+                ELSE oi."totalPrice"
+              END
+            ),
+            0
+          )::float as "grossProfit"
+        FROM orders o
+        JOIN order_items oi
+          ON o.id = oi."orderId"
+        LEFT JOIN frames f
+          ON oi."frameId" = f.id
+        LEFT JOIN lenses l
+          ON oi."lensId" = l.id
+        LEFT JOIN accessories a
+          ON oi."accessoryId" = a.id
+        WHERE o."storeId" = ${req.storeId}
+          AND o.status != 'CANCELLED'
+          AND o."createdAt" BETWEEN ${dateFrom} AND ${dateTo}
+      `,
+
+
+      prisma.expense.aggregate({
+        where: {
+          storeId: req.storeId,
+          createdAt: { gte: dateFrom, lte: dateTo },
+        },
+        _sum: { amount: true },
+      }),
+      prisma.$queryRaw`
+        SELECT
+          COALESCE(SUM(sr."refundAmount"),0)::float as "returnAmount",
+          COALESCE(
+            SUM(
+              sri."refundAmount" -
+              CASE
+                WHEN oi."frameId" IS NOT NULL
+                  THEN sri.quantity * f."purchasePrice"
+
+                WHEN oi."lensId" IS NOT NULL
+                  THEN sri.quantity * l."purchasePrice"
+
+                WHEN oi."accessoryId" IS NOT NULL
+                  THEN sri.quantity * a."purchasePrice"
+
+                ELSE 0
+              END
+            ),
+            0
+          )::float as "returnedProfit"
+        FROM sales_returns sr
+        JOIN sales_return_items sri
+          ON sri."salesReturnId" = sr.id
+        JOIN order_items oi
+          ON oi.id = sri."orderItemId"
+        LEFT JOIN frames f
+          ON oi."frameId" = f.id
+        LEFT JOIN lenses l
+          ON oi."lensId" = l.id
+        LEFT JOIN accessories a
+          ON oi."accessoryId" = a.id
+        WHERE sr."storeId" = ${req.storeId}
+          AND sr."returnedAt" BETWEEN ${dateFrom} AND ${dateTo}
+        `,
+    ]);
+
+    const profit = data[0] || {};
+    const returnData = returns[0] || {};
+    const totalExpenses = expenses._sum.amount || 0;
+    const totalReturns = Number(returnData.returnAmount || 0);
+    const netRevenue = Number(profit.totalRevenue || 0) - totalReturns;
+    const grossProfit = Number(profit.grossProfit || 0) - Number(returnData.returnedProfit || 0);
+    res.json({
+      success: true,
+      data: {
+        ...profit,
+        totalRevenue: netRevenue,
+        grossProfit,
+        totalReturns,
+        totalExpenses,
+        netProfit: grossProfit - totalExpenses,
+      }
+    });
   } catch (e) { next(e); }
 });
 
@@ -269,9 +412,10 @@ const buildPdfHtml = ({ title, periodLabel, store, summary, orderRowsHtml, payme
       <div class="grid">
         <div class="card"><div class="label">Orders</div><div class="value">${summary.orders}</div></div>
         <div class="card"><div class="label">Units Sold</div><div class="value">${summary.units}</div></div>
-        <div class="card"><div class="label">Revenue</div><div class="value">${money(summary.revenue)}</div></div>
+        <div class="card"><div class="label">Net Revenue</div><div class="value">${money(summary.revenue)}</div></div>
         <div class="card"><div class="label">Avg Order</div><div class="value">${money(summary.avgOrder)}</div></div>
         <div class="card"><div class="label">Discounts</div><div class="value">${money(summary.discount)}</div></div>
+        <div class="card"><div class="label">Returns</div><div class="value">${money(summary.returns)}</div></div>
         <div class="card"><div class="label">Tax</div><div class="value">${money(summary.tax)}</div></div>
         <div class="card"><div class="label">Advance</div><div class="value">${money(summary.advance)}</div></div>
         <div class="card"><div class="label">Due</div><div class="value">${money(summary.due)}</div></div>
@@ -331,7 +475,7 @@ const buildPdfHtml = ({ title, periodLabel, store, summary, orderRowsHtml, payme
 `;
 
 const generatePeriodPdf = async ({ req, res, start, end, title, fileSlug }) => {
-  const [store, orders, totals, paymentBreakdown, statusBreakdown, topItems] = await Promise.all([
+  const [store, orders, totals, paymentBreakdown, statusBreakdown, topItems, returnTotals] = await Promise.all([
     prisma.store.findUnique({
       where: { id: req.storeId },
       select: { name: true, address: true, phone: true, email: true }
@@ -398,12 +542,23 @@ const generatePeriodPdf = async ({ req, res, start, end, title, fileSlug }) => {
       GROUP BY oi.name, oi."itemType"
       ORDER BY "units" DESC, "revenue" DESC
       LIMIT 10
-    `
+    `,
+    prisma.salesReturn.aggregate({
+      where: {
+        storeId: req.storeId,
+        returnedAt: { gte: start, lt: end }
+      },
+      _sum: { refundAmount: true },
+      _count: true
+    })
   ]);
 
+  const returnedAmount = returnTotals._sum.refundAmount || 0;
   const summary = {
     orders: totals._count || 0,
-    revenue: totals._sum.totalAmount || 0,
+    revenue: (totals._sum.totalAmount || 0) - returnedAmount,
+    returns: returnedAmount,
+    returnCount: returnTotals._count || 0,
     discount: totals._sum.discountAmount || 0,
     tax: totals._sum.taxAmount || 0,
     advance: totals._sum.advanceAmount || 0,

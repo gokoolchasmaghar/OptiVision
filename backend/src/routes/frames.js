@@ -4,6 +4,7 @@ const { authenticate, requireAdmin } = require('../middleware/auth');
 const { resolveBarcode } = require('../utils/barcode');
 const { resolveSku } = require('../utils/sku');
 const { FRAME_SHAPES, enumValue, numberOrDefault } = require('../utils/normalize');
+const { getFrameGSTMapping } = require('../utils/gst');
 
 router.use(authenticate);
 
@@ -55,7 +56,7 @@ router.get('/:id', async (req, res, next) => {
 
 router.post('/', requireAdmin, async (req, res, next) => {
   try {
-    const { brand, model, shape, size, color, material, gender, purchasePrice, sellingPrice, stockQty, lowStockAlert, barcode, sku, imageUrl, supplierId, frameCode, modelCode } = req.body;
+    const { brand, model, shape, size, color, material, gender, purchasePrice, sellingPrice, stockQty, lowStockAlert, barcode, sku, imageUrl, supplierId, frameCode, modelCode, hsn, gstRate } = req.body;
     if (!brand || !sellingPrice) return res.status(400).json({ success: false, message: 'brand and sellingPrice required' });
     let resolvedSupplierId = null;
     if (supplierId) {
@@ -70,9 +71,31 @@ router.post('/', requireAdmin, async (req, res, next) => {
     const finalBarcode = await resolveBarcode(prisma, barcode);
     const finalSku = await resolveSku(prisma, 'frame', 'FRM', sku);
     const finalShape = enumValue(shape, FRAME_SHAPES, 'RECTANGLE');
+    const gstMapping = getFrameGSTMapping();
 
     const frame = await prisma.frame.create({
-      data: { storeId: req.storeId, frameCode: frameCode || `FRM-${Date.now()}`, modelCode: modelCode || `MDL-${Date.now()}`, brand, model, shape: finalShape, size, color, material, gender, purchasePrice: numberOrDefault(purchasePrice, 0), sellingPrice: numberOrDefault(sellingPrice, 0), stockQty: numberOrDefault(stockQty, 0), lowStockAlert: numberOrDefault(lowStockAlert, 5),  barcode: finalBarcode, sku: finalSku, imageUrl, supplierId: resolvedSupplierId }
+      data: { 
+        storeId: req.storeId, 
+        frameCode: frameCode || `FRM-${Date.now()}`, 
+        modelCode: modelCode || `MDL-${Date.now()}`, 
+        brand, 
+        model, 
+        shape: finalShape, 
+        size, 
+        color, 
+        material, 
+        gender, 
+        purchasePrice: numberOrDefault(purchasePrice, 0), 
+        sellingPrice: numberOrDefault(sellingPrice, 0), 
+        stockQty: numberOrDefault(stockQty, 0), 
+        lowStockAlert: numberOrDefault(lowStockAlert, 5),  
+        barcode: finalBarcode, 
+        sku: finalSku, 
+        imageUrl, 
+        supplierId: resolvedSupplierId,
+        hsn: hsn || gstMapping.hsn,
+        gstRate: gstRate !== undefined ? Math.max(0, Number(gstRate) || 0) : gstMapping.gstRate,
+      }
     });
     if (Number(stockQty) > 0) {
       await prisma.stockMovement.create({ data: { storeId: req.storeId, frameId: frame.id, type: 'IN', quantity: Number(stockQty), beforeQty: 0, afterQty: Number(stockQty), reason: 'Initial stock' } });
@@ -83,7 +106,7 @@ router.post('/', requireAdmin, async (req, res, next) => {
 
 router.put('/:id', requireAdmin, async (req, res, next) => {
   try {
-    const { id, storeId, createdAt, updatedAt, barcode, sku, shape, supplierId, purchasePrice, sellingPrice, stockQty, lowStockAlert, ...safeData } = req.body;
+    const { id, storeId, createdAt, updatedAt, barcode, sku, shape, supplierId, purchasePrice, sellingPrice, stockQty, lowStockAlert, hsn, gstRate, ...safeData } = req.body;
     if (barcode !== undefined) {
       safeData.barcode = await resolveBarcode(prisma, barcode, new Set(), { model: 'frame', id: req.params.id });
     }
@@ -102,6 +125,9 @@ router.put('/:id', requireAdmin, async (req, res, next) => {
     }
     if (purchasePrice !== undefined) safeData.purchasePrice = numberOrDefault(purchasePrice, 0);
     if (sellingPrice !== undefined) safeData.sellingPrice = numberOrDefault(sellingPrice, 0);
+    if (hsn !== undefined) safeData.hsn = hsn;
+    if (gstRate !== undefined) safeData.gstRate = Math.max(0, Number(gstRate) || 0);
+    
     const existing = stockQty !== undefined
       ? await prisma.frame.findFirst({ where: { id: req.params.id, storeId: req.storeId }, select: { id: true, stockQty: true } })
       : null;

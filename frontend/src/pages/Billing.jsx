@@ -7,7 +7,7 @@ import toast from 'react-hot-toast';
 import { Html5Qrcode } from 'html5-qrcode';
 
 const fmt = n => `₹${Number(n || 0).toLocaleString('en-IN')}`;
-const DEFAULT_STORE_PRICING = { gstEnabled: true, taxRate: 18 };
+const DEFAULT_STORE_PRICING = { gstEnabled: true, pricesInclusiveOfGst: false };
 
 export default function Billing() {
   const navigate = useNavigate();
@@ -39,6 +39,7 @@ export default function Billing() {
     api.get('/stores/current').then(r => setStorePricing({
       gstEnabled: r.data.data?.gstEnabled !== false,
       taxRate: Number.isFinite(Number(r.data.data?.taxRate)) ? Math.max(0, Number(r.data.data.taxRate)) : 18,
+      pricesInclusiveOfGst: r.data.data?.pricesInclusiveOfGst === true,
     })).catch(() => { });
     inputRef.current?.focus();
     return () => { stopScanner(); };
@@ -102,7 +103,26 @@ export default function Billing() {
     const discountPct = Math.min(Math.max(Number(item.itemDiscountPct || 0), 0), 100);
     return (itemGross(item) * discountPct) / 100;
   };
+
   const itemTotal = item => Math.max(0, itemGross(item) - itemDiscount(item));
+
+  const itemGstAmount = item => {
+    const rate = storePricing.gstEnabled ? Number(item.gstRate || 0) : 0;
+    const netAmount = itemTotal(item);
+
+    if (rate <= 0) return 0;
+
+    if (storePricing.pricesInclusiveOfGst) {
+      const taxableValue = netAmount / (1 + rate / 100);
+      return netAmount - taxableValue;
+    }
+
+    return netAmount * rate / 100;
+  };
+
+  const itemPayable = item =>
+    itemTotal(item)
+    + (storePricing.pricesInclusiveOfGst ? 0 : itemGstAmount(item));
 
   const updateItemDiscount = (id, type, value) =>
     setCart(c => c.map(x => {
@@ -200,11 +220,9 @@ export default function Billing() {
   const subtotal = cart.reduce((s, x) => s + itemTotal(x), 0);
   const discountPct = Math.max(0, Math.min(100, Number(discount) || 0));
   const discAmt = (subtotal * discountPct) / 100;
-  const gstRate = storePricing.gstEnabled ? Number(storePricing.taxRate) || 0 : 0;
-  const taxable = subtotal - discAmt;
-  const tax = (taxable * gstRate) / 100;
-  const loyaltyDiscount = Math.min(Number(redeemPoints) || 0, selCustomer?.loyaltyPoints || 0);
-  const total = Math.max(0, taxable + tax - loyaltyDiscount);
+  const itemsPayable = cart.reduce((s, x) => s + itemPayable(x), 0);
+  const loyaltyDiscount = Math.min(Number(redeemPoints) || 0, selCustomer?.loyaltyPoints || 0, Math.max(0, itemsPayable - discAmt));
+  const total = Math.max(0, itemsPayable - discAmt - loyaltyDiscount);
   const balance = Math.max(0, total - (Number(advance) || 0));
   const fullyPaid = cart.length > 0 && (Number(advance) || 0) >= total;
 
@@ -224,6 +242,8 @@ export default function Billing() {
         unitPrice: x.sellingPrice,
         discountPct: Math.min(Math.max(Number(x.itemDiscountPct || 0), 0), 100),
         totalPrice: itemTotal(x),
+        hsn: x.hsn || '',
+        gstRate: x.gstRate || 0,
       }));
       const r = await api.post('/orders', {
         customerId: selCustomer.id, items,
@@ -357,7 +377,12 @@ export default function Billing() {
             ) : (
               <table className="tbl">
                 <thead>
-                  <tr><th>Item</th><th className="text-center">Qty</th><th className="text-right">Price</th><th className="text-right">Item Discount %</th><th className="text-right">Total</th><th></th></tr>
+                  <th>Item</th>
+                  <th>GST (HSN)</th>
+                  <th>Qty</th>
+                  <th>Price</th>
+                  <th>Item Discount %</th>
+                  <th>Total</th>
                 </thead>
                 <tbody>
                   {cart.map(item => (
@@ -365,6 +390,11 @@ export default function Billing() {
                       <td>
                         <div className="font-semibold text-slate-800 text-sm">{item.displayName}</div>
                         <div className="text-xs text-slate-400 capitalize">{item.itemType}</div>
+                      </td>
+                      <td>
+                        <div>{Number(item.gstRate || 0).toFixed(2)}%</div>
+                        <div className="text-xs text-slate-400">{fmt(itemGstAmount(item))}</div>
+                        <div className="text-xs text-slate-400">HSN {item.hsn || '-'}</div>
                       </td>
                       <td>
                         <div className="flex items-center justify-center gap-2">
@@ -388,7 +418,7 @@ export default function Billing() {
                           <span className="text-xs font-semibold text-slate-600">%</span>
                         </div>
                       </td>
-                      <td className="text-right font-semibold text-sm">{fmt(itemTotal(item))}</td>
+                      <td className="text-right font-semibold text-sm">{fmt(itemPayable(item))}</td>
                       <td><button onClick={() => removeItem(item.id, item.itemType)} className="text-slate-300 hover:text-red-500 transition-colors"><Trash2 size={14} /></button></td>
                     </tr>
                   ))}
@@ -456,14 +486,10 @@ export default function Billing() {
             <div className="divider" />
 
             <div className="space-y-2 text-sm">
-              <div className="flex justify-between text-slate-600"><span>Subtotal</span><span>{fmt(subtotal)}</span></div>
-              {discAmt > 0 && <div className="flex justify-between text-red-500"><span>Discount</span><span>−{fmt(discAmt)}</span></div>}
+              <div className="flex justify-between text-slate-600"><span>Items Total</span><span>{fmt(itemsPayable)}</span></div>
+              {discAmt > 0 && <div className="flex justify-between text-red-500"><span>Bill Discount</span><span>−{fmt(discAmt)}</span></div>}
               {loyaltyDiscount > 0 && <div className="flex justify-between text-emerald-600"><span>Loyalty Points</span><span>−{fmt(loyaltyDiscount)}</span></div>}
-              <div className="flex justify-between text-slate-600">
-                <span>{gstRate > 0 ? `GST ${gstRate}%` : 'GST'}</span>
-                <span>{gstRate > 0 ? fmt(tax) : 'Off'}</span>
-              </div>
-              <div className="flex justify-between font-bold text-lg border-t border-slate-100 pt-2"><span>Total</span><span>{fmt(total)}</span></div>
+              <div className="flex justify-between font-bold text-lg border-t border-slate-100 pt-2"><span>Grand Total</span><span>{fmt(total)}</span></div>
               {balance > 0 && <div className="flex justify-between text-red-600 font-semibold"><span>Balance Due</span><span>{fmt(balance)}</span></div>}
               {fullyPaid && <div className="text-emerald-600 font-semibold text-center text-sm">✅ Fully Paid</div>}
             </div>

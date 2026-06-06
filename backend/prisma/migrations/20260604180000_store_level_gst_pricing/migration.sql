@@ -1,0 +1,25 @@
+ALTER TABLE "stores"
+ADD COLUMN IF NOT EXISTS "pricesInclusiveOfGst" BOOLEAN NOT NULL DEFAULT false;
+
+ALTER TABLE "orders"
+DROP COLUMN IF EXISTS "taxType",
+DROP COLUMN IF EXISTS "cgstAmount",
+DROP COLUMN IF EXISTS "sgstAmount",
+DROP COLUMN IF EXISTS "igstAmount";
+
+ALTER TABLE "order_items"
+DROP COLUMN IF EXISTS "taxType",
+DROP COLUMN IF EXISTS "cgstAmount",
+DROP COLUMN IF EXISTS "sgstAmount",
+DROP COLUMN IF EXISTS "igstAmount";
+
+ALTER TABLE "frames"
+DROP COLUMN IF EXISTS "rateInclusiveOfGst";
+
+ALTER TABLE "lenses"
+DROP COLUMN IF EXISTS "rateInclusiveOfGst";
+
+ALTER TABLE "accessories"
+DROP COLUMN IF EXISTS "rateInclusiveOfGst";
+
+DROP TYPE IF EXISTS "TaxType";

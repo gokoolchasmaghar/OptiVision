@@ -17,7 +17,7 @@ const TYPE_COLORS = { SINGLE_VISION: 'blue', BIFOCAL: 'purple', PROGRESSIVE: 'gr
 const EMPTY_FORM = {
   name: '', lensType: 'SINGLE_VISION', lensIndex: '',
   coating: [], brand: '', purchasePrice: '', sellingPrice: '',
-  stockQty: '', barcode: ''
+  stockQty: '', barcode: '', hsn: '9001', gstRate: '5'
 };
 
 export default function Lenses() {
@@ -50,7 +50,8 @@ export default function Lenses() {
       name: l.name, lensType: l.lensType, lensIndex: l.lensIndex,
       coating: l.coating || [], brand: l.brand || '',
       purchasePrice: l.purchasePrice, sellingPrice: l.sellingPrice,
-      stockQty: l.stockQty, barcode: l.barcode || ''
+      stockQty: l.stockQty, barcode: l.barcode || '',
+      hsn: l.hsn || '9001', gstRate: l.gstRate || 5
     });
     setModal(true);
   };
@@ -140,6 +141,8 @@ export default function Lenses() {
       purchasePrice: form.purchasePrice ? Number(form.purchasePrice) : 0,
       sellingPrice: Number(form.sellingPrice),
       stockQty: form.stockQty ? Number(form.stockQty) : 0,
+      hsn: form.hsn || '9001',
+      gstRate: form.gstRate ? Number(form.gstRate) : 5,
     };
 
     if (form.barcode) {
@@ -300,7 +303,7 @@ export default function Lenses() {
             </div>
             <div>
               <label className="field-label">Stock Qty</label>
-              <input className="field-input" type="number" value={form.stockQty} onChange={e => setForm(f => ({ ...f, stockQty: e.target.value }))} />
+              <input className="field-input" type="number" value={form.stockQty} min={0} onChange={e => setForm(f => ({ ...f, stockQty: e.target.value }))} />
             </div>
             <div>
               <label className="field-label">Purchase Price ₹</label>
@@ -309,6 +312,14 @@ export default function Lenses() {
             <div>
               <label className="field-label">Selling Price ₹ *</label>
               <input className="field-input" type="number" value={form.sellingPrice} onChange={e => setForm(f => ({ ...f, sellingPrice: e.target.value }))} />
+            </div>
+            <div>
+              <label className="field-label">HSN Code</label>
+              <input className="field-input" type="text" placeholder="9001" value={form.hsn} onChange={e => setForm(f => ({ ...f, hsn: e.target.value }))} />
+            </div>
+            <div>
+              <label className="field-label">GST Rate (%)</label>
+              <input className="field-input" type="number" step="0.01" min="0" max="100" placeholder="5" value={form.gstRate} onChange={e => setForm(f => ({ ...f, gstRate: e.target.value }))} />
             </div>
           </div>
 
@@ -324,6 +335,7 @@ export default function Lenses() {
               ))}
             </div>
           </div>
+
 
           {/* Barcode */}
           <div>

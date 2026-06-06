@@ -21,11 +21,16 @@ async function main() {
   // Create store
   const store = await prisma.store.upsert({
     where: { id: 'store-GO-KOOL CHASMAGHAR-001' },
-    update: { name: 'GO-KOOL CHASMAGHAR', isActive: true },
+    update: {
+      name: 'GO-KOOL CHASMAGHAR',
+      state: 'West Bengal',
+      isActive: true,
+    },
     create: {
       id: 'store-GO-KOOL CHASMAGHAR-001',
       name: 'GO-KOOL CHASMAGHAR',
       address: '235, Parbirata G.T. Road, Sripally Near State Bank of India Burdwan, Purba Bardhaman West Bengal - 713103',
+      state: 'West Bengal',
       phone: '9832906048',
       email: 'gokoolchasmaghar.eyewear@gmail.com',
       gstEnabled: false,

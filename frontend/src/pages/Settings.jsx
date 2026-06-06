@@ -11,6 +11,7 @@ const DEFAULT_STORE = {
   email: '',
   gstNumber: '',
   gstEnabled: true,
+  pricesInclusiveOfGst: false,
   taxRate: 18,
   invoicePrefix: 'INV',
 };
@@ -84,7 +85,7 @@ export default function Settings() {
               <div className="col-span-2 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 flex items-start justify-between gap-4">
                 <div>
                   <div className="font-semibold text-slate-800">GST on new orders</div>
-                  <div className="text-sm text-slate-500">Turn GST calculation on or off. Your saved GST rate stays available even when GST is off.</div>
+                  <div className="text-sm text-slate-500">Turn GST calculation on or off. Your saved GST rate stays available <br></br> even when GST is off.</div>
                 </div>
                 <label className="inline-flex items-center gap-2 cursor-pointer flex-shrink-0">
                   <input
@@ -96,12 +97,26 @@ export default function Settings() {
                   <span className="text-sm font-semibold text-slate-700">{store.gstEnabled !== false ? 'On' : 'Off'}</span>
                 </label>
               </div>
+              <div className="col-span-2 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 flex items-start justify-between gap-4">
+                <div>
+                  <div className="font-semibold text-slate-800">Selling prices include GST</div>
+                  <div className="text-sm text-slate-500">Apply inclusive or exclusive GST pricing to all products on new bills.</div>
+                </div>
+                <label className="inline-flex items-center gap-2 cursor-pointer flex-shrink-0">
+                  <input
+                    className="h-4 w-4 accent-primary-600"
+                    type="checkbox"
+                    checked={store.pricesInclusiveOfGst === true}
+                    onChange={e => setStore(s => ({ ...s, pricesInclusiveOfGst: e.target.checked }))}
+                  />
+                  <span className="text-sm font-semibold text-slate-700">{store.pricesInclusiveOfGst === true ? 'Inclusive' : 'Exclusive'}</span>
+                </label>
+              </div>
               {[
                 ['Store Name *', 'name', 'GO-KOOL CHASMAGHAR'],
                 ['Phone', 'phone', '+91-9876543210'],
                 ['Email', 'email', 'info@store.in'],
                 ['GST Number', 'gstNumber', '27AABCU9603R1ZX'],
-                ['GST Rate %', 'taxRate', '18', 'number'],
                 ['Invoice Prefix', 'invoicePrefix', 'INV'],
               ].map(([label, key, ph, type = 'text']) => (
                 <div key={key} className={key === 'name' ? 'col-span-2' : ''}>

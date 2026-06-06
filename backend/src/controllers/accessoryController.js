@@ -2,6 +2,7 @@ const prisma = require('../utils/prisma');
 const { resolveBarcode } = require('../utils/barcode');
 const { resolveSku } = require('../utils/sku');
 const { ACCESSORY_CATEGORIES, enumValue, numberOrDefault } = require('../utils/normalize');
+const { getAccessoryGSTMapping } = require('../utils/gst');
 
 exports.getAccessories = async (req, res, next) => {
   try {
@@ -45,6 +46,8 @@ exports.createAccessory = async (req, res, next) => {
       sku,
       modelCode,
       imageUrl,
+      hsn,
+      gstRate,
     } = req.body;
 
     if (!name || sellingPrice === undefined || sellingPrice === '') {
@@ -54,6 +57,7 @@ exports.createAccessory = async (req, res, next) => {
     const finalBarcode = await resolveBarcode(prisma, barcode);
     const finalSku = await resolveSku(prisma, 'accessory', 'ACC', sku);
     const finalCategory = enumValue(category, ACCESSORY_CATEGORIES, 'OTHER');
+    const gstMapping = getAccessoryGSTMapping(finalCategory);
 
     const item = await prisma.accessory.create({
       data: {
@@ -68,6 +72,8 @@ exports.createAccessory = async (req, res, next) => {
         sku: finalSku,
         modelCode,
         imageUrl,
+        hsn: hsn || gstMapping.hsn,
+        gstRate: gstRate !== undefined ? Math.max(0, Number(gstRate) || 0) : gstMapping.gstRate,
       },
     });
     if (numberOrDefault(stockQty, 0) > 0) {
@@ -104,6 +110,8 @@ exports.updateAccessory = async (req, res, next) => {
       sku,
       modelCode,
       imageUrl,
+      hsn,
+      gstRate,
     } = req.body;
 
     const existing = await prisma.accessory.findFirst({
@@ -135,6 +143,8 @@ exports.updateAccessory = async (req, res, next) => {
         ...(finalSku !== undefined && { sku: finalSku }),
         ...(modelCode !== undefined && { modelCode }),
         ...(imageUrl !== undefined && { imageUrl }),
+        ...(hsn !== undefined && { hsn }),
+        ...(gstRate !== undefined && { gstRate: Math.max(0, Number(gstRate) || 0) }),
       },
     });
     if (stockQty !== undefined && existing.stockQty !== updated.stockQty) {

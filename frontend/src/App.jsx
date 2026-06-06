@@ -9,10 +9,13 @@ import Frames from './pages/Frames';
 import Lenses from './pages/Lenses';
 import Orders from './pages/Orders';
 import OrderCreate from './pages/OrderCreate';
+import OrderEdit from './pages/OrderEdit';
 import OrderDetail from './pages/OrderDetail';
 import Billing from './pages/Billing';
 import Inventory from './pages/Inventory';
 import Reports from './pages/Reports';
+import Expenses from './pages/Expenses';
+import SalesReturns from './pages/SalesReturns';
 import Settings from './pages/Settings';
 import BulkImport from "./pages/BulkImport";
 import { ScannerProvider } from "./context/ScannerContext";
@@ -48,10 +51,13 @@ export default function App() {
           <Route path="lenses" element={<Lenses />} />
           <Route path="orders" element={<Orders />} />
           <Route path="orders/new" element={<OrderCreate />} />
+          <Route path="orders/:id/edit" element={<AdminRoute><OrderEdit /></AdminRoute>} />
           <Route path="orders/:id" element={<OrderDetail />} />
           <Route path="billing" element={<Billing />} />
           <Route path="inventory" element={<Inventory />} />
           <Route path="reports" element={<AdminRoute><Reports /></AdminRoute>} />
+          <Route path="expenses" element={<AdminRoute><Expenses /></AdminRoute>} />
+          <Route path="sales-returns" element={<SalesReturns />} />
           <Route path="settings" element={<Settings />} />
           <Route path="bulk-import" element={<AdminRoute><BulkImport /></AdminRoute>} />
           <Route path="/accessories" element={<Accessories />} />

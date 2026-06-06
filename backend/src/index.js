@@ -86,6 +86,7 @@ app.use('/api/frames', require('./routes/frames'));
 app.use('/api/lenses', require('./routes/lenses'));
 app.use('/api/accessories', require('./routes/accessories'));
 app.use('/api/orders', require('./routes/orders'));
+app.use('/api/returns', require('./routes/returns'));
 app.use('/api/payments', require('./routes/payments'));
 app.use('/api/inventory', require('./routes/inventory'));
 app.use('/api/suppliers', require('./routes/suppliers'));
@@ -97,6 +98,7 @@ app.use('/api/barcode', require('./routes/barcode'));
 app.use('/api/import', require('./routes/import'));
 app.use('/api/products', require('./routes/product'));
 app.use('/api/notifications', require('./routes/notification'));
+app.use('/api/expenses', require('./routes/expenses'));
 
 // 404 handler
 app.use((req, res) => {

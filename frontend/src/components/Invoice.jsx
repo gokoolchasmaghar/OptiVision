@@ -105,10 +105,14 @@ const generateInvoiceHTML = (order) => {
   // ----------------------
   // 🔥 Apply same logic as backend
   // ----------------------
-  const subtotal = order.items.reduce(
-    (sum, i) => sum + Number(i.totalPrice || 0),
-    0
-  );
+  const itemGross = item => Number(item.unitPrice || 0) * Number(item.quantity || 0);
+  const itemDiscount = item => Number(item.discountAmount ?? (
+    itemGross(item) * Math.max(0, Number(item.discountPct || 0)) / 100
+  ));
+  const itemPayable = item => itemGross(item)
+    + (item.rateInclusiveOfGst ? 0 : Number(item.gstAmount || 0))
+    - itemDiscount(item);
+  const subtotal = order.items.reduce((sum, item) => sum + itemPayable(item), 0);
 
   let barcodeImg = '';
   try {
@@ -137,10 +141,35 @@ const generateInvoiceHTML = (order) => {
       <td class="left">${i.name}</td>
       <td>${i.quantity}</td>
       <td>${fmt(i.unitPrice)}</td>
-      <td>${Number(i.discountPct || 0).toFixed(1)}%</td>
-      <td>${fmt(i.totalPrice)}</td>
+      <td>${i.hsn || '-'}</td>
+      <td>${i.gstRate || 0}%<br/>${fmt(i.gstAmount || 0)}</td>
+      <td>${Number(i.discountPct || 0).toFixed(2)}%<br/>-${fmt(itemDiscount(i))}</td>
+      <td>${fmt(itemPayable(i))}</td>
     </tr>
   `).join('');
+
+  // Calculate GST summary by rate
+  const gstBreakup = {};
+  
+  order.items.forEach(item => {
+    const rate = item.gstRate || 0;
+    if (!gstBreakup[rate]) {
+      gstBreakup[rate] = { taxableValue: 0, gstAmount: 0 };
+    }
+    gstBreakup[rate].taxableValue += (item.taxableValue || item.totalPrice || 0);
+    gstBreakup[rate].gstAmount += (item.gstAmount || 0);
+  });
+
+  // Create GST Summary Table rows
+  const gstSummaryRows = Object.entries(gstBreakup)
+    .sort(([rateA], [rateB]) => Number(rateA) - Number(rateB))
+    .map(([rate, { taxableValue, gstAmount }]) => `
+      <tr>
+        <td style="text-align:center">${rate}%</td>
+        <td style="text-align:right">${fmt(taxableValue)}</td>
+        <td style="text-align:right">${fmt(gstAmount)}</td>
+      </tr>
+    `).join('');
 
   const formatPower = (val) => {
     if (val === null || val === undefined) return "0.00";
@@ -295,10 +324,25 @@ const generateInvoiceHTML = (order) => {
           <th class="left">Product</th>
           <th>Qty</th>
           <th>Rate</th>
+          <th>HSN</th>
+          <th>GST</th>
           <th>Discount</th>
           <th>Total</th>
         </tr>
         ${rows}
+      </table>
+    </div>
+
+    <!-- GST SUMMARY TABLE -->
+    <div class="section">
+      <h3>GST Summary</h3>
+      <table>
+        <tr>
+          <th style="text-align:center">GST %</th>
+          <th style="text-align:right">Taxable Value</th>
+          <th style="text-align:right">GST Amount</th>
+        </tr>
+        ${gstSummaryRows}
       </table>
     </div>
 
@@ -312,20 +356,17 @@ const generateInvoiceHTML = (order) => {
 
         ${Number(order.discountAmount || 0) > 0 ? `
         <tr>
-          <td class="left">Discount</td>
+          <td class="left">Bill Discount</td>
           <td class="right">−${fmt(order.discountAmount)}</td>
         </tr>
         ` : ''}
 
+        ${Number(order.redeemPoints || 0) > 0 ? `
         <tr>
           <td class="left">Loyalty Redeemed</td>
           <td class="right">−${fmt(order.redeemPoints)}</td>
         </tr>
-
-        <tr>
-          <td class="left">GST (Included)</td>
-          <td class="right">${fmt(order.taxAmount)}</td>
-        </tr>
+        ` : ''}
 
         <tr>
           <td class="left bold">Total Payable</td>

@@ -76,24 +76,32 @@ GO-KOOL CHASMAGHAR/
 |   |   |   ├── barcode.js         # Barcode
 │   │   │   ├── customers.js       # Customer CRUD
 │   │   │   ├── dashboard.js       # KPI dashboard
-│   │   │   ├── frames.js          # Frame inventory
+|   |   |   ├── expenses.js        # Expense records
+│   │   │   ├── frames.js          # Frame 
+│   │   │   ├── import.js          # bulk import of products
 │   │   │   ├── inventory.js       # Stock management
 │   │   │   ├── lenses.js          # Lens catalog
+│   │   │   ├── notification.js    # Notifications
 │   │   │   ├── orders.js          # Order
 │   │   │   ├── payments.js        # Payment Method
 │   │   │   ├── prescriptions.js   # Rx management
 |   |   |   ├── product.js         # Product (Frames & Lens) to scan
 │   │   │   ├── purchases.js       # Purchase orders
 │   │   │   ├── reports.js         # Analytics
+│   │   │   ├── return.js          # sales return
 │   │   │   ├── stores.js          # Store settings
 │   │   │   ├── suppliers.js       # Suppliers
 │   │   │   └── upload.js          # Uploads
 │   │   └── utils/
+│   │       ├── barcode.js
 │   │       ├── calculatePay.js 
 |   |       ├── excelParser.js
 │   │       ├── pdfBrowser.js
+│   │       ├── gst.js
+│   │       ├── normalize.js
 │   │       ├── prisma.js       # DB client
 │   │       └── logger.js       # Winston logger
+│   │       ├── sku.js
 │   ├── prisma/
 |   |   ├── migrations/         # Migration in DB schema
 │   │   ├── schema.prisma       # DB schema
@@ -113,26 +121,38 @@ GO-KOOL CHASMAGHAR/
 │   │   │   ├── BarcodeInput.jsx      # Barcode component  
 │   │   │   ├── ErrorBoundary.jsx
 │   │   │   ├── Invoice.jsx       
-|   |   |   └── Label.jsx             # Label for lenses, frames.
-│   │   │   ├── Prescription.jsx
+|   |   |   ├── Label.jsx             # Label for lenses, frames.
+|   |   |   ├── NotificationBell.jsx  # Notification icon
+│   │   │   └── Prescription.jsx
+│   │   ├── context/
+│   │   │   └── ScannerContext.jsx
 │   │   ├── pages/
+│   │   │   ├── Accessories.jsx
+│   │   │   ├── Auth.jsx
+│   │   │   ├── BulkImport.jsx
 │   │   │   ├── Login.jsx
 │   │   │   ├── Dashboard.jsx         # KPI + charts
 │   │   │   ├── Customers.jsx         # Customer grid
 │   │   │   ├── CustomerDetail.jsx    # History + Rx
+│   │   │   ├── Expenses.jsx
 │   │   │   ├── Frames.jsx            # Gallery + filters
 │   │   │   ├── Lenses.jsx            # Lens packages
 │   │   │   ├── Orders.jsx            # Order list
 │   │   │   ├── OrderCreate.jsx       # 5-step wizard
 │   │   │   ├── OrderDetail.jsx       # Timeline + bill
+│   │   │   ├── OrderEdit.jsx
 │   │   │   ├── Billing.jsx           # POS counter
 │   │   │   ├── Inventory.jsx         # Stock levels
 │   │   │   ├── Reports.jsx           # Analytics
+│   │   │   ├── SalesReturn.jsx
 │   │   │   └── Settings.jsx          # Config + users
 │   │   ├── stores/
 │   │   │   └── authStore.js    # Zustand auth
-│   │   └── services/
-│   │       └── api.js          # Axios instance
+│   │   ├── services/
+│   │   |   └── api.js          # Axios instance
+│   │   └── utils/
+│   │       ├── assets.js
+│   │       └── roles.js
 │   ├── Dockerfile
 │   └── Index.html
 │

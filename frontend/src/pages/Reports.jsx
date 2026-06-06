@@ -185,6 +185,21 @@ export default function Reports() {
               <div className="text-xs text-slate-500 mt-0.5">{c.label}</div>
             </div>
           ))}
+          <div className="card p-4">
+            <div className="w-10 h-10 rounded-xl bg-rose-50 text-rose-700 flex items-center justify-center text-sm font-bold mb-2">Rs</div>
+            <div className="text-xl font-bold text-slate-900">{fmt(profit.totalExpenses)}</div>
+            <div className="text-xs text-slate-500 mt-0.5">Expenses</div>
+          </div>
+          <div className="card p-4">
+            <div className="w-10 h-10 rounded-xl bg-orange-50 text-orange-700 flex items-center justify-center text-sm font-bold mb-2">RT</div>
+            <div className="text-xl font-bold text-slate-900">{fmt(profit.totalReturns)}</div>
+            <div className="text-xs text-slate-500 mt-0.5">Sales Returns</div>
+          </div>
+          <div className="card p-4">
+            <div className="w-10 h-10 rounded-xl bg-slate-50 text-slate-700 flex items-center justify-center text-sm font-bold mb-2">NP</div>
+            <div className="text-xl font-bold text-slate-900">{fmt(profit.netProfit)}</div>
+            <div className="text-xs text-slate-500 mt-0.5">Net Profit</div>
+          </div>
         </div>
       )}
 

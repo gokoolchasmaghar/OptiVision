@@ -38,6 +38,8 @@ export default function Accessories() {
         barcode: '',
         modelCode: '',
         imageUrl: '',
+        hsn: '9004',
+        gstRate: '18',
     });
 
     // ── Barcode generation ──────────────────────────────────────────────────────
@@ -174,6 +176,8 @@ export default function Accessories() {
             stockQty: form.stockQty ? Number(form.stockQty) : 0,
             lowStockAlert: form.lowStockAlert ? Number(form.lowStockAlert) : 5,
             modelCode: form.modelCode || undefined,
+            hsn: form.hsn || '9004',
+            gstRate: form.gstRate ? Number(form.gstRate) : 18,
         };
 
         if (editingItem) {
@@ -217,6 +221,8 @@ export default function Accessories() {
                 modelCode: '',
                 lowStockAlert: '5',
                 imageUrl: '',
+                hsn: '9004',
+                gstRate: '18',
             });
 
             fetchData();
@@ -297,6 +303,8 @@ export default function Accessories() {
                                 barcode: '',
                                 modelCode: '',
                                 imageUrl: '',
+                                hsn: '9004',
+                                gstRate: '18',
                             });
                             resetImageInput();
                             setShowModal(true);
@@ -461,6 +469,8 @@ export default function Accessories() {
                                                     barcode: i.barcode || '',
                                                     lowStockAlert: i.lowStockAlert || '2',
                                                     imageUrl: i.imageUrl || '',
+                                                    hsn: i.hsn || '9004',
+                                                    gstRate: i.gstRate || 18,
                                                 });
                                                 resetImageInput();
                                                 setShowModal(true);
@@ -647,6 +657,32 @@ export default function Accessories() {
                                     />
                                 </div>
 
+                                {/* HSN Code */}
+                                <div>
+                                    <label className="field-label">HSN Code</label>
+                                    <input
+                                        className="field-input"
+                                        type="text"
+                                        placeholder="9004"
+                                        value={form.hsn}
+                                        onChange={e => setForm(f => ({ ...f, hsn: e.target.value }))}
+                                    />
+                                </div>
+
+                                {/* GST Rate */}
+                                <div>
+                                    <label className="field-label">GST Rate (%)</label>
+                                    <input
+                                        className="field-input"
+                                        type="number"
+                                        step="0.01"
+                                        min="0" max="100"
+                                        placeholder="18"
+                                        value={form.gstRate}
+                                        onChange={e => setForm(f => ({ ...f, gstRate: e.target.value }))}
+                                    />
+                                </div>
+
                                 {/* Stock */}
                                 <div>
                                     <label className="field-label">Stock Qty</label>
@@ -676,7 +712,7 @@ export default function Accessories() {
 
                             {/* Margin Box */}
                             {form.purchasePrice && form.sellingPrice && (
-                                <div className="mt-5 bg-emerald-50 border border-emerald-100 rounded-xl p-3 text-sm">
+                                <div className="mt-5 bg-emerald-50 border border-emerald-100 rounded-xl p-3 text-sm ml-6 mr-6">
                                     <span className="text-emerald-700 font-semibold">
                                         Margin: {Math.round(
                                             (form.sellingPrice - form.purchasePrice) / form.sellingPrice * 100
@@ -685,6 +721,7 @@ export default function Accessories() {
                                     <span className="text-emerald-600 ml-3">
                                         Profit: ₹{form.sellingPrice - form.purchasePrice} per unit
                                     </span>
+                                    {form.gstRate && <span className="text-slate-600 ml-3">| GST: {form.gstRate}% (HSN: {form.hsn || '9004'})</span>}
                                 </div>
                             )}
 

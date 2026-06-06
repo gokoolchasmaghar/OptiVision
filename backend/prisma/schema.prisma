@@ -40,6 +40,8 @@ enum OrderStatus {
   FITTING
   READY
   DELIVERED
+  PARTIALLY_RETURNED
+  RETURNED
   CANCELLED
 }
 
@@ -84,14 +86,34 @@ enum InventoryAuditStatus {
   REJECTED
 }
 
+enum ExpenseCategory {
+  RENT
+  ELECTRICITY
+  TEA_SNACKS
+  TRANSPORT
+  MAINTENANCE
+  INTERNET
+  STATIONERY
+  OTHER
+}
+
+enum ExpensePaymentMode {
+  CASH
+  UPI
+  CARD
+  BANK_TRANSFER
+}
+
 model Store {
   id              String   @id @default(uuid())
   name            String
   address         String?
+  state           String?
   phone           String?
   email           String?
   gstNumber       String?
   gstEnabled      Boolean  @default(false)
+  pricesInclusiveOfGst Boolean @default(false)
   logoUrl         String?
   taxRate         Float    @default(18)
   invoicePrefix   String   @default("INVGC")
@@ -110,6 +132,8 @@ model Store {
   suppliers   Supplier[]
   purchases   Purchase[]
   inventoryAudits InventoryAudit[]
+  expenses    Expense[]
+  salesReturns SalesReturn[]
 
   @@map("stores")
 }
@@ -133,6 +157,9 @@ model User {
   inventoryAudits InventoryAudit[]
   confirmedAudits InventoryAudit[] @relation("AuditConfirmedBy")
   rejectedAudits InventoryAudit[] @relation("RejectedAudits")
+  expenses Expense[]
+  salesReturns SalesReturn[]
+  orderEditLogs OrderEditLog[]
 
   @@index([storeId])
   @@index([email])
@@ -146,6 +173,7 @@ model Customer {
   phone         String
   email         String?
   address       String?
+  state         String?
   gender        Gender?
   age           Int?
   dateOfBirth   DateTime?
@@ -197,28 +225,30 @@ model Prescription {
 }
 
 model Frame {
-  id            String     @id @default(uuid())
-  storeId       String
-  frameCode     String
-  brand         String
-  model         String?
-  shape         FrameShape @default(RECTANGLE)
-  size          String?
-  color         String?
-  material      String?
-  gender        String?
-  purchasePrice Float      @default(0)
-  sellingPrice  Float
-  stockQty      Int        @default(0)
-  lowStockAlert Int        @default(5)
-  barcode       String     @unique
-  sku           String     @unique
-  modelCode     String?
-  imageUrl      String?
-  isActive      Boolean    @default(true)
-  supplierId    String?
-  createdAt     DateTime   @default(now())
-  updatedAt     DateTime   @updatedAt
+  id                  String     @id @default(uuid())
+  storeId             String
+  frameCode           String
+  brand               String
+  model               String?
+  shape               FrameShape @default(RECTANGLE)
+  size                String?
+  color               String?
+  material            String?
+  gender              String?
+  purchasePrice       Float      @default(0)
+  sellingPrice        Float
+  stockQty            Int        @default(0)
+  lowStockAlert       Int        @default(5)
+  barcode             String     @unique
+  sku                 String     @unique
+  modelCode           String?
+  imageUrl            String?
+  hsn                 String     @default("9003")
+  gstRate             Float      @default(5)
+  isActive            Boolean    @default(true)
+  supplierId          String?
+  createdAt           DateTime   @default(now())
+  updatedAt           DateTime   @updatedAt
 
   store      Store           @relation(fields: [storeId], references: [id])
   supplier   Supplier?       @relation(fields: [supplierId], references: [id])
@@ -232,24 +262,26 @@ model Frame {
 }
 
 model Lens {
-  id            String    @id @default(uuid())
-  storeId       String
-  name          String
-  lensType      LensType  @default(SINGLE_VISION)
-  lensIndex     String    @default("1.56")
-  coating       String[]
-  brand         String?
-  barcode       String    @unique
-  sku           String    @unique
-  modelCode     String?
-  purchasePrice Float     @default(0)
-  sellingPrice  Float
-  stockQty      Int       @default(100)
-  lowStockAlert Int       @default(10)
-  isActive      Boolean   @default(true)
-  supplierId    String?
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
+  id                  String    @id @default(uuid())
+  storeId             String
+  name                String
+  lensType            LensType  @default(SINGLE_VISION)
+  lensIndex           String    @default("1.56")
+  coating             String[]
+  brand               String?
+  barcode             String    @unique
+  sku                 String    @unique
+  modelCode           String?
+  purchasePrice       Float     @default(0)
+  sellingPrice        Float
+  stockQty            Int       @default(100)
+  lowStockAlert       Int       @default(10)
+  hsn                 String    @default("9001")
+  gstRate             Float     @default(5)
+  isActive            Boolean   @default(true)
+  supplierId          String?
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
 
   store      Store           @relation(fields: [storeId], references: [id])
   supplier   Supplier?       @relation(fields: [supplierId], references: [id])
@@ -261,19 +293,21 @@ model Lens {
 }
 
 model Accessory {
-  id            String  @id @default(uuid())
-  storeId       String
-  name          String
-  category AccessoryCategory @default(OTHER)
-  purchasePrice Float   @default(0)
-  sellingPrice  Float
-  stockQty      Int     @default(0)
-  lowStockAlert Int     @default(5)
-  barcode       String  @unique
-  sku           String  @unique
-  modelCode     String?
-  imageUrl      String?
-  isActive      Boolean @default(true)
+  id                  String  @id @default(uuid())
+  storeId             String
+  name                String
+  category            AccessoryCategory @default(OTHER)
+  purchasePrice       Float   @default(0)
+  sellingPrice        Float
+  stockQty            Int     @default(0)
+  lowStockAlert       Int     @default(5)
+  barcode             String  @unique
+  sku                 String  @unique
+  modelCode           String?
+  imageUrl            String?
+  hsn                 String  @default("9004")
+  gstRate             Float   @default(18)
+  isActive            Boolean @default(true)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -327,6 +361,8 @@ model Order {
   items        OrderItem[]
   payments     Payment[]
   statusLogs   OrderStatusLog[]
+  returns      SalesReturn[]
+  editLogs     OrderEditLog[]
 
   @@index([storeId])
   @@index([customerId])
@@ -337,26 +373,89 @@ model Order {
 }
 
 model OrderItem {
-  id          String  @id @default(uuid())
-  orderId     String
-  itemType    String
-  frameId     String?
-  lensId      String?
-  accessoryId String?
-  name        String
-  quantity    Int     @default(1)
-  unitPrice   Float
-  discountAmount Float @default(0)
-  discountPct    Float @default(0)
-  totalPrice  Float
+  id               String  @id @default(uuid())
+  orderId          String
+  itemType         String
+  frameId          String?
+  lensId           String?
+  accessoryId      String?
+  name             String
+  quantity         Int     @default(1)
+  unitPrice        Float
+  discountAmount   Float   @default(0)
+  discountPct      Float   @default(0)
+  totalPrice       Float
+  hsn              String?
+  gstRate          Float   @default(5)
+  taxableValue     Float   @default(0)
+  gstAmount        Float   @default(0)
+  rateInclusiveOfGst Boolean @default(false)
 
-  order     Order      @relation(fields: [orderId], references: [id])
+  order     Order      @relation(fields: [orderId], references: [id], onDelete: Cascade)
   frame     Frame?     @relation(fields: [frameId], references: [id])
   lens      Lens?      @relation(fields: [lensId], references: [id])
   accessory Accessory? @relation(fields: [accessoryId], references: [id])
+  returnItems SalesReturnItem[]
 
   @@index([orderId])
   @@map("order_items")
+}
+
+model OrderEditLog {
+  id        String   @id @default(uuid())
+  orderId   String
+  userId    String
+  changes   Json
+  createdAt DateTime @default(now())
+
+  order Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  user  User  @relation(fields: [userId], references: [id])
+
+  @@index([orderId])
+  @@index([userId])
+  @@index([createdAt])
+  @@map("order_edit_logs")
+}
+
+model SalesReturn {
+  id           String   @id @default(uuid())
+  storeId      String
+  orderId      String
+  staffId      String
+  refundAmount Float
+  reason       String
+  returnedAt   DateTime @default(now())
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  store Store @relation(fields: [storeId], references: [id])
+  order Order @relation(fields: [orderId], references: [id])
+  staff User  @relation(fields: [staffId], references: [id])
+  items SalesReturnItem[]
+
+  @@index([storeId])
+  @@index([orderId])
+  @@index([staffId])
+  @@index([returnedAt])
+  @@map("sales_returns")
+}
+
+model SalesReturnItem {
+  id            String @id @default(uuid())
+  salesReturnId String
+  orderItemId   String
+  itemType      String
+  itemName      String
+  quantity      Int
+  unitRefund    Float
+  refundAmount  Float
+
+  salesReturn SalesReturn @relation(fields: [salesReturnId], references: [id], onDelete: Cascade)
+  orderItem   OrderItem   @relation(fields: [orderItemId], references: [id])
+
+  @@index([salesReturnId])
+  @@index([orderItemId])
+  @@map("sales_return_items")
 }
 
 model Payment {
@@ -512,4 +611,29 @@ model InventoryAuditItem {
   @@index([auditId])
   @@index([itemId])
   @@map("inventory_audit_items")
+}
+
+model Expense {
+  id                 String             @id @default(uuid())
+  storeId            String
+  category           ExpenseCategory
+  customCategoryName String?            // <-- ADDED: For "Other" category text
+  description        String
+  amount             Float
+  paymentMode        ExpensePaymentMode
+  paidBy             String?            // <-- ADDED: For "Paid By" dropdown/input
+  notes              String?
+  receiptUrl         String?
+  createdBy          String
+  createdAt          DateTime           @default(now())
+  updatedAt          DateTime           @updatedAt
+
+  store   Store @relation(fields: [storeId], references: [id])
+  creator User  @relation(fields: [createdBy], references: [id])
+
+  @@index([storeId])
+  @@index([createdBy])
+  @@index([category])
+  @@index([createdAt])
+  @@map("expenses")
 }
