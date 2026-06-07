@@ -188,7 +188,12 @@ const generateInvoiceHTML = (order) => {
   <html>
   <head>
     <style>
-      body { font-family: Arial; padding: 24px; color:#000 }
+      @page {
+          size: A4;
+          margin: 8mm;
+      }
+          
+      body { font-family: Arial; padding: 20px; color:#000; font-size:11px; }
 
       .header {
         display:flex;
@@ -196,9 +201,9 @@ const generateInvoiceHTML = (order) => {
         align-items:flex-start;
       }
 
-      .title { font-size:28px; font-weight:bold }
+      .title { font-size:22px; font-weight:bold }
 
-      .section { margin-top:18px }
+      .section { margin-top:10px }
 
       table {
         width:100%;
@@ -208,8 +213,9 @@ const generateInvoiceHTML = (order) => {
 
       th, td {
         border:1px solid #000;
-        padding:8px;
+        padding:4px;
         text-align:center;
+        font-size:12px;
       }
 
       th { background:#f5f5f5 }
@@ -226,8 +232,9 @@ const generateInvoiceHTML = (order) => {
       .bold { font-weight:bold }
 
       .footer {
-        margin-top:30px;
+        margin-top:12px;
         text-align:center;
+        font-size:11px;
       }
     </style>
   </head>

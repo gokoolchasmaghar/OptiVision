@@ -58,18 +58,23 @@ const buildInvoiceHtml = (order, barcodeImg = '') => {
     <html>
     <head>
       <style>
-        body { font-family: Arial; padding: 24px; color: #000; }
+        @page {
+          size: A4;
+          margin: 8mm;
+        }
+    
+        body { font-family: Arial; padding: 20px; color: #000; font-size: 11px; }
         .header { display: flex; justify-content: space-between; align-items: flex-start; }
-        .title { font-size: 28px; font-weight: bold; }
-        .section { margin-top: 18px; }
+        .title { font-size: 22px; font-weight: bold; }
+        .section { margin-top: 10px; }
         table { width: 100%; border-collapse: collapse; margin-top: 10px; }
-        th, td { border: 1px solid #000; padding: 8px; text-align: center; }
+        th, td { border: 1px solid #000; padding: 4px; text-align: center; font-size: 12px; }
         th { background: #f5f5f5; }
         .left { text-align: left; }
         .right { text-align: right; }
         .summary { width: 280px; margin-left: auto; margin-top: 15px; }
         .bold { font-weight: bold; }
-        .footer { margin-top: 30px; text-align: center; }
+        .footer { margin-top: 12px; text-align: center; font-size: 11px; }
       </style>
     </head>
 
