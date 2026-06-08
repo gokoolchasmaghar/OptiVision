@@ -15,8 +15,20 @@ import {
 } from '../components/Invoice';
 
 const fmt = n => `₹${Number(n || 0).toLocaleString('en-IN')}`;
-const STATUS_FLOW = ['CREATED', 'LENS_ORDERED', 'GRINDING', 'FITTING', 'READY', 'DELIVERED'];
-const NEXT_MAP = { CREATED: 'LENS_ORDERED', LENS_ORDERED: 'GRINDING', GRINDING: 'FITTING', FITTING: 'READY', READY: 'DELIVERED' };
+const FULL_FLOW = [
+  'CREATED',
+  'LENS_ORDERED',
+  'GRINDING',
+  'FITTING',
+  'READY',
+  'DELIVERED'
+];
+
+const ACCESSORY_FLOW = [
+  'CREATED',
+  'READY',
+  'DELIVERED'
+];
 
 export default function OrderDetail() {
   const { id } = useParams();
@@ -84,20 +96,58 @@ export default function OrderDetail() {
   };
 
   const handleCancelOrder = async () => {
-    const ok = window.confirm("Are you sure you want to cancel this order?");
+    const ok = window.confirm(
+      'Are you sure you want to cancel this order?'
+    );
+
     if (!ok) return;
 
     try {
-      await api.patch(`/orders/${id}/status`, { status: 'CANCELLED' });
+      await api.delete(`/orders/${id}`, {
+        data: {
+          reason: 'Cancelled by admin'
+        }
+      });
+
       toast.success('Order cancelled successfully');
       load();
     } catch (err) {
-      toast.error('Failed to cancel order');
+      toast.error(
+        err.response?.data?.message ||
+        'Failed to cancel order'
+      );
     }
   };
 
   if (loading) return <div className="flex justify-center py-16"><Spinner size={28} /></div>;
   if (!order) return <div className="text-center text-red-500 py-16">Order not found</div>;
+
+  const isAccessoryOnly =
+    order.items?.length > 0 &&
+    order.items.every(
+      item =>
+        item.accessoryId &&
+        !item.frameId &&
+        !item.lensId
+    );
+
+  const STATUS_FLOW =
+    isAccessoryOnly
+      ? ACCESSORY_FLOW
+      : FULL_FLOW;
+
+  const NEXT_MAP = isAccessoryOnly
+    ? {
+      CREATED: 'READY',
+      READY: 'DELIVERED'
+    }
+    : {
+      CREATED: 'LENS_ORDERED',
+      LENS_ORDERED: 'GRINDING',
+      GRINDING: 'FITTING',
+      FITTING: 'READY',
+      READY: 'DELIVERED'
+    };
 
   const curIdx = STATUS_FLOW.indexOf(order.status);
   const nextStatus = NEXT_MAP[order.status];
@@ -305,7 +355,7 @@ Thank you for trusting us 🙏`
           </div>
 
           {canAdminOrder &&
-          !['CANCELLED', 'RETURNED', 'PARTIALLY_RETURNED'].includes(order.status) && (
+            ['DELIVERED', 'PARTIALLY_RETURNED'].includes(order.status) && (
               <button
                 onClick={() => navigate('/sales-returns', {
                   state: {
@@ -319,11 +369,19 @@ Thank you for trusting us 🙏`
               </button>
             )}
 
-          {canAdminOrder && order.status !== 'CANCELLED' && typeof handleCancelOrder === 'function' && (
-            <button onClick={handleCancelOrder} className="btn-danger btn-md">
-              Cancel Order
-            </button>
-          )}
+          {canAdminOrder &&
+            ![
+              'READY',
+              'DELIVERED',
+              'PARTIALLY_RETURNED',
+              'RETURNED',
+              'CANCELLED'
+            ].includes(order.status) &&
+            typeof handleCancelOrder === 'function' && (
+              <button onClick={handleCancelOrder} className="btn-danger btn-md">
+                Cancel Order
+              </button>
+            )}
 
           {nextStatus && (
             <button onClick={advanceStatus} className="btn-primary btn-md">→ {nextStatus.replace('_', ' ')}</button>

@@ -219,7 +219,7 @@ router.post('/', requireStaff, async (req, res, next) => {
       return res.status(400).json({ success: false, message: 'Invalid order items' });
     }
 
-    const store = await prisma.store.findUnique({ 
+    const store = await prisma.store.findUnique({
       where: { id: req.storeId },
       select: { id: true, gstEnabled: true, pricesInclusiveOfGst: true, taxRate: true, invoicePrefix: true }
     });
@@ -437,6 +437,16 @@ router.patch('/:id/status', requireStaff, async (req, res, next) => {
     });
 
     if (!existing) return res.status(404).json({ success: false, message: 'Not found' });
+
+    const isAccessoryOnly =
+      existing.items?.length > 0 &&
+      existing.items.every(
+        item =>
+          item.accessoryId &&
+          !item.frameId &&
+          !item.lensId
+      );
+
     if (existing.status === 'CANCELLED') {
       return res.status(400).json({ success: false, message: 'Order is already cancelled' });
     }
@@ -449,13 +459,18 @@ router.patch('/:id/status', requireStaff, async (req, res, next) => {
         });
       }
 
-      const allowedTransitions = {
-        CREATED: ['LENS_ORDERED'],
-        LENS_ORDERED: ['GRINDING'],
-        GRINDING: ['FITTING'],
-        FITTING: ['READY'],
-        READY: ['DELIVERED']
-      };
+      const allowedTransitions = isAccessoryOnly
+        ? {
+          CREATED: ['READY'],
+          READY: ['DELIVERED']
+        }
+        : {
+          CREATED: ['LENS_ORDERED'],
+          LENS_ORDERED: ['GRINDING'],
+          GRINDING: ['FITTING'],
+          FITTING: ['READY'],
+          READY: ['DELIVERED']
+        };
 
       const current = existing.status;
 
@@ -533,7 +548,7 @@ router.put('/:id', requireAdmin, async (req, res, next) => {
       if (existing.status === 'CANCELLED') throw Object.assign(new Error('Cancelled orders cannot be edited'), { status: 400 });
       if (existing.returns.length > 0) throw Object.assign(new Error('Orders with sales returns cannot be edited'), { status: 400 });
 
-      const store = await tx.store.findUnique({ 
+      const store = await tx.store.findUnique({
         where: { id: req.storeId },
         select: { id: true, gstEnabled: true, pricesInclusiveOfGst: true, taxRate: true }
       });
@@ -576,7 +591,7 @@ router.put('/:id', requireAdmin, async (req, res, next) => {
       const itemsForGstCalc = items.map(item => {
         const key = inventoryKeyForItem(item);
         const existingItem = key ? existingItemsByKey.get(key) : null;
-        
+
         if (existingItem) {
           // 🔒 FROZEN: Same inventory item, preserve original GST values
           return {
@@ -927,9 +942,10 @@ router.delete('/:id', requireAdmin, async (req, res, next) => {
     }
 
     // ❌ Restrict delete after READY
-    if (['READY', 'DELIVERED'].includes(order.status)) {
+    if (['READY', 'DELIVERED', 'PARTIALLY_RETURNED', 'RETURNED'].includes(order.status)) {
       return res.status(400).json({
-        message: "Cannot delete order after READY stage"
+        success: false,
+        message: `Cannot cancel order after ${order.status} stage`
       });
     }
 
