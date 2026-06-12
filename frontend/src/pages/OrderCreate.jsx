@@ -131,8 +131,18 @@ export default function OrderCreate() {
   }
 
   const loyaltyDiscount = Math.min(Number(redeemPoints) || 0, selCustomer?.loyaltyPoints || 0, Math.max(0, itemsPayable - discountAmt));
-  const total = Math.max(0, itemsPayable - discountAmt - loyaltyDiscount);
-  const balance = Math.max(0, total - advance);
+  const total = Math.max(
+    0,
+    itemsPayable - discountAmt - loyaltyDiscount
+  );
+
+  const roundedTotal = Math.round(total);
+  const roundOff = roundedTotal - total;
+
+  const balance = Math.max(
+    0,
+    roundedTotal - advance
+  );
 
   const hasPrescription =
     newRx.rightSph !== '' ||
@@ -428,7 +438,21 @@ export default function OrderCreate() {
                         <span>−{fmt(loyaltyDiscount)}</span>
                       </div>
                     )}
-                    <div className="flex justify-between font-bold text-base border-t border-slate-200 pt-1.5 mt-1"><span>Total</span><span>{fmt(total)}</span></div>
+                    {Math.abs(roundOff) > 0.001 && (
+                      <div className="flex justify-between text-slate-500">
+                        <span>Round Off</span>
+                        <span>
+                          {roundOff >= 0 ? '+' : ''}
+                          {fmt(roundOff)}
+                        </span>
+                      </div>
+                    )}
+
+                    <div className="flex justify-between font-bold text-base border-t border-slate-200 pt-1.5 mt-1">
+                      <span>Total Payable</span>
+                      <span>{fmt(roundedTotal)}</span>
+                    </div>  
+                                    
                   </div>
                 </div>
               </div>

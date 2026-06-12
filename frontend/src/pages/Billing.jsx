@@ -223,7 +223,12 @@ export default function Billing() {
   const itemsPayable = cart.reduce((s, x) => s + itemPayable(x), 0);
   const loyaltyDiscount = Math.min(Number(redeemPoints) || 0, selCustomer?.loyaltyPoints || 0, Math.max(0, itemsPayable - discAmt));
   const total = Math.max(0, itemsPayable - discAmt - loyaltyDiscount);
-  const balance = Math.max(0, total - (Number(advance) || 0));
+  const roundedTotal = Math.round(total);
+  const roundOff = roundedTotal - total;
+  const balance = Math.max(
+    0,
+    roundedTotal - (Number(advance) || 0)
+  );
   const fullyPaid = cart.length > 0 && (Number(advance) || 0) >= total;
 
   // ── Checkout ────────────────────────────────────────────────────────────────
@@ -489,7 +494,19 @@ export default function Billing() {
               <div className="flex justify-between text-slate-600"><span>Items Total</span><span>{fmt(itemsPayable)}</span></div>
               {discAmt > 0 && <div className="flex justify-between text-red-500"><span>Bill Discount</span><span>−{fmt(discAmt)}</span></div>}
               {loyaltyDiscount > 0 && <div className="flex justify-between text-emerald-600"><span>Loyalty Points</span><span>−{fmt(loyaltyDiscount)}</span></div>}
-              <div className="flex justify-between font-bold text-lg border-t border-slate-100 pt-2"><span>Grand Total</span><span>{fmt(total)}</span></div>
+              {Math.abs(roundOff) > 0.001 && (
+                <div className="flex justify-between text-slate-500">
+                  <span>Round Off</span>
+                  <span>
+                    {roundOff >= 0 ? '+' : ''}
+                    {fmt(roundOff)}
+                  </span>
+                </div>
+              )}
+              <div className="flex justify-between font-bold text-lg border-t border-slate-100 pt-2">
+                <span>Grand Total</span>
+                <span>{fmt(roundedTotal)}</span>
+              </div>
               {balance > 0 && <div className="flex justify-between text-red-600 font-semibold"><span>Balance Due</span><span>{fmt(balance)}</span></div>}
               {fullyPaid && <div className="text-emerald-600 font-semibold text-center text-sm">✅ Fully Paid</div>}
             </div>
@@ -499,7 +516,7 @@ export default function Billing() {
               disabled={saving || cart.length === 0 || !selCustomer}
               className="btn-primary btn-lg w-full justify-center"
             >
-              {saving ? 'Processing…' : `🧾 Order Now ${cart.length > 0 ? fmt(total) : ''}`}
+              {saving ? 'Processing…' : `🧾 Order Now ${cart.length > 0 ? fmt(roundedTotal) : ''}`}
             </button>
           </div>
 

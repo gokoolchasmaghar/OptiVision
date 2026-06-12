@@ -88,7 +88,7 @@ export const shareOnWhatsApp = (order) => {
 
   const message = `🧾 *Invoice: ${order.orderNumber}*
     👤 ${order.customer?.name}
-    💰 Total: ${fmt(order.totalAmount)}
+    💰 Total: ${fmt(Math.round(Number(order.totalAmount || 0)))}
 
     📥 Download Invoice:
     ${invoiceUrl}
@@ -99,6 +99,45 @@ export const shareOnWhatsApp = (order) => {
     `https://api.whatsapp.com/send?phone=${phone}&text=${encodeURIComponent(message)}`,
     '_blank'
   );
+};
+
+const numberToWords = num => {
+  const a = [
+    '', 'One', 'Two', 'Three', 'Four', 'Five',
+    'Six', 'Seven', 'Eight', 'Nine', 'Ten',
+    'Eleven', 'Twelve', 'Thirteen', 'Fourteen',
+    'Fifteen', 'Sixteen', 'Seventeen', 'Eighteen',
+    'Nineteen'
+  ];
+
+  const b = [
+    '', '', 'Twenty', 'Thirty', 'Forty',
+    'Fifty', 'Sixty', 'Seventy', 'Eighty', 'Ninety'
+  ];
+
+  const inWords = n => {
+    if (n < 20) return a[n];
+    if (n < 100)
+      return b[Math.floor(n / 10)] + (n % 10 ? ' ' + a[n % 10] : '');
+    if (n < 1000)
+      return a[Math.floor(n / 100)] +
+        ' Hundred' +
+        (n % 100 ? ' ' + inWords(n % 100) : '');
+    if (n < 100000)
+      return inWords(Math.floor(n / 1000)) +
+        ' Thousand' +
+        (n % 1000 ? ' ' + inWords(n % 1000) : '');
+    if (n < 10000000)
+      return inWords(Math.floor(n / 100000)) +
+        ' Lakh' +
+        (n % 100000 ? ' ' + inWords(n % 100000) : '');
+
+    return inWords(Math.floor(n / 10000000)) +
+      ' Crore' +
+      (n % 10000000 ? ' ' + inWords(n % 10000000) : '');
+  };
+
+  return `INR ${inWords(num)} only`;
 };
 
 const generateInvoiceHTML = (order) => {
@@ -113,6 +152,20 @@ const generateInvoiceHTML = (order) => {
     + (item.rateInclusiveOfGst ? 0 : Number(item.gstAmount || 0))
     - itemDiscount(item);
   const subtotal = order.items.reduce((sum, item) => sum + itemPayable(item), 0);
+
+  const itemsTotal = subtotal;
+
+  const totalTaxableValue = order.items.reduce(
+    (sum, item) => sum + Number(item.taxableValue || 0),
+    0
+  );
+
+  const totalGSTAmount = order.items.reduce(
+    (sum, item) => sum + Number(item.gstAmount || 0),
+    0
+  );
+
+  const roundedGrandTotal = Math.round(Number(order.totalAmount || 0));
 
   let barcodeImg = '';
   try {
@@ -139,38 +192,15 @@ const generateInvoiceHTML = (order) => {
   const rows = order.items.map((i) => `
     <tr>
       <td class="left">${i.name}</td>
+      <td>${Number(i.gstRate || 0).toFixed(2)}%<br/>HSN ${i.hsn || '-'}</td>
       <td>${i.quantity}</td>
       <td>${fmt(i.unitPrice)}</td>
-      <td>${i.hsn || '-'}</td>
-      <td>${i.gstRate || 0}%<br/>${fmt(i.gstAmount || 0)}</td>
-      <td>${Number(i.discountPct || 0).toFixed(2)}%<br/>-${fmt(itemDiscount(i))}</td>
-      <td>${fmt(itemPayable(i))}</td>
+      <td>${Number(i.discountPct || 0).toFixed(2)}%</td>
+      <td>${fmt(Math.round(itemPayable(i)))}</td>
     </tr>
   `).join('');
 
-  // Calculate GST summary by rate
-  const gstBreakup = {};
-  
-  order.items.forEach(item => {
-    const rate = item.gstRate || 0;
-    if (!gstBreakup[rate]) {
-      gstBreakup[rate] = { taxableValue: 0, gstAmount: 0 };
-    }
-    gstBreakup[rate].taxableValue += (item.taxableValue || item.totalPrice || 0);
-    gstBreakup[rate].gstAmount += (item.gstAmount || 0);
-  });
-
-  // Create GST Summary Table rows
-  const gstSummaryRows = Object.entries(gstBreakup)
-    .sort(([rateA], [rateB]) => Number(rateA) - Number(rateB))
-    .map(([rate, { taxableValue, gstAmount }]) => `
-      <tr>
-        <td style="text-align:center">${rate}%</td>
-        <td style="text-align:right">${fmt(taxableValue)}</td>
-        <td style="text-align:right">${fmt(gstAmount)}</td>
-      </tr>
-    `).join('');
-
+  // Calculate GST by rate
   const formatPower = (val) => {
     if (val === null || val === undefined) return "0.00";
     return Number(val).toFixed(2);
@@ -223,12 +253,6 @@ const generateInvoiceHTML = (order) => {
       .left { text-align:left }
       .right { text-align:right }
 
-      .summary {
-        width:280px;
-        margin-left:auto;
-        margin-top:15px;
-      }
-
       .bold { font-weight:bold }
 
       .footer {
@@ -244,12 +268,10 @@ const generateInvoiceHTML = (order) => {
     <!-- HEADER -->
     <div class="header">
       <div>
-        <div class="title">GO-KOOL CHASMAGHAR</div>
-        <div>235, Parbirata G.T. Road, Sripally  </div>
-        <div>Near State Bank of India </div>
-        <div>Burdwan, Purba Bardhaman </div>
-        <div>West Bengal - 713103</div>
-        <div>Phone: +91 9832906048</div>
+        <div class="title">${order.store?.name || 'GO-KOOL CHASMAGHAR'}</div>
+        <div>${order.store?.address || '235, Parbirata G.T. Road, Sripally'}</div>
+        ${order.store?.gstNumber ? `<div>GSTIN: ${order.store.gstNumber}</div>` : ''}
+        <div>Phone: ${order.store?.phone || '+91 9832906048'}</div>
       </div>
 
       <div style="text-align:right">
@@ -266,11 +288,10 @@ const generateInvoiceHTML = (order) => {
 
     <div style="text-align:right">
       <div><b>Date:</b> ${format(new Date(order.createdAt), 'dd-MMM-yyyy')}</div>
-      <div><b>Delivery Date:</b> ${
-        order.deliveryDate
-          ? format(new Date(order.deliveryDate), 'dd-MMM-yyyy')
-          : 'Pending'
-      }</div>
+      <div><b>Delivery Date:</b> ${order.deliveryDate
+      ? format(new Date(order.deliveryDate), 'dd-MMM-yyyy')
+      : 'Pending'
+    }</div>
     </div>
   </div>
 
@@ -281,47 +302,53 @@ const generateInvoiceHTML = (order) => {
     </div>
 
     <!-- EYE -->
-    <div class="section">
-      <h3>Customer Eye Power</h3>
-      <table>
-        <tr>
-          <td>SPH</td>
-          <td>${formatPower(rx.rightSph)}</td>
-          <td>${formatPower(rx.leftSph)}</td>
-        </tr>
+    ${order.prescription ? `
+        <div class="section">
+          <h3>Customer Eye Power</h3>
+          <table>
+            <tr>
+              <th></th>
+              <th>Right Eye</th>
+              <th>Left Eye</th>
+            </tr>
 
-        <tr>
-          <td>CYL</td>
-          <td>${formatPower(rx.rightCyl)}</td>
-          <td>${formatPower(rx.leftCyl)}</td>
-        </tr>
+            <tr>
+              <td>SPH</td>
+              <td>${formatPower(rx.rightSph)}</td>
+              <td>${formatPower(rx.leftSph)}</td>
+            </tr>
 
-        <tr>
-          <td>AXIS</td>
-          <td>${rx.rightAxis ?? '0.00'}</td>
-          <td>${rx.leftAxis ?? '0.00'}</td>
-        </tr>
+            <tr>
+              <td>CYL</td>
+              <td>${formatPower(rx.rightCyl)}</td>
+              <td>${formatPower(rx.leftCyl)}</td>
+            </tr>
 
-        <tr>
-          <td>ADD</td>
-          <td>${formatPower(rx.rightAdd)}</td>
-          <td>${formatPower(rx.leftAdd)}</td>
-        </tr>
-      </table>
+            <tr>
+              <td>AXIS</td>
+              <td>${rx.rightAxis ?? '0.00'}</td>
+              <td>${rx.leftAxis ?? '0.00'}</td>
+            </tr>
 
-      <!-- PD -->
-      <div style="margin-top:10px;">
-        <b>PD (mm):</b> ${formatPD(rx.pd)}
-      </div>
+            <tr>
+              <td>ADD</td>
+              <td>${formatPower(rx.rightAdd)}</td>
+              <td>${formatPower(rx.leftAdd)}</td>
+            </tr>
+          </table>
 
-      <div style="margin-top:4px;">
-        <b>Lens Type:</b> ${
-          rx.lensType
-            ? rx.lensType.replace('_', ' ')
-            : 'NULL'
-        }
-      </div>
-    </div>
+          <div style="margin-top:10px;">
+            <b>PD (mm):</b> ${formatPD(rx.pd)}
+          </div>
+
+          <div style="margin-top:4px;">
+            <b>Lens Type:</b> ${rx.lensType
+        ? rx.lensType.replace('_', ' ')
+        : 'NULL'
+      }
+          </div>
+        </div>
+      ` : ''}
 
     <!-- PRODUCTS -->
     <div class="section">
@@ -329,67 +356,98 @@ const generateInvoiceHTML = (order) => {
       <table>
         <tr>
           <th class="left">Product</th>
-          <th>Qty</th>
-          <th>Rate</th>
-          <th>HSN</th>
-          <th>GST</th>
-          <th>Discount</th>
-          <th>Total</th>
+            <th>GST (HSN)</th>
+            <th>Qty</th>
+            <th>Rate</th>
+            <th>Discount</th>
+            <th>Total</th>
         </tr>
         ${rows}
       </table>
     </div>
 
-    <!-- GST SUMMARY TABLE -->
-    <div class="section">
-      <h3>GST Summary</h3>
-      <table>
-        <tr>
-          <th style="text-align:center">GST %</th>
-          <th style="text-align:right">Taxable Value</th>
-          <th style="text-align:right">GST Amount</th>
-        </tr>
-        ${gstSummaryRows}
-      </table>
+    <div style="
+      display:flex;
+      justify-content:space-between;
+      align-items:flex-start;
+      margin-top:15px;
+    ">
+
+      <!-- Other Details -->
+      <div style="
+        width:55%;
+        font-size:12px;
+      ">
+
+        Amount In Words:<br/>
+        <b>${numberToWords(roundedGrandTotal)}</b> <br/><br/>
+
+        <b>Bank Details</b><br/>
+        Bank Name : Bank of Baroda<br/>
+        Account Name : GO KOOL CHASMAGHAR<br/>
+        A/C No : 09060200000927<br/>
+        IFSC Code : BARB0BURDWA<br/>
+        Branch : Burdwan Branch, West Bengal
+      </div>
+
+      <!-- Summary -->
+      <div style="width:300px;">
+        <table>
+          <tr>
+            <td class="left">Items Total</td>
+            <td class="right">${fmt(itemsTotal)}</td>
+          </tr>
+
+          <tr>
+            <td class="left">Taxable Value</td>
+            <td class="right">${fmt(totalTaxableValue)}</td>
+          </tr>
+
+          <tr>
+            <td class="left">GST Amount</td>
+            <td class="right">${fmt(totalGSTAmount)}</td>
+          </tr>
+
+          ${Number(order.discountAmount || 0) > 0 ? `
+          <tr>
+            <td class="left">Bill Discount</td>
+            <td class="right">-${fmt(order.discountAmount)}</td>
+          </tr>
+          ` : ''}
+
+          ${Number(order.redeemPoints || 0) > 0 ? `
+          <tr>
+            <td class="left">Loyalty Redeemed</td>
+            <td class="right">-${fmt(order.redeemPoints)}</td>
+          </tr>
+          ` : ''}
+
+          <tr>
+            <td class="left bold">Grand Total</td>
+            <td class="right bold"> ${fmt(roundedGrandTotal)}</td>
+          </tr>
+
+          <tr>
+            <td class="left">Advance Paid</td>
+            <td class="right">${fmt(order.advanceAmount)}</td>
+          </tr>
+
+          <tr>
+            <td class="left bold">Balance</td>
+            <td class="right bold">
+              ${fmt(Math.round(Number(order.balanceAmount || 0)))}
+            </td>
+          </tr>
+        </table>
+      </div>
     </div>
 
-    <!-- SUMMARY -->
-    <div class="summary">
-      <table>
-        <tr>
-          <td class="left">Items Total</td>
-          <td class="right">${fmt(subtotal)}</td>
-        </tr>
+    <div style="margin-top:15px;">
+      <b>Warranty Details</b>
 
-        ${Number(order.discountAmount || 0) > 0 ? `
-        <tr>
-          <td class="left">Bill Discount</td>
-          <td class="right">−${fmt(order.discountAmount)}</td>
-        </tr>
-        ` : ''}
-
-        ${Number(order.redeemPoints || 0) > 0 ? `
-        <tr>
-          <td class="left">Loyalty Redeemed</td>
-          <td class="right">−${fmt(order.redeemPoints)}</td>
-        </tr>
-        ` : ''}
-
-        <tr>
-          <td class="left bold">Total Payable</td>
-          <td class="right bold">${fmt(order.totalAmount)}</td>
-        </tr>
-
-        <tr>
-          <td class="left">Advance Paid</td>
-          <td class="right">${fmt(order.advanceAmount)}</td>
-        </tr>
-
-        <tr>
-          <td class="left bold">Balance</td>
-          <td class="right bold">${fmt(order.balanceAmount)}</td>
-        </tr>
-      </table>
+      <p style="font-size:12px; margin-top:5px;">
+        All products come with a standard warranty of 1 year from the date of purchase. The warranty covers manufacturing defects and does not cover damage caused by misuse, accidents, or unauthorized repairs. Please retain your invoice as proof of purchase for any warranty claims.
+      </p>
     </div>
 
     <!-- FOOTER -->

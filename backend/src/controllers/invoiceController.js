@@ -1,6 +1,7 @@
 const bwipjs = require('bwip-js');
 const prisma = require('../utils/prisma');
 const { launchPdfBrowser } = require('../utils/pdfBrowser');
+const { format } = require('date-fns');
 
 const fmt = n => `&#8377;${Number(n || 0).toLocaleString('en-IN')}`;
 
@@ -20,6 +21,53 @@ const formatPower = val => {
 const formatPD = val => {
   if (val === null || val === undefined || Number.isNaN(Number(val))) return '-';
   return Number(val).toFixed(0);
+};
+
+const numberToWords = num => {
+  const a = [
+    '', 'One', 'Two', 'Three', 'Four', 'Five',
+    'Six', 'Seven', 'Eight', 'Nine', 'Ten',
+    'Eleven', 'Twelve', 'Thirteen', 'Fourteen',
+    'Fifteen', 'Sixteen', 'Seventeen', 'Eighteen',
+    'Nineteen'
+  ];
+
+  const b = [
+    '', '', 'Twenty', 'Thirty', 'Forty',
+    'Fifty', 'Sixty', 'Seventy', 'Eighty', 'Ninety'
+  ];
+
+  const inWords = n => {
+    if (n < 20) return a[n];
+    if (n < 100)
+      return b[Math.floor(n / 10)] + (n % 10 ? ' ' + a[n % 10] : '');
+    if (n < 1000)
+      return (
+        a[Math.floor(n / 100)] +
+        ' Hundred' +
+        (n % 100 ? ' ' + inWords(n % 100) : '')
+      );
+    if (n < 100000)
+      return (
+        inWords(Math.floor(n / 1000)) +
+        ' Thousand' +
+        (n % 1000 ? ' ' + inWords(n % 1000) : '')
+      );
+    if (n < 10000000)
+      return (
+        inWords(Math.floor(n / 100000)) +
+        ' Lakh' +
+        (n % 100000 ? ' ' + inWords(n % 100000) : '')
+      );
+
+    return (
+      inWords(Math.floor(n / 10000000)) +
+      ' Crore' +
+      (n % 10000000 ? ' ' + inWords(n % 10000000) : '')
+    );
+  };
+
+  return `INR ${inWords(num)} Only`;
 };
 
 const buildInvoiceHtml = (order, barcodeImg = '') => {
@@ -43,6 +91,8 @@ const buildInvoiceHtml = (order, barcodeImg = '') => {
     0
   );
 
+  const roundedGrandTotal = Math.round(Number(order.totalAmount || 0));
+
   const itemRows = order.items.map(i => `
     <tr>
       <td class="left">${i.name}</td>
@@ -50,7 +100,7 @@ const buildInvoiceHtml = (order, barcodeImg = '') => {
       <td>${i.quantity}</td>
       <td>${fmt(i.unitPrice)}</td>
       <td>${Number(i.discountPct || 0).toFixed(2)}%</td>
-      <td>${fmt(itemPayable(i))}</td>
+      <td>${fmt(Math.round(itemPayable(i)))}</td>
     </tr>
     `).join('');
 
@@ -74,7 +124,7 @@ const buildInvoiceHtml = (order, barcodeImg = '') => {
         .right { text-align: right; }
         .summary { width: 280px; margin-left: auto; margin-top: 15px; }
         .bold { font-weight: bold; }
-        .footer { margin-top: 12px; text-align: center; font-size: 11px; }
+        .footer { margin-top: 18px; text-align: center; font-size: 11px; }
       </style>
     </head>
 
@@ -98,11 +148,8 @@ const buildInvoiceHtml = (order, barcodeImg = '') => {
         <div><b>Invoice No:</b> ${order.orderNumber}</div>
 
         <div style="text-align:right">
-          <div><b>Date:</b> ${new Date(order.createdAt).toLocaleDateString()}</div>
-          <div><b>Delivery Date:</b> ${order.deliveryDate
-      ? new Date(order.deliveryDate).toLocaleDateString()
-      : 'Pending'
-    }</div>
+          <div><b>Date:</b> ${require('date-fns').format(new Date(order.createdAt), 'dd-MMM-yyyy')}</div>
+          <div><b>Delivery Date:</b> ${order.deliveryDate ? require('date-fns').format(new Date(order.deliveryDate), 'dd-MMM-yyyy'): 'Pending'}</div>
         </div>
       </div>
 
@@ -117,20 +164,29 @@ const buildInvoiceHtml = (order, barcodeImg = '') => {
           <h3>Customer Eye Power</h3>
           <table>
             <tr>
+              <th></th>
+              <th>Right Eye</th>
+              <th>Left Eye</th>
+            </tr>
+
+            <tr>
               <td>SPH</td>
               <td>${formatPower(rx.rightSph)}</td>
               <td>${formatPower(rx.leftSph)}</td>
             </tr>
+
             <tr>
               <td>CYL</td>
               <td>${formatPower(rx.rightCyl)}</td>
               <td>${formatPower(rx.leftCyl)}</td>
             </tr>
+
             <tr>
               <td>AXIS</td>
               <td>${rx.rightAxis ?? '0.00'}</td>
               <td>${rx.leftAxis ?? '0.00'}</td>
             </tr>
+
             <tr>
               <td>ADD</td>
               <td>${formatPower(rx.rightAdd)}</td>
@@ -167,50 +223,85 @@ const buildInvoiceHtml = (order, barcodeImg = '') => {
         </table>
       </div>
 
-      <div class="summary">
-        <table>
-          <tr>
-            <td class="left">Items Total</td>
-            <td class="right">${fmt(itemsTotal)}</td>
-          </tr>
+      <div style="
+        display:flex;
+        justify-content:space-between;
+        align-items:flex-start;
+        margin-top:15px;
+      ">
 
-          <tr>
-            <td class="left">Taxable Value</td>
-            <td class="right">${fmt(totalTaxableValue)}</td>
-          </tr>
+        <!-- Other Details -->
+        <div style="
+          width:55%;
+          font-size:12px;
+        ">
 
-          <tr>
-            <td class="left">GST Amount</td>
-            <td class="right">${fmt(totalGSTAmount)}</td>
-          </tr>
+          Amount In Words:<br/>
+          <b>${numberToWords(roundedGrandTotal)}</b> <br/><br/>
 
-          ${Number(order.discountAmount || 0) > 0 ? `
-          <tr>
-            <td class="left">Bill Discount</td>
-            <td class="right">-${fmt(order.discountAmount)}</td>
-          </tr>
+          <b>Bank Details</b><br/>
+          Bank Name : Bank of Baroda<br/>
+          Account Name : GO KOOL CHASMAGHAR<br/>
+          A/C No : 09060200000927<br/>
+          IFSC Code : BARB0BURDWA<br/>
+          Branch : Burdwan Branch, West Bengal
+        </div>
 
-          ` : ''}
-          ${Number(order.redeemPoints || 0) > 0 ? `<tr>
-            <td class="left">Loyalty Redeemed</td>
-            <td class="right">-${fmt(order.redeemPoints)}</td>
-          </tr>` : ''}
+        <div style="width:300px;">
+          <table>
+            <tr>
+              <td class="left">Items Total</td>
+              <td class="right">${fmt(itemsTotal)}</td>
+            </tr>
 
-          <tr>
-            <td class="left bold">Grand Total</td>
-            <td class="right bold">${fmt(order.totalAmount)}</td>
-          </tr>
+            <tr>
+              <td class="left">Taxable Value</td>
+              <td class="right">${fmt(totalTaxableValue)}</td>
+            </tr>
 
-          <tr>
-            <td class="left">Advance Paid</td>
-            <td class="right">${fmt(order.advanceAmount)}</td>
-          </tr>
-          
-          <tr>
-            <td class="left bold">Balance</td>
-            <td class="right bold">${fmt(order.balanceAmount)}</td>
-          </tr>
-        </table>
+            <tr>
+              <td class="left">GST Amount</td>
+              <td class="right">${fmt(totalGSTAmount)}</td>
+            </tr>
+
+            ${Number(order.discountAmount || 0) > 0 ? `
+            <tr>
+              <td class="left">Bill Discount</td>
+              <td class="right">-${fmt(order.discountAmount)}</td>
+            </tr>
+
+            ` : ''}
+            ${Number(order.redeemPoints || 0) > 0 ? `<tr>
+              <td class="left">Loyalty Redeemed</td>
+              <td class="right">-${fmt(order.redeemPoints)}</td>
+            </tr>` : ''}
+
+            <tr>
+              <td class="left bold">Grand Total</td>
+              <td class="right bold"> ${fmt(roundedGrandTotal)}</td>
+            </tr>
+
+            <tr>
+              <td class="left">Advance Paid</td>
+              <td class="right">${fmt(order.advanceAmount)}</td>
+            </tr>
+            
+            <tr>
+              <td class="left bold">Balance</td>
+              <td class="right bold">
+                ${fmt(Math.round(Number(order.balanceAmount || 0)))}
+              </td>
+            </tr>
+          </table>
+        </div>
+      </div>
+
+      <div style="margin-top:15px;">
+        <b>Warranty Details</b>
+
+        <p style="font-size:12px; margin-top:5px;">
+          All products come with a standard warranty of 1 year from the date of purchase. The warranty covers manufacturing defects and does not cover damage caused by misuse, accidents, or unauthorized repairs. Please retain your invoice as proof of purchase for any warranty claims.
+        </p>
       </div>
 
       <div class="footer">

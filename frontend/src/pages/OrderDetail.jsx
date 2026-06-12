@@ -169,6 +169,9 @@ export default function OrderDetail() {
     - itemDiscount(item);
   const subtotal = order.items.reduce((sum, item) => sum + itemPayable(item), 0);
 
+  const roundedTotal = Math.round(Number(order.totalAmount || 0));
+  const roundOff = roundedTotal - Number(order.totalAmount || 0);
+
   const sendWhatsAppUpdate = (status) => {
     const phone = order.customer?.phone;
     if (!phone) return toast.error('Customer phone not available');
@@ -257,7 +260,7 @@ Thank you for trusting us 🙏`
           {/* <button onClick={() => window.print()} className="btn-secondary btn-md"><Printer size={15} /> Print</button> */}
           {canAdminOrder && order.status !== 'CANCELLED' && order.balanceAmount > 0 && (
             <button onClick={() => { setPayForm({ amount: String(order.balanceAmount), method: 'CASH', note: '' }); setPayModal(true); }}
-              className="btn-success btn-md"><CreditCard size={15} /> Collect {fmt(order.balanceAmount)}</button>
+              className="btn-success btn-md"><CreditCard size={15} /> Collect {fmt(Math.round(Number(order.balanceAmount || 0)))}</button>
           )}
           {canAdminOrder && order.status !== 'CANCELLED' && !(order.returns?.length > 0) && (
             <button onClick={() => navigate(`/orders/${id}/edit`)} className="btn-secondary btn-md">
@@ -483,8 +486,19 @@ Thank you for trusting us 🙏`
               ].filter(Boolean).map(([k, v]) => (
                 <div key={k} className="flex justify-between text-sm text-slate-600"><span>{k}</span><span>{v}</span></div>
               ))}
+              {Math.abs(roundOff) > 0.001 && (
+                <div className="flex justify-between text-sm text-slate-500">
+                  <span>Round Off</span>
+                  <span>
+                    {roundOff >= 0 ? '+' : ''}
+                    {fmt(roundOff)}
+                  </span>
+                </div>
+              )}
+
               <div className="flex justify-between font-bold text-base border-t border-slate-200 pt-2">
-                <span>Total Payable</span><span>{fmt(order.totalAmount)}</span>
+                <span>Total Payable</span>
+                <span>{fmt(roundedTotal)}</span>
               </div>
               {order.advanceAmount > 0 && (
                 <div className="flex justify-between text-sm text-emerald-600 font-semibold">
@@ -498,7 +512,7 @@ Thank you for trusting us 🙏`
               )}
               {canAdminOrder && order.status !== 'CANCELLED' && order.balanceAmount > 0 && (
                 <div className="flex justify-between text-sm text-red-600 font-bold">
-                  <span>Balance Due</span><span>{fmt(order.balanceAmount)}</span>
+                  <span>Balance Due</span><span>{fmt(Math.round(Number(order.balanceAmount || 0)))}</span>
                 </div>
               )}
             </div>
